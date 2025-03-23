@@ -1,0 +1,7 @@
+IDENTIFIER = A name created by the user, such as functions, variables etc    (^[_a-zA-Z][_a-zA-Z0-9]*)
+INTEGER    = A integer number, such as 1, 40, 4343                           (^[0-9]+)
+KEY        = A reserved word                                                 (^(if|else|for|while))
+ASSIGN     = Symbols that changes variables                                  (^(\+=|=))
+OPERATOR   = Operator that are applyed to values                             (^(\+|\-|\*|\/))
+DELIMITER  = Delimiter the end of a line                                     (^[;{}\(\)])                        
+WHITESPACE = A whitespace, \n or \t                                          (^[ \t\n]+)

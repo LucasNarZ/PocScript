@@ -2,3 +2,4 @@
 *.o
 compiler
 output.txt
+input.txt

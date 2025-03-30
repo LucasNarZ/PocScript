@@ -17,10 +17,12 @@ typedef struct Node {
 extern Node *root;
 
 void printTreeWithBranches(Node *node, int depth, int is_last[]);
-void addNodes(Node *base, Token *token);
 Node *createNode(char *value, char *description);
 void printTreePretty(Node *root);
 Node *allocNode(Node *base, Node *newNode);
-void callAnteriorAndNext(Node *newNode, Token *token);
+Node *parseFactor(Token **token);
+Node *parseTerm(Token **token);
+Node *parseExpression(Token **token);
+Node *parseStatement(Token **token);
 
 #endif 

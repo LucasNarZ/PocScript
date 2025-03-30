@@ -18,49 +18,63 @@ Node *allocNode(Node *base, Node *newNode){
     return base;
 }
 
-void callAnteriorAndNext(Node *newNode, Token *token){
-    addNodes(newNode, token->anterior);
-    if(token->next != NULL){
-        addNodes(newNode, token->next);
+
+
+Node *parseFactor(Token **token){
+    if(*token == NULL) return NULL;
+    
+    if((*token) != NULL && (strcmp((*token)->type, "INTEGER") == 0 || strcmp((*token)->type, "IDENTIFIER") == 0)){
+        Node *node = createNode((*token)->value, (*token)->type);
+        *token = (*token)->next;
+        return node;
     }
+
+    return NULL;
 }
 
-void addNodes(Node *base, Token *token){
-    printf("%s\n", token->value);
-    if(strcmp(token->value, "if") == 0){
-        Node *newNode = createNode("if", "statment");
-        addNodes(newNode, token->next);
-    }else if(strcmp(token->type, "ASSIGN") == 0 || strcmp(token->type, "OPERATOR") == 0){
-        Node *newNode = createNode(token->value, token->type);
-        allocNode(base, newNode);
-        callAnteriorAndNext(newNode, token);
-    }else if((strcmp(token->type, "IDENTIFIER") == 0 || strcmp(token->type, "INTEGER") == 0) && strcmp(base->value, "ROOT") != 0 && (token->anterior == NULL || strcmp(base->description, token->anterior->type) != 0 || strcmp(token->next->type, "DELIMITER") == 0)){
-        Node *newNode = createNode(token->value, token->type);
-        allocNode(base, newNode);
-        printf("description: %s\n", base->description);
-        if(token->next != NULL && (strcmp(base->value, "ROOT") == 0|| strcmp(token->next->type, "ASSIGN") != 0 && strcmp(token->next->type, "OPERATOR") != 0)){
-            addNodes(base, token->next);
-        }
-    }else if(strcmp(token->value, ";") == 0){
-        if(token->next != NULL){
-            Node *temp = (Node*)(malloc(sizeof(Node)));
-            temp = base;
-            while(temp->parent != NULL){
-                if(strcmp(temp->description, "KEY") == 0){
-                    addNodes(temp, token->next);
-                    break;
-                }
-                temp = temp->parent;
-            }
-            addNodes(root, token->next);
-        }
-    }else{
-        if(token->next != NULL){
-            addNodes(base, token->next);
-        }
+Node *parseTerm(Token **token){
+    Node *node = parseFactor(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, "*") == 0 || strcmp((*token)->value, "/") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        *token = (*token)->next;
+        opNode = allocNode(opNode, node);
+        opNode = allocNode(opNode, parseTerm(token));
+        node = opNode;
     }
+    return node;
 }
 
+Node *parseExpression(Token **token){
+    Node *node = parseTerm(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0 || strcmp((*token)->value, "=") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        
+        *token = (*token)->next;
+        
+        opNode = allocNode(opNode, node);
+        
+        parseExpression(token);
+        node = opNode;
+    }
+    return node;
+}
+
+Node *parseStatement(Token **token){
+    if(*token == NULL) return NULL;
+
+    Node *node = parseExpression(token);
+    root = allocNode(root, node);
+    
+    if((*token) != NULL && strcmp((*token)->value, ";") == 0){
+        Node *root = createNode("ROOT", "ROOT");
+        *token = (*token)->next;
+        Node *node = parseStatement(token);
+        root = allocNode(root, node);
+    }
+    return root;
+}
 
 void printTreeWithBranches(Node *node, int depth, int is_last[]){
     if (node == NULL) return;

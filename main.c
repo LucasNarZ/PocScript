@@ -12,9 +12,8 @@ int main(){
         getTokens(&head, &input);
     }
     print(head);
-    root = createNode("ROOT", "ROOT");
-    root->numChildren = 0;
-    addNodes(root, head);
+    
+    Node *root = parseStatement(&head);
     printTreePretty(root);
     return 0;
 }

@@ -55,24 +55,22 @@ Node *parseExpression(Token **token){
         
         opNode = allocNode(opNode, node);
         
-        parseExpression(token);
+        opNode = allocNode(opNode, parseExpression(token));
         node = opNode;
     }
     return node;
 }
 
-Node *parseStatement(Token **token){
+Node *parseStatement(Node *root, Token **token){
     if(*token == NULL) return NULL;
-
+    
     Node *node = parseExpression(token);
     root = allocNode(root, node);
     
     if((*token) != NULL && strcmp((*token)->value, ";") == 0){
-        Node *root = createNode("ROOT", "ROOT");
         *token = (*token)->next;
-        Node *node = parseStatement(token);
-        root = allocNode(root, node);
-    }
+        parseStatement(root, token);
+    } 
     return root;
 }
 

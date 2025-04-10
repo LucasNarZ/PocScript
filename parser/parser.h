@@ -20,7 +20,7 @@ void printTreeWithBranches(Node *node, int depth, int is_last[]);
 Node *parseFactor(Token **token);
 Node *parseTerm(Token **token);
 Node *parseExpression(Token **token);
-Node *parseStatement(Token **token);
+Node *parseStatement(Node *root, Token **token);
 Node *createNode(char *value, char *description);
 void printTreePretty(Node *root);
 Node *allocNode(Node *base, Node *newNode);

@@ -50,11 +50,9 @@ Node *parseExpression(Token **token){
 
     if((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0 || strcmp((*token)->value, "=") == 0)){
         Node *opNode = createNode((*token)->value, "OPERATOR");
-        
         *token = (*token)->next;
         
         opNode = allocNode(opNode, node);
-        
         opNode = allocNode(opNode, parseExpression(token));
         node = opNode;
     }
@@ -63,16 +61,36 @@ Node *parseExpression(Token **token){
 
 Node *parseStatement(Node *root, Token **token){
     if(*token == NULL) return NULL;
+
+    if((*token) != NULL && strcmp((*token)->value, "if") == 0){
+        Node *opNode = createNode((*token)->value, (*token)->type);
+        *token = (*token)->next->next;
+        opNode = allocNode(opNode, parseExpression(token));
+        root = allocNode(root, opNode);
+        *token = (*token)->next->next;
+        if(strcmp((*token)->type, "DELIMITER") != 0){
+            parseStatement(opNode, token);                
+        }
+    }else{
+        Node *node = parseExpression(token);
+        root = allocNode(root, node);
+    }
     
-    Node *node = parseExpression(token);
-    root = allocNode(root, node);
-    
-    if((*token) != NULL && strcmp((*token)->value, ";") == 0){
+    if((*token) != NULL && strcmp((*token)->value, ";") == 0 && strcmp((*token)->next->value, "}") != 0){
+        
         *token = (*token)->next;
         parseStatement(root, token);
     } 
+
+    // if((*token) != NULL && strcmp((*token)->next->value, "}") == 0 && strcmp(root->value, "ROOT") == 0){
+    //     *token = (*token)->next->next;
+    //     printf((*token)->value);
+    //     // parseStatement(root, token);
+    // }
+
     return root;
 }
+
 
 void printTreeWithBranches(Node *node, int depth, int is_last[]){
     if (node == NULL) return;

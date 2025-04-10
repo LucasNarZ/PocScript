@@ -2,7 +2,6 @@
 #include "./lexer/lexer.h"
 #include "./parser/parser.h"
 
-Node *root = NULL;
 
 int main(){
     FILE *file_ptr = fopen("input.txt", "r");
@@ -11,9 +10,8 @@ int main(){
         char *input = file;
         getTokens(&head, &input);
     }
-    print(head);
-    
-    Node *root = parseStatement(&head);
+    Node *root = createNode("ROOT", "ROOT");
+    parseStatement(root, &head);
     printTreePretty(root);
     return 0;
 }

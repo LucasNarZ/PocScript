@@ -18,8 +18,6 @@ Node *allocNode(Node *base, Node *newNode){
     return base;
 }
 
-
-
 Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
@@ -48,7 +46,7 @@ Node *parseTerm(Token **token){
 Node *parseExpression(Token **token){
     Node *node = parseTerm(token);
 
-    if((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0 || strcmp((*token)->value, "=") == 0)){
+    if((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0)){
         Node *opNode = createNode((*token)->value, "OPERATOR");
         *token = (*token)->next;
         
@@ -59,35 +57,92 @@ Node *parseExpression(Token **token){
     return node;
 }
 
+Node *parseComparison(Token **token){
+    Node *node = parseExpression(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, ">") == 0 || strcmp((*token)->value, "<") == 0 || strcmp((*token)->value, ">=") == 0 || strcmp((*token)->value, "<=") == 0 || strcmp((*token)->value, "==") == 0 || strcmp((*token)->value, "!=") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        *token = (*token)->next;
+        
+        opNode = allocNode(opNode, node);
+        opNode = allocNode(opNode, parseComparison(token));
+        node = opNode;
+    }
+    return node;
+}
+
+Node *parseLogical(Token **token){
+    Node *node = parseComparison(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, "&&") == 0 || strcmp((*token)->value, "||") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        *token = (*token)->next;
+        
+        opNode = allocNode(opNode, node);
+        opNode = allocNode(opNode, parseLogical(token));
+        node = opNode;
+    }
+    return node;
+}
+
+Node *parseAssign(Token **token){
+    Node *node = parseLogical(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, "=") == 0 || strcmp((*token)->value, "+=") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        *token = (*token)->next;
+        
+        opNode = allocNode(opNode, node);
+        opNode = allocNode(opNode, parseAssign(token));
+        node = opNode;
+    }
+    return node;
+}
+
 Node *parseStatement(Node *root, Token **token){
     if(*token == NULL) return NULL;
 
-    if((*token) != NULL && strcmp((*token)->value, "if") == 0){
-        Node *opNode = createNode((*token)->value, (*token)->type);
-        *token = (*token)->next->next;
-        opNode = allocNode(opNode, parseExpression(token));
-        root = allocNode(root, opNode);
-        *token = (*token)->next->next;
-        if(strcmp((*token)->type, "DELIMITER") != 0){
-            parseStatement(opNode, token);                
-        }
-    }else{
-        Node *node = parseExpression(token);
-        root = allocNode(root, node);
-    }
-    
-    if((*token) != NULL && strcmp((*token)->value, ";") == 0 && strcmp((*token)->next->value, "}") != 0){
-        
+    Node *node = parseAssign(token);
+
+    if((*token) != NULL && (strcmp((*token)->value, ";") == 0)){
         *token = (*token)->next;
-        parseStatement(root, token);
+        allocNode(root, node);
+        parseBlock(root, token);
     } 
 
-    // if((*token) != NULL && strcmp((*token)->next->value, "}") == 0 && strcmp(root->value, "ROOT") == 0){
-    //     *token = (*token)->next->next;
-    //     printf((*token)->value);
-    //     // parseStatement(root, token);
-    // }
 
+    return root;
+}
+
+Node *parseBlock(Node *root, Token **token){
+    if((*token) != NULL && (strcmp((*token)->value, "if") == 0 || strcmp((*token)->value, "while") == 0)){
+        Node *opNode = createNode((*token)->value, "BLOCK");
+        *token = (*token)->next->next;
+        opNode = allocNode(opNode, parseLogical(token));
+        *token = (*token)->next->next;
+        allocNode(root, parseBlock(opNode, token));
+        if((*token)->next != NULL){
+            *token = (*token)->next;
+            parseBlock(root, token);
+        }
+
+    }else if((*token) != NULL && (strcmp((*token)->value, "for") == 0)){
+        Node *opNode = createNode((*token)->value, "BLOCK");
+        *token = (*token)->next->next;
+        opNode = allocNode(opNode, parseAssign(token));
+        *token = (*token)->next;
+        opNode = allocNode(opNode, parseAssign(token));
+        *token = (*token)->next;
+        opNode = allocNode(opNode, parseAssign(token));
+        *token = (*token)->next->next;
+        allocNode(root, parseBlock(opNode, token));
+        if((*token)->next != NULL){
+            *token = (*token)->next;
+            parseBlock(root, token);
+        }
+    }else{
+        parseStatement(root, token);
+    }
     return root;
 }
 

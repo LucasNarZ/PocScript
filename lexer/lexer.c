@@ -5,9 +5,9 @@ Token *head = NULL;
 TokenType types[NUM_TYPES] = {
     {"INTEGER", "(^[0-9]+)"},
     {"KEY", "(^(if|else|for|while))"},
-    {"OPERATOR", "(^[\+|\-|\*|\/|==])"},
-    {"ASSIGN", "(^[=])"},
-    {"DELIMITER", "(^[;{}\(\)])"},
+    {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&|>|<|==|>=|<=|!=)"},
+    {"ASSIGN", "^(=)"},
+    {"DELIMITER", "(^[;{}\\(\\)])"},
     {"IDENTIFIER", "(^[_a-zA-Z][_a-zA-Z0-9]*)"},
     {"WHITESPACE", "(^[ \t\n]+)"}
 };

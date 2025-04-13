@@ -11,7 +11,7 @@ int main(){
         getTokens(&head, &input);
     }
     Node *root = createNode("ROOT", "ROOT");
-    parseStatement(root, &head);
+    parseBlock(root, &head);
     printTreePretty(root);
     return 0;
 }

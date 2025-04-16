@@ -4,10 +4,10 @@ Token *head = NULL;
 
 TokenType types[NUM_TYPES] = {
     {"INTEGER", "(^[0-9]+)"},
-    {"KEY", "(^(if|else|for|while))"},
-    {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&|>|<|==|>=|<=|!=)"},
+    {"KEY", "(^(if|else|for|while|int|float|char))"},
+    {"DELIMITER", "(^[;{}\\(\\)><])"},
+    {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&|==|>=|<=|!=)"},
     {"ASSIGN", "^(=)"},
-    {"DELIMITER", "(^[;{}\\(\\)])"},
     {"IDENTIFIER", "(^[_a-zA-Z][_a-zA-Z0-9]*)"},
     {"WHITESPACE", "(^[ \t\n]+)"}
 };

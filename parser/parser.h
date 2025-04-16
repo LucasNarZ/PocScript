@@ -1,9 +1,13 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#define MAX_SIZE_STACK 100
+#define MAX_SIZE_SCOPE 50
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "../lexer/lexer.h"
 
 typedef struct Node {
@@ -14,8 +18,20 @@ typedef struct Node {
     int numChildren;
 } Node;
 
-extern Node *root;
+typedef struct Stack {
+    char **variables[MAX_SIZE_STACK];
+    int size;
+} Stack;
 
+typedef struct ScopeStack {
+    int *scope;
+    int size;
+} ScopeStack;
+
+extern Stack stack;
+extern ScopeStack scopesStack;
+
+bool arrayContains(char *array[], int tamanho, const char *valor);
 void printTreeWithBranches(Node *node, int depth, int is_last[]);
 Node *parseFactor(Token **token);
 Node *parseTerm(Token **token);

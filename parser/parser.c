@@ -1,5 +1,25 @@
 #include "parser.h"
 
+
+
+
+
+bool arrayContains(char *array[], int tamanho, const char *valor) {
+    for (int i = 0; i < tamanho; i++) {
+        if (strcmp(array[i], valor) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void popVaribles(Stack *stack, int value){
+    for(int i = 0;i < value;i++){
+        free(stack->variables[stack->size - 1]);
+        stack->size--;
+    }
+}
+
 Node *createNode(char *value, char *description){
     Node *node = (Node*)(malloc(sizeof(Node)));
     node->children = NULL;
@@ -21,8 +41,22 @@ Node *allocNode(Node *base, Node *newNode){
 Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
-    if((*token) != NULL && (strcmp((*token)->type, "INTEGER") == 0 || strcmp((*token)->type, "IDENTIFIER") == 0)){
+    if((*token) != NULL && (strcmp((*token)->type, "INTEGER") == 0 )){
         Node *node = createNode((*token)->value, (*token)->type);
+        *token = (*token)->next;
+        return node;
+    }
+
+    if((*token) != NULL && (strcmp((*token)->type, "IDENTIFIER") == 0)){
+        Node *node = createNode((*token)->value, (*token)->type);
+        if(!(arrayContains( stack.variables, stack.size, (*token)->value))){
+            stack.variables[stack.size++] = (*token)->value;
+            scopesStack.scope[scopesStack.size]++;
+            *token = (*token)->next->next;
+            Node *type = createNode((*token)->value, (*token)->type);
+            node = allocNode(node, type);
+            *token = (*token)->next;
+        }
         *token = (*token)->next;
         return node;
     }
@@ -116,17 +150,23 @@ Node *parseStatement(Node *root, Token **token){
 
 Node *parseBlock(Node *root, Token **token){
     if((*token) != NULL && (strcmp((*token)->value, "if") == 0 || strcmp((*token)->value, "while") == 0)){
+        scopesStack.size++;
+        scopesStack.scope[scopesStack.size] = 0;
         Node *opNode = createNode((*token)->value, "BLOCK");
         *token = (*token)->next->next;
         opNode = allocNode(opNode, parseLogical(token));
         *token = (*token)->next->next;
         allocNode(root, parseBlock(opNode, token));
         if((*token)->next != NULL){
+            // popVaribles(&stack, scopesStack.scope[scopesStack.size]);
+            // scopesStack.size--;
             *token = (*token)->next;
             parseBlock(root, token);
         }
 
     }else if((*token) != NULL && (strcmp((*token)->value, "for") == 0)){
+        scopesStack.size++;
+        scopesStack.scope[scopesStack.size] = 0;
         Node *opNode = createNode((*token)->value, "BLOCK");
         *token = (*token)->next->next;
         opNode = allocNode(opNode, parseAssign(token));
@@ -137,6 +177,8 @@ Node *parseBlock(Node *root, Token **token){
         *token = (*token)->next->next;
         allocNode(root, parseBlock(opNode, token));
         if((*token)->next != NULL){
+            // popVaribles(&stack, scopesStack.scope[scopesStack.size]);
+            // scopesStack.size--;
             *token = (*token)->next;
             parseBlock(root, token);
         }

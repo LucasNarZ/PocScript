@@ -41,6 +41,7 @@ Node *parseComparison(Token **token);
 Node *parseLogical(Token **token);
 Node *parseAssign(Token **token);
 Node *parseBlock(Node *root, Token **token);
+Node *parseArguments(Node *func, Token **token);
 Node *createNode(char *value, char *description);
 void printTreePretty(Node *root);
 Node *allocNode(Node *base, Node *newNode);

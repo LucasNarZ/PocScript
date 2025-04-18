@@ -1,9 +1,5 @@
 #include "parser.h"
 
-
-
-
-
 bool arrayContains(char *array[], int tamanho, const char *valor) {
     for (int i = 0; i < tamanho; i++) {
         if (strcmp(array[i], valor) == 0) {
@@ -52,10 +48,9 @@ Node *parseFactor(Token **token){
         if(!(arrayContains( stack.variables, stack.size, (*token)->value))){
             stack.variables[stack.size++] = (*token)->value;
             scopesStack.scope[scopesStack.size]++;
-            *token = (*token)->next->next;
+            *token = (*token)->next->next->next;
             Node *type = createNode((*token)->value, (*token)->type);
             node = allocNode(node, type);
-            *token = (*token)->next;
         }
         *token = (*token)->next;
         return node;
@@ -127,7 +122,7 @@ Node *parseAssign(Token **token){
         *token = (*token)->next;
         
         opNode = allocNode(opNode, node);
-        opNode = allocNode(opNode, parseAssign(token));
+        opNode = allocNode(opNode, parseLogical(token));
         node = opNode;
     }
     return node;
@@ -182,13 +177,33 @@ Node *parseBlock(Node *root, Token **token){
             *token = (*token)->next;
             parseBlock(root, token);
         }
+    }else if((*token) != NULL && (strcmp((*token)->value, "func") == 0)){
+        *token = (*token)->next;
+        Node *opNode = createNode((*token)->value, "DECLARATION");
+        Node *args = createNode("ARGS", "ARGS");
+        allocNode(opNode, args);
+        *token = (*token)->next;
+        parseArguments(args, token);
+        *token = (*token)->next->next;
+        allocNode(root, parseBlock(opNode, token));
+        if((*token)->next != NULL){
+            // popVaribles(&stack, scopesStack.scope[scopesStack.size]);
+            // scopesStack.size--;
+            *token = (*token)->next;
+            parseBlock(root, token);
+        }
     }else{
         parseStatement(root, token);
     }
     return root;
 }
 
-
+Node *parseArguments(Node *func, Token **token){
+    do{
+        *token = (*token)->next;
+        allocNode(func, parseFactor(token));
+    }while(strcmp((*token)->value, ",") == 0);
+}
 void printTreeWithBranches(Node *node, int depth, int is_last[]){
     if (node == NULL) return;
 

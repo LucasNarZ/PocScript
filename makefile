@@ -1,6 +1,6 @@
 TARGET = compiler
 
-SRC = main.c ./lexer/lexer.c ./parser/parser.c
+SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c
 
 OBJ = $(SRC:.c=.o)
 

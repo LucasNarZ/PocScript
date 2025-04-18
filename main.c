@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "./lexer/lexer.h"
 #include "./parser/parser.h"
+#include "./utils/utils.h"
 
 Stack stack = {0};
 ScopeStack scopesStack;
@@ -14,8 +15,8 @@ int main(){
         getTokens(&head, &input);
     }
     print(head);
+    
     Node *root = createNode("ROOT", "ROOT");
-    scopesStack.scope = malloc(MAX_SIZE_SCOPE * sizeof(int));;
     scopesStack.scope[0] = 0;
     parseBlock(root, &head);
     printTreePretty(root);

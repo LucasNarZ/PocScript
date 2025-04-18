@@ -3,22 +3,29 @@
 Token *head = NULL;
 
 TokenType types[NUM_TYPES] = {
-    {"INTEGER", "(^[0-9]+)"},
-    {"KEY", "(^(if|else|for|while|int|float|char|func))"},
+    {"NUMBER", "^[+-]?([0-9]*\\.[0-9]+|[0-9]+)"},
+    {"TYPE", "^(int|float|char)"},
+    {"KEY", "^(if|else|for|while|func)"},
+    {"STRING", "^\"([^\"\\\\]|\\\\.)*\""},
+    {"ASSIGN", "^(\\+=|=)"},
     {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&|==|>=|<=|!=|>|<)"},
-    {"DELIMITER", "(^[;{}\\(\\):,])"},
-    {"ASSIGN", "^(=)"},
-    {"IDENTIFIER", "(^[_a-zA-Z][_a-zA-Z0-9]*)"},
-    {"WHITESPACE", "(^[ \t\n]+)"}
+    {"DELIMITER", "^[]\\[;{}():,]"},
+    {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},
+    {"WHITESPACE", "^[ \t\n]+"}
 };
+
 
 void getTokens(Token **head, char **input){
     regex_t regex;
     regmatch_t match;
+    bool matched = false;
     while(**input != '\0'){
+        matched = false;
         for(int i = 0;i < NUM_TYPES;i++){
-            if(regcomp(&regex, types[i].pattern, REG_EXTENDED) != 0){
-                printf("Failed to compile regex");
+            if (regcomp(&regex, types[i].pattern, REG_EXTENDED) != 0) {
+                char errbuf[256];
+                regerror(1, &regex, errbuf, sizeof(errbuf));
+                fprintf(stderr, "Regex compilation failed for type %s: %s\n", types[i].type, errbuf);
                 exit(1);
             }
             if(regexec(&regex, *input, 1, &match, 0) == 0){
@@ -44,8 +51,15 @@ void getTokens(Token **head, char **input){
                     }
                 }
                 *input += length;
+                matched = true;
                 regfree(&regex);
+                break;
             }
+            regfree(&regex);
+        }
+        if (!matched) {
+            fprintf(stderr, "Unrecognized token: %.10s\n", *input);
+            exit(1);
         }
     }
 }

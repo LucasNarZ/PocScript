@@ -3,12 +3,13 @@
 Token *head = NULL;
 
 TokenType types[NUM_TYPES] = {
-    {"NUMBER", "^[+-]?([0-9]*\\.[0-9]+|[0-9]+)"},
+    {"NUMBER", "^([0-9]*\\.[0-9]+|[0-9]+)"},
     {"TYPE", "^(int|float|char)"},
     {"KEY", "^(if|else|for|while|func)"},
     {"STRING", "^\"([^\"\\\\]|\\\\.)*\""},
+    {"COMPARISON", "^(==|>=|<=|!=|>|<)"},
     {"ASSIGN", "^(\\+=|=)"},
-    {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&|==|>=|<=|!=|>|<)"},
+    {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&)"},
     {"DELIMITER", "^[]\\[;{}():,]"},
     {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},
     {"WHITESPACE", "^[ \t\n]+"}

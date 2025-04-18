@@ -34,8 +34,8 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Assignment Operators  
 - [x] Integers  
 - [x] Identifiers  
-- [ ] Character and String literals  
-- [ ] Floating-point numbers  
+- [x] Floating-point numbers  
+- [x] Character and String literals  
 
 ### ✅ Parser
 - [x] Variable declarations  
@@ -45,9 +45,10 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] `for` loops  
 - [x] Functions  
 - [x] Primitive types  
-- [ ] Variable scopes  
-- [ ] `+=` operator  
-- [ ] Arrays  
+- [x] `+=` operator  
+- [x] Variable scopes  
+- [ ] Vectors
+- [ ] Matrices 
 - [ ] Parentheses in expressions  
 
 ### 🚧 Assembly Generator

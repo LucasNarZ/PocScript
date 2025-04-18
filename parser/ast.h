@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "../types.h"
 
 #ifndef AST_H

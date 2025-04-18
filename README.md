@@ -55,5 +55,40 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 
 ---
 
+## 🛠️ How to Build and Run
+
+### 📦 Dependencies
+To compile and run PocScript, make sure you have the following tools installed:
+
+- `gcc` (GNU Compiler Collection)
+- `make` (Build automation tool)
+- `nasm` (The Netwide Assembler — for x86 assembly)
+
+You can install them using your package manager. For example, on Debian/Ubuntu-based systems:
+
+```bash
+sudo apt update
+sudo apt install build-essential nasm
+```
+### ⚙️ Building the Project
+
+Clone the repository and run make in the project root:
+```bash
+git clone https://github.com/LucasNarZ/PocScript.git
+cd PocScript
+make
+```
+
+### 🧪 Running the Compiler
+
+1. Create an input file with the extension .ps. For example:
+```bash
+echo "a::int = 2 + 3;" > input.ps
+```
+2. Run the compiler:
+```bash
+./compiler
+```
+3. (In future versions) The output will be an .asm file to be compiled with NASM.
 ## 📌 Notes
 This project is intended for **learning purposes**, so the implementation favors simplicity and clarity over performance or completeness. Contributions, feedback, or suggestions are welcome!

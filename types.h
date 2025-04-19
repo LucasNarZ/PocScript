@@ -15,6 +15,14 @@ typedef struct {
     char *pattern;
 } TokenType;
 
+// typedef struct typeNode {
+//     union {
+//         char *type;
+//         struct typeNode *typeNode;
+//     };
+    
+// } TypeNode;
+
 typedef struct Node {
     char *value;
     char *description;
@@ -23,8 +31,70 @@ typedef struct Node {
     int numChildren;
 } Node;
 
+// typedef struct literalNode {
+//     char *value;
+//     struct typeNode *type;
+// } LiteralNode;
+
+// typedef struct assignmentNode {
+//     char *value;
+//     struct variableNode *var;
+//     struct literalNode *literal;
+// } AssignmentNode;
+
+// typedef struct operatorNode {
+//     char *value;
+//     struct literalNode *left;
+//     struct literalNode *right;
+// } OperatorNode;
+
+// typedef struct arrayNode {
+//     char *value;
+//     union {
+//         struct literalNode *literal;
+//         struct variableNode *var;
+//         struct arrayNode *array;
+//     } data;
+//     struct typeNode *type;
+// } ArrayNode;
+
+// typedef struct functionNode {
+//     char *value;
+//     struct variableNode *var;
+//     struct literalNode *literal;
+// } FunctionNode;
+
+// typedef struct logicalNode {
+//     char *value;
+//     union {
+//         struct logicalNode *logical;
+//         struct comparisonNode *comparison;
+//         struct literalNode *literal;
+//     };
+// } LogicalNode;
+
+// typedef struct comparisonNode {
+//     char *value;
+//     union {
+//         struct comparisonNode *comparison;
+//         struct operatorNode *operator;
+//         struct literalNode *literal;
+//     };
+// } ComparisonNode;
+
+
+// typedef struct primitiveVariableNode {
+//     char *value;
+//     struct typeNode *type;
+// } PrimitiveVariableNode;
+
+typedef struct variable {
+    char *name;
+    struct Node *type;
+} Variable;
+
 typedef struct Stack {
-    char **variables[MAX_SIZE_STACK];
+    struct variable *variables[MAX_SIZE_STACK];
     int size;
 } Stack;
 

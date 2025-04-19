@@ -19,9 +19,8 @@ Node *parseComparison(Token **token);
 Node *parseLogical(Token **token);
 Node *parseAssign(Token **token);
 Node *parseBlock(Node *root, Token **token);
-Node *parseArguments(Node *func, Token **token);
-
-Node *createNode(char *value, char *description);
-Node *allocNode(Node *base, Node *newNode);
+void *parseArguments(Node *func, Token **token);
+void *parseType(Node *var, Token **token);
+void *parseArray(Node *node, Token **token);
 
 #endif 

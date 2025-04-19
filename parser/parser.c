@@ -1,8 +1,6 @@
 #include "parser.h"
 #include "../utils/utils.h"
 
-
-
 Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
@@ -16,7 +14,7 @@ Node *parseFactor(Token **token){
         Node *node = createNode((*token)->value, (*token)->type);
         
         if(!(arrayContains(stack.variables, stack.size, (*token)->value))){
-            if(strcmp((*token)->next->next->next->type, "TYPE") != 0){
+            if(strcmp((*token)->next->next->next->type, "TYPE") != 0 && strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") != 0){
                 fprintf(stderr, "NameError: Undefined Variable: %s\n", (*token)->value);
                 exit(1);
             }
@@ -24,8 +22,12 @@ Node *parseFactor(Token **token){
             scopesStack.scope[scopesStack.size]++;
             
             *token = (*token)->next->next->next;
-            Node *type = createNode((*token)->value, (*token)->type);
-            node = allocNode(node, type);
+            if(strcmp((*token)->type, "COMPOSED_TYPE") == 0){
+                parseType(node, token);
+            }else{
+                Node *type = createNode((*token)->value, (*token)->type);
+                node = allocNode(node, type);
+            }
         }else{
             if(strcmp((*token)->next->next->next->type, "TYPE") == 0){
                 fprintf(stderr, "NameError: redeclared Variable: %s\n", (*token)->value);
@@ -102,7 +104,14 @@ Node *parseAssign(Token **token){
         *token = (*token)->next;
         
         opNode = allocNode(opNode, node);
-        opNode = allocNode(opNode, parseLogical(token));
+        if(strcmp((*token)->value, "{") != 0){
+            opNode = allocNode(opNode, parseLogical(token));
+        }else{
+            Node *arrayNode = createNode("ARRAY_LITERAL", "ARRAY_LITERAL");
+            allocNode(opNode, arrayNode);
+            (*token) = (*token)->next;
+            parseArray(arrayNode, token);
+        }
         node = opNode;
     }
     return node;
@@ -180,12 +189,62 @@ Node *parseBlock(Node *root, Token **token){
     return root;
 }
 
-Node *parseArguments(Node *func, Token **token){
+void *parseArguments(Node *func, Token **token){
     do{
         *token = (*token)->next;
         allocNode(func, parseFactor(token));
     }while(strcmp((*token)->value, ",") == 0);
 }
 
+void *parseType(Node *var, Token **token){
+    Node *currentNode = var;
+    Node *type = createNode((*token)->value, (*token)->type);
+    allocNode(currentNode, type);
+    currentNode = type;
+    (*token) = (*token)->next;
+    while(strcmp((*token)->value, "<") == 0){
+        (*token) = (*token)->next;
+        type = createNode((*token)->value, (*token)->type);
+        allocNode(currentNode, type);
+        currentNode = type;
+        (*token) = (*token)->next;
+    }
 
+    while(strcmp((*token)->value, ">") == 0){
+        (*token) = (*token)->next;
+    }
+    while(strcmp((*token)->value, "[") == 0){
+        (*token) = (*token)->next;
+        Node *size = createNode((*token)->value, "LIMIT");
+        allocNode(var, size);
+        (*token) = (*token)->next->next;
+    }
+    (*token) = (*token)->anterior;
+}
 
+void *parseArray(Node *node, Token **token){
+    if((*token)->next != NULL && strcmp((*token)->value, "{") == 0){
+        Node *array = createNode("ARRAY_LITERAL", "ARRAY_LITERAL");
+        allocNode(node, array);
+        (*token) = (*token)->next;
+        parseArray(array, token);
+        while((*token)->next != NULL && strcmp((*token)->value, ";") != 0){
+            array = createNode("ARRAY_LITERAL", "ARRAY_LITERAL");
+            allocNode(node, array);
+            if(strcmp((*token)->next->value, ";") == 0){
+                (*token) = (*token)->next;
+            }else{
+                (*token) = (*token)->next->next;
+            }
+            
+            parseArray(array, token);
+        }
+    }else{
+        while((*token)->next != NULL && strcmp((*token)->type, "DELIMITER") != 0){
+            Node *element = createNode((*token)->value, (*token)->type);
+            allocNode(node, element);
+            (*token) = (*token)->next->next;
+        }
+    }
+
+}

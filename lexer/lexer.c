@@ -4,15 +4,16 @@ Token *head = NULL;
 
 TokenType types[NUM_TYPES] = {
     {"NUMBER", "^([0-9]*\\.[0-9]+|[0-9]+)"},
+    {"COMPOSED_TYPE", "^(Array)"},
     {"TYPE", "^(int|float|char)"},
     {"KEY", "^(if|else|for|while|func)"},
     {"STRING", "^\"([^\"\\\\]|\\\\.)*\""},
-    {"COMPARISON", "^(==|>=|<=|!=|>|<)"},
+    {"SYMBOL", "^(==|>=|<=|!=|>|<)"},
     {"ASSIGN", "^(\\+=|=)"},
     {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&)"},
     {"DELIMITER", "^[]\\[;{}():,]"},
-    {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},
-    {"WHITESPACE", "^[ \t\n]+"}
+    {"WHITESPACE", "^[ \t\n]+"},
+    {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"}
 };
 
 
@@ -63,6 +64,7 @@ void getTokens(Token **head, char **input){
             exit(1);
         }
     }
+
 }
 
 void print(Token *head){

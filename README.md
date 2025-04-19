@@ -41,21 +41,50 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 ### ✅ Parser
 - [x] Variable declarations  
 - [x] Basic arithmetic and logic expressions  
-- [x] `if` statements  
+- [x] `if` statements 
+- [x] `else` statements
+- [x] `else if` statements
 - [x] `while` loops  
 - [x] `for` loops  
-- [x] Functions  
+- [x] Function declaration
 - [x] Primitive types  
 - [x] `+=` operator  
 - [x] Variable scopes  
 - [x] Vectors
 - [x] Matrices 
-- [ ] Manage Array scope 
-- [ ] Parentheses in expressions  
+- [x] Manage Array scope 
+- [x] Parentheses in expressions  
+- [ ] Functions calls
+- [ ] Access array elements
 - [ ] n-dimention Array(maybe)
 
 ### 🚧 Assembly Generator
-- [ ] Not started yet
+- [ ] Generate `.asm` output file
+- [ ] Add `.data`, `.text`, and `.global main` sections
+- [ ] Add `main:` entry point label
+- [ ] Declare scalar variables in `.data` (`int`, `float`, etc.)
+- [ ] Support variable initialization with literals
+- [ ] Load and store scalar variables using labels
+- [ ] Generate code for number literals
+- [ ] Basic arithmetic operations (`+`, `-`, `*`, `/`)
+- [ ] Parentheses and precedence in expressions
+- [ ] Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`)
+- [ ] Logical operators (`&&`, `||`, `!`)
+- [ ] Simple assignment (`=`)
+- [ ] Compound assignment (`+=`, `-=`, etc.)
+- [ ] If statements (`if`)
+- [ ] Else and else-if chaining (`else`, `else if`)
+- [ ] While loops
+- [ ] For loops
+- [ ] Label generation and conditional/unconditional jumps (`jmp`, `je`, `jne`, etc.)
+- [ ] Support return statements
+- [ ] Function declaration
+- [ ] Pass function arguments via stack/register
+- [ ] Return values from functions
+- [ ] Print integer using `printf` (external libc)
+- [ ] Add string literals to `.data`
+- [ ] Support 1D arrays (declaration and access)
+- [ ] Support 2D matrices (declaration and access)
 
 ---
 

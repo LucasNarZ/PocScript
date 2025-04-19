@@ -5,6 +5,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+
+void printType(Node *typeNode);
 void printStack(Stack *stack);
 void printScopeStack(ScopeStack *stack);
 bool arrayContains(char *array[], int tamanho, const char *valor);

@@ -42,16 +42,42 @@ void printTreePretty(Node *root){
     printTreeWithBranches(root, 0, is_last);
 }
 
-void printStack(Stack *stack){
+void printType(Node *typeNode){
+    if (typeNode == NULL) {
+        printf("Unknown");
+        return;
+    }
+    if (typeNode->numChildren > 0) {
+        printf("%s[", typeNode->value); 
+        for (int i = 0; i < typeNode->numChildren; i++) {
+            if (i > 0) printf(", ");
+            printType(typeNode->children[i]);
+        }
+        printf("]"); 
+    } else {
+        printf("%s", typeNode->value);
+    }
+}
+
+void printStack(Stack *stack) {
     printf("\n====== Stack ======\n");
     if (stack->size == 0) {
         printf("|   (empty)       |\n");
     } else {
-        for (int i = stack->size - 1; i >= 0; i--) {
-            if (i == stack->size - 1)
-                printf("| %2d: %-12s <--- top\n", i, stack->variables[i]);
-            else
-                printf("| %2d: %-12s |\n", i, stack->variables[i]);
+        for(int i = stack->size - 1; i >= 0; i--){
+            Variable *var = stack->variables[i]; 
+            Node *typeNode = var->type; 
+            
+
+            if(i == stack->size - 1){
+                printf("| %2d: %-12s ", i, var->name);
+                printType(typeNode); 
+                printf(" <--- top\n");
+            }else{
+                printf("| %2d: %-12s ", i, var->name);
+                printType(typeNode);
+                printf(" |\n");
+            }
         }
     }
     printf("===================\n\n");

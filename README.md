@@ -48,9 +48,11 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Primitive types  
 - [x] `+=` operator  
 - [x] Variable scopes  
-- [ ] Vectors
-- [ ] Matrices 
+- [x] Vectors
+- [x] Matrices 
+- [ ] Manage Array scope 
 - [ ] Parentheses in expressions  
+- [ ] n-dimention Array(maybe)
 
 ### 🚧 Assembly Generator
 - [ ] Not started yet

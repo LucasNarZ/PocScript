@@ -54,8 +54,12 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Matrices 
 - [x] Manage Array scope 
 - [x] Parentheses in expressions  
-- [ ] Functions calls
-- [ ] Access array elements
+- [x] Functions calls
+- [x] `!` operator
+- [x] `true` and `false` keywords
+- [ ] Negative Numbers
+- [x] Access array elements
+- [x] Functions `ret` statement
 - [ ] n-dimention Array(maybe)
 
 ### 🚧 Assembly Generator

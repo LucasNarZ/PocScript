@@ -9,10 +9,6 @@
 #include "../utils/utils.h"
 #include "../types.h"
 
-
-
-
-
 extern Token *head;
 extern TokenType types[NUM_TYPES];
 

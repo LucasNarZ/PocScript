@@ -4,16 +4,18 @@ Token *head = NULL;
 
 TokenType types[NUM_TYPES] = {
     {"NUMBER", "^([0-9]*\\.[0-9]+|[0-9]+)"},
+    {"BOOL", "^(true|false)\\b"},
     {"COMPOSED_TYPE", "^(Array)"},
-    {"TYPE", "^(int|float|char|bool)"},
-    {"KEY", "^(if|else|for|while|func|else if)"},
-    {"STRING", "^\"([^\"\\\\]|\\\\.)*\""},
-    {"SYMBOL", "^(==|>=|<=|!=|>|<)"},
+    {"TYPE", "^(int|float|char|bool)\\b"},
+    {"KEY", "^(if|else|for|while|func|else if|ret)\\b"},
+    {"STRING", "^(['\"])([^\\\\\\1]|\\\\.)*\\1"},
+    {"SYMBOL", "^(==|>=|<=|!=|>|<|!)"},
     {"ASSIGN", "^(\\+=|=|-=)"},
+    {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},
     {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&)"},
     {"DELIMITER", "^[]\\[;{}():,]"},
     {"WHITESPACE", "^[ \t\n]+"},
-    {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"}
+    
 };
 
 

@@ -3,6 +3,6 @@
 
 #define MAX_SIZE_STACK 100
 #define MAX_SIZE_SCOPE 50
-#define NUM_TYPES 10
+#define NUM_TYPES 11
 
 #endif

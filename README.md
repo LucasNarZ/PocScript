@@ -62,19 +62,18 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Functions `ret` statement
 - [ ] n-dimention Array(maybe)
 
-### 🚧 Assembly Generator
-- [ ] Generate `.asm` output file
-- [ ] Add `.data`, `.text`, and `.global main` sections
-- [ ] Add `main:` entry point label
+### ✅ Assembly Generator
+- [x] Generate `.asm` output file
+- [x] Add `.data`, `.text`, and `_start` sections
 - [ ] Declare scalar variables in `.data` (`int`, `float`, etc.)
-- [ ] Support variable initialization with literals
+- [x] Support variable initialization with literals
+- [x] Simple assignment (`=`)
 - [ ] Load and store scalar variables using labels
-- [ ] Generate code for number literals
-- [ ] Basic arithmetic operations (`+`, `-`, `*`, `/`)
-- [ ] Parentheses and precedence in expressions
-- [ ] Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`)
-- [ ] Logical operators (`&&`, `||`, `!`)
-- [ ] Simple assignment (`=`)
+- [x] Generate code for number literals
+- [x] Basic arithmetic operations (`+`, `-`, `*`, `/`)
+- [x] Parentheses and precedence in expressions
+- [x] Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`)
+- [x] Logical operators (`&&`, `||`, `!`)
 - [ ] Compound assignment (`+=`, `-=`, etc.)
 - [ ] If statements (`if`)
 - [ ] Else and else-if chaining (`else`, `else if`)

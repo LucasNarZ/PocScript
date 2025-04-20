@@ -1,20 +1,39 @@
-TARGET = compiler
+TARGET = output
 
-SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c
+SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c ./assemblyGenerator/generator.c 
 
 OBJ = $(SRC:.c=.o)
+SRC_NASM = output.asm
+OBJ_NASM = output.o
+TARGET_AST = compiler
+
+ASSEMBLER = nasm
+NASM_FLAGS = -f elf64
 
 CC = gcc
 CFLAGS = -Wall -g
 
-$(TARGET): $(OBJ)
-	$(CC) $(OBJ) -o $(TARGET)
+$(TARGET): $(SRC_NASM)
+	$(ASSEMBLER) $(NASM_FLAGS) $(SRC_NASM) -o $(OBJ_NASM)
+	ld $(OBJ_NASM) -o $(TARGET)
+
+$(TARGET_AST): $(OBJ)
+	$(CC) $(OBJ) -o $(TARGET_AST)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-clean:
-	rm -f $(OBJ) $(TARGET)
+%.asm: $(TARGET_AST)
+	./$(TARGET_AST)
 
-# Regra padrão para o Makefile (se você rodar `make` sem argumentos)
+
+clean:
+	rm -f $(OBJ) $(TARGET) $(OBJ_NASM) $(TARGET_AST) $(SRC_NASM)
+
+ast: $(TARGET_AST)
+
+test: test.asm
+	nasm -f elf64 test.asm -o test.o
+	ld test.o -o test
+
 all: $(TARGET)

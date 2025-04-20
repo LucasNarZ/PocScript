@@ -3,3 +3,4 @@
 compiler
 output.txt
 *.ps
+output*

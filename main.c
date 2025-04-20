@@ -2,6 +2,7 @@
 #include "./lexer/lexer.h"
 #include "./parser/parser.h"
 #include "./utils/utils.h"
+#include "./assemblyGenerator/generator.h"
 
 Stack stack = {0};
 ScopeStack scopesStack;
@@ -14,11 +15,18 @@ int main(){
         char *input = file;
         getTokens(&head, &input);
     }
-    print(head);
     
     Node *root = createNode("ROOT", "ROOT");
     scopesStack.scope[0] = 0;
     parseBlock(root, &head);
     printTreePretty(root);
+
+    FILE *OUTPUT;
+    LineIndices *lineIndices = malloc(sizeof(LineIndices));
+    lineIndices->currentLine = 1;
+    lineIndices->globalVariblesLine = 4;
+
+    generateAssembly(root, OUTPUT, lineIndices);
+
     return 0;
 }

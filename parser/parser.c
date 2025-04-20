@@ -33,7 +33,7 @@ Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
     if((*token) != NULL && (strcmp((*token)->type, "NUMBER") == 0 || strcmp((*token)->type, "STRING") == 0 || strcmp((*token)->type, "BOOL") == 0)){
-        Node *node = createNode((*token)->value, (*token)->type);
+        Node *node = createNode((*token)->value, "LITERAL");
         *token = (*token)->next;
         return node;
     }
@@ -59,7 +59,7 @@ Node *parseFactor(Token **token){
             }
             defineVariables(name, type, &stack);
         }else{
-            if((*token)->next->next->next != NULL && (strcmp((*token)->next->next->next->type, "TYPE") == 0 || strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") == 0)){
+            if((*token)->next->next != NULL && (*token)->next->next->next != NULL && (strcmp((*token)->next->next->next->type, "TYPE") == 0 || strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") == 0)){
                 fprintf(stderr, "NameError: redeclared Variable: %s\n", (*token)->value);
                 exit(1);
             }
@@ -112,11 +112,11 @@ Node *parseNegation(Token **token){
 Node *parseTerm(Token **token){
     Node *node = parseNegation(token);
 
-    if((*token) != NULL && (strcmp((*token)->value, "*") == 0 || strcmp((*token)->value, "/") == 0)){
+    while((*token) != NULL && (strcmp((*token)->value, "*") == 0 || strcmp((*token)->value, "/") == 0)){
         Node *opNode = createNode((*token)->value, "OPERATOR");
         *token = (*token)->next;
         opNode = allocNode(opNode, node);
-        opNode = allocNode(opNode, parseTerm(token));
+        opNode = allocNode(opNode, parseNegation(token));
         
         node = opNode;
     }
@@ -126,7 +126,21 @@ Node *parseTerm(Token **token){
 Node *parseExpression(Token **token){
     Node *node = parseTerm(token);
 
-    if((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0)){
+    while((*token) != NULL && (strcmp((*token)->value, "+") == 0 || strcmp((*token)->value, "-") == 0)){
+        Node *opNode = createNode((*token)->value, "OPERATOR");
+        *token = (*token)->next;
+        
+        opNode = allocNode(opNode, node);
+        opNode = allocNode(opNode, parseTerm(token));
+        node = opNode;
+    }
+    return node;
+}
+
+Node *parseComparison(Token **token){
+    Node *node = parseExpression(token);
+
+    while((*token) != NULL && (strcmp((*token)->value, ">") == 0 || strcmp((*token)->value, "<") == 0 || strcmp((*token)->value, ">=") == 0 || strcmp((*token)->value, "<=") == 0 || strcmp((*token)->value, "==") == 0 || strcmp((*token)->value, "!=") == 0)){
         Node *opNode = createNode((*token)->value, "OPERATOR");
         *token = (*token)->next;
         
@@ -137,29 +151,15 @@ Node *parseExpression(Token **token){
     return node;
 }
 
-Node *parseComparison(Token **token){
-    Node *node = parseExpression(token);
+Node *parseLogical(Token **token){
+    Node *node = parseComparison(token);
 
-    if((*token) != NULL && (strcmp((*token)->value, ">") == 0 || strcmp((*token)->value, "<") == 0 || strcmp((*token)->value, ">=") == 0 || strcmp((*token)->value, "<=") == 0 || strcmp((*token)->value, "==") == 0 || strcmp((*token)->value, "!=") == 0)){
+    while((*token) != NULL && (strcmp((*token)->value, "&&") == 0 || strcmp((*token)->value, "||") == 0)){
         Node *opNode = createNode((*token)->value, "OPERATOR");
         *token = (*token)->next;
         
         opNode = allocNode(opNode, node);
         opNode = allocNode(opNode, parseComparison(token));
-        node = opNode;
-    }
-    return node;
-}
-
-Node *parseLogical(Token **token){
-    Node *node = parseComparison(token);
-
-    if((*token) != NULL && (strcmp((*token)->value, "&&") == 0 || strcmp((*token)->value, "||") == 0)){
-        Node *opNode = createNode((*token)->value, "OPERATOR");
-        *token = (*token)->next;
-        
-        opNode = allocNode(opNode, node);
-        opNode = allocNode(opNode, parseLogical(token));
         node = opNode;
     }
 

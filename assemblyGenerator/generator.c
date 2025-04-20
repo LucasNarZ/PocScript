@@ -1,0 +1,266 @@
+#include "generator.h"
+
+char *operators[4] = {"-", "+", "*", "/"};
+char *skip = "skip";
+int skipIndex = 0;
+
+void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex){
+    lines[lineIndex] = malloc(MAX_LINE_LEN);
+    snprintf(lines[lineIndex], MAX_LINE_LEN, "%s", text);
+    lineIndices->currentLine++;
+}
+
+void writeBaseFile(char **lines, LineIndices *lineIndices){
+    writeAtLine("; Assembly Program", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    writeAtLine("section .data", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    writeAtLine("section .bss", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    intBuffer resb 20", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    writeAtLine("section .text", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    global _start", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    // end label
+    writeAtLine("end:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, 60", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    xor rdi, rdi", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    syscall", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    // strlen function
+    writeAtLine("strlen:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    xor rcx, rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(".next:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    cmp byte [rsi + rcx], 0", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    je .done", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    inc rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    jmp .next", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(".done:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rdx, rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    ret", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    // print function
+    writeAtLine("print:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    push rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rsi, rdi", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, 1", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rdi, 1", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    call strlen", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    syscall", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    pop rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    ret", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    writeAtLine("printInt:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rcx, intBuffer + 19", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, rsi", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rbx, 10", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    jne .convert", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov byte [rcx], '0'", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    dec rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    jmp .done", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(".convert:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(".loop:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    xor rdx, rdx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    div rbx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    add dl, '0'", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    dec rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov [rcx], dl", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    jne .loop", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(".done:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rdi, 1", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, 1", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rsi, rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rdx, intBuffer + 19", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    sub rdx, rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    syscall", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    ret", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+    // _start
+    writeAtLine("_start:", lines, lineIndices, lineIndices->currentLine);
+}
+
+void writeIntGlobalVariable(const char *name, const char *value, char **lines, LineIndices *lineIndices){
+    char *buffer = malloc(MAX_LINE_LEN);
+    snprintf(buffer, MAX_LINE_LEN, "    %s dq %s", name, value);
+
+    for (int i = lineIndices->currentLine; i > lineIndices->globalVariblesLine; i--) {
+        lines[i] = lines[i - 1];
+    }
+
+    writeAtLine("", lines, lineIndices, lineIndices->globalVariblesLine);
+    writeAtLine(buffer, lines, lineIndices, lineIndices->globalVariblesLine);
+    lineIndices->globalVariblesLine++;
+    lineIndices->currentLine--;
+    free(buffer);
+}
+
+void writeStringGlobalVariable(const char *name, const char *value, char **lines, LineIndices *lineIndices){
+    char *buffer = malloc(MAX_LINE_LEN);
+    snprintf(buffer, MAX_LINE_LEN, "    %s db %s, 0", name, value);
+
+    for (int i = lineIndices->currentLine; i > lineIndices->globalVariblesLine; i--) {
+        lines[i] = lines[i - 1];
+    }
+
+    writeAtLine("", lines, lineIndices, lineIndices->globalVariblesLine);
+    writeAtLine(buffer, lines, lineIndices, lineIndices->globalVariblesLine);
+    lineIndices->globalVariblesLine++;
+    lineIndices->currentLine--;
+    free(buffer);
+}
+
+void writeComparison(const char *label, char **lines, LineIndices *lineIndices){
+    char *buffer1 = malloc(MAX_LINE_LEN);
+    char *buffer2 = malloc(MAX_LINE_LEN);
+    char *buffer3 = malloc(MAX_LINE_LEN);
+    char *buffer4 = malloc(MAX_LINE_LEN);
+    snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
+    snprintf(buffer2, MAX_LINE_LEN, "    %s skip%d",label, skipIndex);
+    skipIndex++;
+    snprintf(buffer3, MAX_LINE_LEN, "skip%d:", skipIndex);
+    snprintf(buffer4, MAX_LINE_LEN, "    jmp skip%d", skipIndex);
+    
+    writeAtLine("    pop rbx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    cmp rax, rbx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, 1", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(buffer4, lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    xor rax, rax", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(buffer3, lines, lineIndices, lineIndices->currentLine);
+    skipIndex++;
+    free(buffer1);
+    free(buffer2);
+    free(buffer3);
+    free(buffer4);
+}
+
+void writeOperator(const char *operator, char **lines, LineIndices *lineIndices){
+    char *buffer = malloc(MAX_LINE_LEN);
+    snprintf(buffer, MAX_LINE_LEN, "    %s rax, rbx", operator);
+    writeAtLine("    pop rbx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    push rax", lines, lineIndices, lineIndices->currentLine);
+    free(buffer);
+}
+
+void writeAssignGlobalVaribleInt(const char *name, const char *value, char **lines, LineIndices *lineIndices){
+    char *buffer = malloc(MAX_LINE_LEN);
+
+    snprintf(buffer, MAX_LINE_LEN, "    mov qword [%s], %s", name, value);
+    writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+    free(buffer);
+}
+
+void writeFile(const char *filename, char **lines, LineIndices *lineIndices){
+    FILE *file = fopen(filename, "w");
+    if(file == NULL){
+        fprintf(stderr, "Error opening file %s\n", filename);
+        return;
+    }
+
+    for(int i = 1; i < lineIndices->currentLine; i++){
+        fprintf(file, "%s\n", lines[i]);
+        free(lines[i]);
+    }
+    fclose(file);
+}
+
+void writeExpression(Node *node, char **lines, LineIndices *lineIndices){
+    
+    for(int i = 0; i < node->numChildren; i++){
+        writeExpression(node->children[i], lines, lineIndices);
+    }
+
+    if(strcmp(node->description, "LITERAL") == 0){
+        char *buffer = malloc(MAX_LINE_LEN);
+        snprintf(buffer, MAX_LINE_LEN, "    push %s", node->value);
+        writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+        free(buffer);
+    }else if(strcmp(node->description, "IDENTIFIER") == 0){
+        char *buffer = malloc(MAX_LINE_LEN);
+        snprintf(buffer, MAX_LINE_LEN, "    push qword [%s]", node->value);
+        writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+        free(buffer);
+    }else if(strcmp(node->value, "+") == 0){
+        writeOperator("add", lines, lineIndices);
+    }else if(strcmp(node->value, "-") == 0){
+        writeOperator("sub", lines, lineIndices);
+    }else if(strcmp(node->value, "*") == 0){
+        writeOperator("imul", lines, lineIndices);
+    }else if(strcmp(node->value, "/") == 0){
+        writeOperator("div", lines, lineIndices);
+    }else if(strcmp(node->value, "&&") == 0){
+        writeOperator("and", lines, lineIndices);
+    }else if(strcmp(node->value, "||") == 0){
+        writeOperator("or", lines, lineIndices);
+    }else if(strcmp(node->value, "==") == 0){
+        writeComparison("jne", lines, lineIndices);
+    }else if(strcmp(node->value, "!=") == 0){
+        writeComparison("je", lines, lineIndices);
+    }
+}
+
+void walkTree(Node *node, char **lines, LineIndices *lineIndices){
+    if(node == NULL) return;
+
+    if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") == 0 && strcmp(node->children[0]->children[0]->value, "char") != 0){
+        writeIntGlobalVariable(node->children[0]->value, "0", lines, lineIndices);
+        writeAssignGlobalVaribleInt(node->children[0]->value, node->children[1]->value, lines, lineIndices);
+    }else if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") == 0 && strcmp(node->children[0]->children[0]->value, "char") == 0){
+        writeStringGlobalVariable(node->children[0]->value, node->children[1]->value, lines, lineIndices);
+    }else if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") != 0){
+        if(node->children[0]->children != NULL && strcmp(node->children[0]->children[0]->value, "char") != 0){
+            writeIntGlobalVariable(node->children[0]->value, "0", lines, lineIndices);
+        }
+        
+        writeExpression(node->children[1], lines, lineIndices);
+        writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
+        writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+    }
+
+    for(int i = 0; i < node->numChildren; i++){
+        if(!arrayContains(operators, 4, node->value)){
+            walkTree(node->children[i], lines, lineIndices);
+        }
+    }
+}
+
+void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices){
+    if(root == NULL) return;
+
+    char **lines = malloc(sizeof(char*) * MAX_LINES);
+
+    outputFile = fopen("output.asm", "w");
+    if(outputFile == NULL){
+        fprintf(stderr, "Error opening outputFile \n");
+        return;
+    }
+
+    writeBaseFile(lines, lineIndices);
+
+    walkTree(root, lines, lineIndices);
+
+    writeAtLine("    mov rsi, [var6]", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    call printInt", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    call end", lines, lineIndices, lineIndices->currentLine);
+
+    writeFile("output.asm", lines, lineIndices);
+    free(lines);
+
+    printf("Assembly code generated successfully.\n");
+}
+

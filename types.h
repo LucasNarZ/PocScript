@@ -103,4 +103,10 @@ typedef struct ScopeStack {
     int size;
 } ScopeStack;
 
+typedef struct lineIndices {
+    int currentLine;
+    int globalVariblesLine;
+    int pastInstructionLine;
+} LineIndices;
+
 #endif

@@ -26,7 +26,16 @@ int main(){
     print->type->numChildren = 0;
     stack.variables[0] = print;
     stack.size++;
-    scopesStack.scope[0] = 1;
+    Variable *printString = (Variable *)malloc(sizeof(Variable));
+    Node *type2 = (Node *)malloc(sizeof(Node));
+    printString->name = "printString";
+    printString->type = type2;
+    printString->type->value = "FUNCTION";
+    printString->type->description = "FUNCTION";
+    printString->type->numChildren = 0;
+    stack.variables[1] = printString;
+    stack.size++;
+    scopesStack.scope[0] = 2;
     parseBlock(root, &head);
     printTreePretty(root);
 

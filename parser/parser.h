@@ -11,10 +11,6 @@
 extern Stack stack;
 extern ScopeStack scopesStack;
 
-char *getVarType(char *var, Stack *stack);
-void defineVariables(char *name, Node *type, Stack *stack);
-char **getVarsNames(char **names, Stack *stack);
-Variable *createVariable(char *name, Node *type);
 Node *parseFactor(Token **token);
 Node *parseTerm(Token **token);
 Node *parseExpression(Token **token);

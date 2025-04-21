@@ -1,34 +1,6 @@
 #include "parser.h"
 #include "../utils/utils.h"
 
-
-char *getVarType(char *var, Stack *stack){
-    for(int i = 0;i < stack->size;i++){
-        if(strcmp(stack->variables[i]->name, var) == 0){
-            return stack->variables[i]->type->value;
-        }
-    }
-    return NULL;
-}
-
-void defineVariables(char *name, Node *type, Stack *stack){
-    stack->variables[stack->size++] = createVariable(name, type);
-    scopesStack.scope[scopesStack.size]++;
-}
-
-char **getVarsNames(char **names, Stack *stack){
-    for(int i = 0;i < stack->size;i++){
-        names[i] = stack->variables[i]->name;
-    }
-}
-
-Variable *createVariable(char *name, Node *type){
-    Variable *var = (Variable *)(malloc(sizeof(Variable)));
-    var->name = name;
-    var->type = type;
-    return var;
-}
-
 Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
@@ -57,7 +29,7 @@ Node *parseFactor(Token **token){
                 type = createNode((*token)->value, (*token)->type);
                 node = allocNode(node, type);
             }
-            defineVariables(name, type, &stack);
+            defineVariables(name, type, &stack, &scopesStack);
         }else{
             if((*token)->next->next != NULL && (*token)->next->next->next != NULL && (strcmp((*token)->next->next->next->type, "TYPE") == 0 || strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") == 0)){
                 fprintf(stderr, "NameError: redeclared Variable: %s\n", (*token)->value);
@@ -289,7 +261,7 @@ Node *parseBlock(Node *root, Token **token){
             fprintf(stderr, "NameError: redeclared Variable: %s\n", functionName);
             exit(1);
         }
-        defineVariables(functionName, func, &stack);
+        defineVariables(functionName, func, &stack, &scopesStack);
 
         scopesStack.size++;
         scopesStack.scope[scopesStack.size] = 0;

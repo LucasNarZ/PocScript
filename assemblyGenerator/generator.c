@@ -1,8 +1,10 @@
 #include "generator.h"
 
-char *operators[5] = {"-", "+", "*", "/", "="};
+char *operators[8] = {"-", "+", "*", "/", "=", "if", "else", "else if"};
 char *argsRegisters[4] = {"rdi", "rsi", "rcx", "rdx"};
 char *skip = "skip";
+char *strValue = "strValue";
+int stringIndex = 0;
 int skipIndex = 0;
 
 void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex){
@@ -47,7 +49,8 @@ void writeBaseFile(char **lines, LineIndices *lineIndices){
     writeAtLine("", lines, lineIndices, lineIndices->currentLine);
 
     // print function
-    writeAtLine("print:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("printString:", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    push rax", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    push rcx", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    mov rsi, rdi", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    mov rax, 1", lines, lineIndices, lineIndices->currentLine);
@@ -55,6 +58,7 @@ void writeBaseFile(char **lines, LineIndices *lineIndices){
     writeAtLine("    call strlen", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    syscall", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    pop rcx", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    ret", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("", lines, lineIndices, lineIndices->currentLine);
 
@@ -210,6 +214,14 @@ void writeExpression(Node *node, char **lines, LineIndices *lineIndices){
         writeComparison("jne", lines, lineIndices);
     }else if(strcmp(node->value, "!=") == 0){
         writeComparison("je", lines, lineIndices);
+    }else if(strcmp(node->value, ">=") == 0){
+        writeComparison("jl", lines, lineIndices);
+    }else if(strcmp(node->value, "<=") == 0){
+        writeComparison("jg", lines, lineIndices);
+    }else if(strcmp(node->value, "<") == 0){
+        writeComparison("jge", lines, lineIndices);
+    }else if(strcmp(node->value, ">") == 0){
+        writeComparison("jle", lines, lineIndices);
     }
 }
 
@@ -220,7 +232,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
         char *buffer = malloc(MAX_LINE_LEN);
         if(node->children[0]->numChildren != 0){
             if(strcmp(node->children[0]->children[0]->value, "char") == 0){
-                snprintf(buffer, MAX_LINE_LEN, "db %s, 0", node->children[1]->value);
+                snprintf(buffer, MAX_LINE_LEN, "db %s, 0x0A, 0", node->children[1]->value);
                 writeGlobalVariable(node->children[0]->value, buffer, lines, lineIndices);
             }else{
                 snprintf(buffer, MAX_LINE_LEN, "dq %s", node->children[1]->value);
@@ -249,7 +261,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
     }else if(node->children != NULL && strcmp(node->children[0]->value, "CALL_ARGS") == 0){
         char *buffer = malloc(MAX_LINE_LEN);
         for(int i = 0;i < node->children[0]->numChildren;i++){
-            if(strcmp(node->children[0]->children[i]->description, "LITERAL") == 0){
+            if(strcmp(node->children[0]->children[i]->description, "LITERAL") == 0 || strcmp(getVarType(node->children[0]->children[i]->value, &stack), "char") == 0){
                 snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], node->children[0]->children[i]->value);
             }else{
                 snprintf(buffer, MAX_LINE_LEN, "    mov %s, [%s]", argsRegisters[i], node->children[0]->children[i]->value);
@@ -259,10 +271,76 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
         snprintf(buffer, MAX_LINE_LEN, "    call %s", node->value);
         writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
         free(buffer);
+    }else if(strcmp(node->value, "if") == 0){
+        writeExpression(node->children[0], lines, lineIndices);
+        char *buffer1 = malloc(MAX_LINE_LEN);
+        char *buffer2 = malloc(MAX_LINE_LEN);
+
+        
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
+        writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
+        writeAtLine("    push rax", lines, lineIndices, lineIndices->currentLine);
+        
+        int i = 1;
+        for(i; i < node->numChildren; i++){
+            walkTree(node->children[i], lines, lineIndices);
+        }
+        skipIndex++;
+        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+
+        free(buffer1);
+        free(buffer2);
+    }else if(strcmp(node->value, "else if") == 0){
+        char *buffer1 = malloc(MAX_LINE_LEN);
+        char *buffer2 = malloc(MAX_LINE_LEN);
+
+        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+        
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
+        writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
+
+        writeExpression(node->children[0], lines, lineIndices);
+
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
+        writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
+
+        int i = 1;
+        for(i; i < node->numChildren; i++){
+            walkTree(node->children[i], lines, lineIndices);
+        }
+        
+
+        free(buffer1);
+        free(buffer2);
+
+    }else if(strcmp(node->value, "else") == 0){
+        char *buffer1 = malloc(MAX_LINE_LEN);
+        char *buffer2 = malloc(MAX_LINE_LEN);
+
+        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
+        skipIndex++;
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+
+
+        int i = 0;
+        for(i; i < node->numChildren; i++){
+            walkTree(node->children[i], lines, lineIndices);
+        }
+
+        free(buffer1);
+        free(buffer2);
+
     }
 
     for(int i = 0; i < node->numChildren; i++){
-        if(!arrayContains(operators, 5, node->value)){
+        if(!arrayContains(operators, 8, node->value)){
             walkTree(node->children[i], lines, lineIndices);
         }
     }

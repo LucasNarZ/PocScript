@@ -5,6 +5,7 @@ Token *head = NULL;
 TokenType types[NUM_TYPES] = {
     {"NUMBER", "^([0-9]*\\.[0-9]+|[0-9]+)"},
     {"BOOL", "^(true|false)\\b"},
+    {"COMMENT", "//.*"},
     {"COMPOSED_TYPE", "^(Array)"},
     {"TYPE", "^(int|float|char|bool)\\b"},
     {"KEY", "^(if|else|for|while|func|else if|ret)\\b"},
@@ -14,8 +15,7 @@ TokenType types[NUM_TYPES] = {
     {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},
     {"OPERATOR", "^(\\+|\\-|\\*|\\/|\\|\\||&&)"},
     {"DELIMITER", "^[]\\[;{}():,]"},
-    {"WHITESPACE", "^[ \t\n]+"},
-    
+    {"WHITESPACE", "^[ \t\n]+"}
 };
 
 
@@ -34,7 +34,7 @@ void getTokens(Token **head, char **input){
             }
             if(regexec(&regex, *input, 1, &match, 0) == 0){
                 int length = match.rm_eo - match.rm_so;
-                if(strcmp(types[i].type, "WHITESPACE") != 0){
+                if(strcmp(types[i].type, "WHITESPACE") != 0 && strcmp(types[i].type, "COMMENT") != 0){
                     Token *token = (Token*)(malloc(sizeof(Token)));
                     token->type = types[i].type;
                     token->value = (char*)(malloc(length + 1));

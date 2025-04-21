@@ -7,6 +7,9 @@
 #include "../types.h"
 #include "../constants.h"
 #include "../utils/utils.h"
+#include "../parser/parser.h"
+
+
 
 void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices);
 void writeFile(const char *filename, char **lines, LineIndices *lineIndices);

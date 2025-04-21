@@ -1,6 +1,7 @@
 #include "generator.h"
 
-char *operators[4] = {"-", "+", "*", "/"};
+char *operators[5] = {"-", "+", "*", "/", "="};
+char *argsRegisters[4] = {"rdi", "rsi", "rcx", "rdx"};
 char *skip = "skip";
 int skipIndex = 0;
 
@@ -59,7 +60,7 @@ void writeBaseFile(char **lines, LineIndices *lineIndices){
 
     writeAtLine("printInt:", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    mov rcx, intBuffer + 19", lines, lineIndices, lineIndices->currentLine);
-    writeAtLine("    mov rax, rsi", lines, lineIndices, lineIndices->currentLine);
+    writeAtLine("    mov rax, rdi", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    mov rbx, 10", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    jne .convert", lines, lineIndices, lineIndices->currentLine);
@@ -89,24 +90,9 @@ void writeBaseFile(char **lines, LineIndices *lineIndices){
     writeAtLine("_start:", lines, lineIndices, lineIndices->currentLine);
 }
 
-void writeIntGlobalVariable(const char *name, const char *value, char **lines, LineIndices *lineIndices){
+void writeGlobalVariable(const char *name, const char *value, char **lines, LineIndices *lineIndices){
     char *buffer = malloc(MAX_LINE_LEN);
-    snprintf(buffer, MAX_LINE_LEN, "    %s dq %s", name, value);
-
-    for (int i = lineIndices->currentLine; i > lineIndices->globalVariblesLine; i--) {
-        lines[i] = lines[i - 1];
-    }
-
-    writeAtLine("", lines, lineIndices, lineIndices->globalVariblesLine);
-    writeAtLine(buffer, lines, lineIndices, lineIndices->globalVariblesLine);
-    lineIndices->globalVariblesLine++;
-    lineIndices->currentLine--;
-    free(buffer);
-}
-
-void writeStringGlobalVariable(const char *name, const char *value, char **lines, LineIndices *lineIndices){
-    char *buffer = malloc(MAX_LINE_LEN);
-    snprintf(buffer, MAX_LINE_LEN, "    %s db %s, 0", name, value);
+    snprintf(buffer, MAX_LINE_LEN, "    %s %s", name, value);
 
     for (int i = lineIndices->currentLine; i > lineIndices->globalVariblesLine; i--) {
         lines[i] = lines[i - 1];
@@ -154,6 +140,20 @@ void writeOperator(const char *operator, char **lines, LineIndices *lineIndices)
     writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    push rax", lines, lineIndices, lineIndices->currentLine);
     free(buffer);
+}
+
+void writeAssignString(char *name, char *value, int size, char **lines, LineIndices *lineIndices){
+    char *buffer = malloc(MAX_LINE_LEN);
+
+    writeAtLine("    mov rcx, TAMANHO_MAX_STRING", lines, lineIndices, lineIndices->currentLine++);
+    writeAtLine("    mov rdi, addr_string", lines, lineIndices, lineIndices->currentLine++);
+    writeAtLine("    xor rax, rax", lines, lineIndices, lineIndices->currentLine++);
+    writeAtLine("    rep stosb", lines, lineIndices, lineIndices->currentLine++);
+
+    for(int i = 0; i < size;i++){
+        snprintf(buffer, MAX_LINE_LEN, "    mov [%s + %d], '%c'", name, i, value[i]);
+        writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+    }
 }
 
 void writeAssignGlobalVaribleInt(const char *name, const char *value, char **lines, LineIndices *lineIndices){
@@ -216,24 +216,53 @@ void writeExpression(Node *node, char **lines, LineIndices *lineIndices){
 void walkTree(Node *node, char **lines, LineIndices *lineIndices){
     if(node == NULL) return;
 
-    if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") == 0 && strcmp(node->children[0]->children[0]->value, "char") != 0){
-        writeIntGlobalVariable(node->children[0]->value, "0", lines, lineIndices);
-        writeAssignGlobalVaribleInt(node->children[0]->value, node->children[1]->value, lines, lineIndices);
-    }else if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") == 0 && strcmp(node->children[0]->children[0]->value, "char") == 0){
-        writeStringGlobalVariable(node->children[0]->value, node->children[1]->value, lines, lineIndices);
-    }else if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0 && strcmp(node->children[1]->description, "LITERAL") != 0){
-        if(node->children[0]->children != NULL && strcmp(node->children[0]->children[0]->value, "char") != 0){
-            writeIntGlobalVariable(node->children[0]->value, "0", lines, lineIndices);
+    if(strcmp(node->value, "=") == 0 && strcmp(node->parent->value, "ROOT") == 0){
+        char *buffer = malloc(MAX_LINE_LEN);
+        if(node->children[0]->numChildren != 0){
+            if(strcmp(node->children[0]->children[0]->value, "char") == 0){
+                snprintf(buffer, MAX_LINE_LEN, "db %s, 0", node->children[1]->value);
+                writeGlobalVariable(node->children[0]->value, buffer, lines, lineIndices);
+            }else{
+                snprintf(buffer, MAX_LINE_LEN, "dq %s", node->children[1]->value);
+                writeExpression(node->children[1], lines, lineIndices);
+                writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+                writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
+                writeGlobalVariable(node->children[0]->value, "dq 0", lines, lineIndices);
+            }
+            Node *type = NULL;
+
+            type = createNode(node->children[0]->children[0]->value, node->children[0]->description);
+            node = allocNode(node, type);
+            
+            defineVariables(node->children[0]->value, type, &stack, &scopesStack);
+        }else{
+            if(strcmp(getVarType(node->children[0]->value, &stack), "char") == 0){
+                printStack(&stack);
+                writeAssignString(node->children[0]->value, node->children[1]->value, sizeof(node->children[0]->value), lines, lineIndices);
+            }else{
+                writeExpression(node->children[1], lines, lineIndices);
+                writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+                writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
+            }
         }
-        
-        writeExpression(node->children[1], lines, lineIndices);
-        writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
-        writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
-        writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+        free(buffer);
+    }else if(node->children != NULL && strcmp(node->children[0]->value, "CALL_ARGS") == 0){
+        char *buffer = malloc(MAX_LINE_LEN);
+        for(int i = 0;i < node->children[0]->numChildren;i++){
+            if(strcmp(node->children[0]->children[i]->description, "LITERAL") == 0){
+                snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], node->children[0]->children[i]->value);
+            }else{
+                snprintf(buffer, MAX_LINE_LEN, "    mov %s, [%s]", argsRegisters[i], node->children[0]->children[i]->value);
+            }
+            writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+        }
+        snprintf(buffer, MAX_LINE_LEN, "    call %s", node->value);
+        writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+        free(buffer);
     }
 
     for(int i = 0; i < node->numChildren; i++){
-        if(!arrayContains(operators, 4, node->value)){
+        if(!arrayContains(operators, 5, node->value)){
             walkTree(node->children[i], lines, lineIndices);
         }
     }
@@ -254,8 +283,6 @@ void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices){
 
     walkTree(root, lines, lineIndices);
 
-    writeAtLine("    mov rsi, [var6]", lines, lineIndices, lineIndices->currentLine);
-    writeAtLine("    call printInt", lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    call end", lines, lineIndices, lineIndices->currentLine);
 
     writeFile("output.asm", lines, lineIndices);

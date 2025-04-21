@@ -17,16 +17,27 @@ int main(){
     }
     
     Node *root = createNode("ROOT", "ROOT");
-    scopesStack.scope[0] = 0;
+    Variable *print = (Variable *)malloc(sizeof(Variable));
+    Node *type = (Node *)malloc(sizeof(Node));
+    print->name = "printInt";
+    print->type = type;
+    print->type->value = "FUNCTION";
+    print->type->description = "FUNCTION";
+    print->type->numChildren = 0;
+    stack.variables[0] = print;
+    stack.size++;
+    scopesStack.scope[0] = 1;
     parseBlock(root, &head);
     printTreePretty(root);
 
-    FILE *OUTPUT;
+    cleanStack(&stack, &scopesStack);
+
+    FILE *OUTPUT = NULL;
     LineIndices *lineIndices = malloc(sizeof(LineIndices));
     lineIndices->currentLine = 1;
     lineIndices->globalVariblesLine = 4;
 
     generateAssembly(root, OUTPUT, lineIndices);
-
+    cleanStack(&stack, &scopesStack);
     return 0;
 }

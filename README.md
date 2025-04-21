@@ -37,6 +37,7 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Floating-point numbers  
 - [x] Character and String literals  
 - [x] Primitive Types
+- [x] Comments
 
 ### ✅ Parser
 - [x] Variable declarations  
@@ -68,24 +69,20 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [ ] Declare scalar variables in `.data` (`int`, `float`, etc.)
 - [x] Support variable initialization with literals
 - [x] Simple assignment (`=`)
-- [ ] Load and store scalar variables using labels
 - [x] Generate code for number literals
 - [x] Basic arithmetic operations (`+`, `-`, `*`, `/`)
 - [x] Parentheses and precedence in expressions
 - [x] Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`)
 - [x] Logical operators (`&&`, `||`, `!`)
+- [x] Default `print` function
+- [x] Function Call
 - [ ] Compound assignment (`+=`, `-=`, etc.)
 - [ ] If statements (`if`)
 - [ ] Else and else-if chaining (`else`, `else if`)
 - [ ] While loops
 - [ ] For loops
-- [ ] Label generation and conditional/unconditional jumps (`jmp`, `je`, `jne`, etc.)
-- [ ] Support return statements
+- [ ] Local Variable declaration
 - [ ] Function declaration
-- [ ] Pass function arguments via stack/register
-- [ ] Return values from functions
-- [ ] Print integer using `printf` (external libc)
-- [ ] Add string literals to `.data`
 - [ ] Support 1D arrays (declaration and access)
 - [ ] Support 2D matrices (declaration and access)
 

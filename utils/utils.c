@@ -1,5 +1,32 @@
 #include "utils.h"
 
+char *getVarType(char *var, Stack *stack){
+    for(int i = 0;i < stack->size;i++){
+        if(strcmp(stack->variables[i]->name, var) == 0){
+            return stack->variables[i]->type->value;
+        }
+    }
+    return NULL;
+}
+
+void defineVariables(char *name, Node *type, Stack *stack, ScopeStack *scopesStack){
+    stack->variables[stack->size++] = createVariable(name, type);
+    scopesStack->scope[scopesStack->size]++;
+}
+
+void getVarsNames(char **names, Stack *stack){
+    for(int i = 0;i < stack->size;i++){
+        names[i] = stack->variables[i]->name;
+    }
+}
+
+Variable *createVariable(char *name, Node *type){
+    Variable *var = (Variable *)(malloc(sizeof(Variable)));
+    var->name = name;
+    var->type = type;
+    return var;
+}
+
 void popVaribles(Stack *stack, int value){
     for(int i = 0;i < value;i++){
         stack->size--;
@@ -94,4 +121,13 @@ void printScopeStack(ScopeStack *stack){
     }
     
     printf("===================\n\n");
+}
+
+void cleanStack(Stack *stack, ScopeStack *ScopeStack){
+    for(int i = stack->size - 1;i > 0;i--){
+        free(stack->variables[i]);
+    }
+    stack->size = 1;
+    ScopeStack->size = 0;
+    ScopeStack->scope[0] = 1;
 }

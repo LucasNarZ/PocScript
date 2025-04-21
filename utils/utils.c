@@ -124,10 +124,10 @@ void printScopeStack(ScopeStack *stack){
 }
 
 void cleanStack(Stack *stack, ScopeStack *ScopeStack){
-    for(int i = stack->size - 1;i > 0;i--){
+    for(int i = stack->size - 1;i > 1;i--){
         free(stack->variables[i]);
     }
-    stack->size = 1;
+    stack->size = 2;
     ScopeStack->size = 0;
-    ScopeStack->scope[0] = 1;
+    ScopeStack->scope[0] = 2;
 }

@@ -1,0 +1,9 @@
+for(var1=45;var < 45;var=var+1){
+    car1 = 34;
+    car3 = asd*34;
+}
+
+if(var6>34){
+    var78 = 23+23;
+}
+var7 = 23+23;

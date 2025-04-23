@@ -193,9 +193,9 @@ Node *parseBlock(Node *root, Token **token){
         Node *opNode;
         if(strcmp((*token)->value, "else if") == 0){
             Node *opNode2 = createNode("else", "BLOCK");
-            opNode = createNode("if", "BLOCK");
-            allocNode(opNode2, opNode);
+            opNode = createNode("if", "SUB-BLOCK");
             allocNode(root, opNode2);
+            allocNode(opNode2, opNode);
         }else{
             opNode = createNode((*token)->value, "BLOCK");
             allocNode(root, opNode);
@@ -222,7 +222,7 @@ Node *parseBlock(Node *root, Token **token){
                     *token = (*token)->next;
                 }
             }
-            if(strcmp(opNode->value, "if") == 0){
+            if(strcmp(opNode->value, "if") == 0 && strcmp(opNode->description, "SUB-BLOCK") != 0){
                 parseBlock(root, token);
             }
         }

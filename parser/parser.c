@@ -190,11 +190,20 @@ Node *parseBlock(Node *root, Token **token){
     if((*token) != NULL && (strcmp((*token)->value, "if") == 0 || strcmp((*token)->value, "else if") == 0)){
         scopesStack.size++;
         scopesStack.scope[scopesStack.size] = 0;
-        Node *opNode = createNode((*token)->value, "BLOCK");
+        Node *opNode;
+        if(strcmp((*token)->value, "else if") == 0){
+            Node *opNode2 = createNode("else", "BLOCK");
+            opNode = createNode("if", "BLOCK");
+            allocNode(opNode2, opNode);
+            allocNode(root, opNode2);
+        }else{
+            opNode = createNode((*token)->value, "BLOCK");
+            allocNode(root, opNode);
+        }
         *token = (*token)->next->next;
         opNode = allocNode(opNode, parseLogical(token));
         *token = (*token)->next->next;
-        allocNode(root, parseBlock(opNode, token));
+        parseBlock(opNode, token);
         popVaribles(&stack, scopesStack.scope[scopesStack.size]);
         scopesStack.size--;
         if((*token)->next != NULL){

@@ -1,6 +1,6 @@
 #include "generator.h"
 
-char *operators[9] = {"-", "+", "*", "/", "=", "if", "else", "else if", "while"};
+char *operators[10] = {"-", "+", "*", "/", "=", "if", "else", "else if", "while", "for"};
 char *argsRegisters[4] = {"rdi", "rsi", "rcx", "rdx"};
 char *skip = "skip";
 char *strValue = "strValue";
@@ -329,13 +329,19 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
         char *buffer1 = malloc(MAX_LINE_LEN);
 
         skipIndex++;
-        int lastIndex = skipIndex;
+        int lastIndex1 = skipIndex;
+        int lastIndex2 = skipIndex + 1;
+        skipIndex++;
 
+        writeExpression(node->children[0], lines, lineIndices);
+        writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
+        snprintf(buffer1, MAX_LINE_LEN, "    jne skip%d", lastIndex2);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
 
-        snprintf(buffer1, MAX_LINE_LEN, "loop%d:", lastIndex);
+        snprintf(buffer1, MAX_LINE_LEN, "loop%d:", lastIndex1);
         writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);
-        int i = 0;
+        int i = 1;
         for(i; i < node->numChildren; i++){
             walkTree(node->children[i], lines, lineIndices);
         }
@@ -344,13 +350,49 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
 
         
         writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
-        snprintf(buffer1, MAX_LINE_LEN, "    jne loop%d", lastIndex);
+        snprintf(buffer1, MAX_LINE_LEN, "    jne loop%d", lastIndex1);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", lastIndex2);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+    }else if(strcmp(node->value, "for") == 0){
+        char *buffer1 = malloc(MAX_LINE_LEN);
+
+        skipIndex++;
+        int lastIndex1 = skipIndex;
+        int lastIndex2 = skipIndex + 1;
+        skipIndex++;
+
+        walkTree(node->children[0], lines, lineIndices);
+
+        writeExpression(node->children[2], lines, lineIndices);
+        writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
+        snprintf(buffer1, MAX_LINE_LEN, "    jne skip%d", lastIndex2);
         writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
 
+        snprintf(buffer1, MAX_LINE_LEN, "loop%d:", lastIndex1);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+        writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+        int i = 3;
+        for(i; i < node->numChildren; i++){
+            walkTree(node->children[i], lines, lineIndices);
+        }
+        walkTree(node->children[2], lines, lineIndices);   
+        writeAtLine("", lines, lineIndices, lineIndices->currentLine);   
+        
+        writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+        writeExpression(node->children[1], lines, lineIndices);
+        writeAtLine("", lines, lineIndices, lineIndices->currentLine);
+
+          
+        writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
+        snprintf(buffer1, MAX_LINE_LEN, "    jne loop%d", lastIndex1);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", lastIndex2);
+        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
     }
 
     for(int i = 0; i < node->numChildren; i++){
-        if(!arrayContains(operators, 9, node->value)){
+        if(!arrayContains(operators, 10, node->value)){
             walkTree(node->children[i], lines, lineIndices);
         }
     }

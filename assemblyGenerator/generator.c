@@ -114,6 +114,7 @@ void writeComparison(const char *label, char **lines, LineIndices *lineIndices){
     char *buffer2 = malloc(MAX_LINE_LEN);
     char *buffer3 = malloc(MAX_LINE_LEN);
     char *buffer4 = malloc(MAX_LINE_LEN);
+    skipIndex++;
     snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
     snprintf(buffer2, MAX_LINE_LEN, "    %s skip%d",label, skipIndex);
     skipIndex++;
@@ -129,7 +130,6 @@ void writeComparison(const char *label, char **lines, LineIndices *lineIndices){
     writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
     writeAtLine("    xor rax, rax", lines, lineIndices, lineIndices->currentLine);
     writeAtLine(buffer3, lines, lineIndices, lineIndices->currentLine);
-    skipIndex++;
     free(buffer1);
     free(buffer2);
     free(buffer3);
@@ -276,63 +276,52 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices){
         char *buffer1 = malloc(MAX_LINE_LEN);
         char *buffer2 = malloc(MAX_LINE_LEN);
 
-        
-        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
+        skipIndex++;
+        int lastIndex = skipIndex;
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", lastIndex);
         writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
         writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
         writeAtLine("    push rax", lines, lineIndices, lineIndices->currentLine);
         
         int i = 1;
         for(i; i < node->numChildren; i++){
+            if(strcmp(node->children[i]->value, "else") == 0){
+                writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+                snprintf(buffer1, MAX_LINE_LEN, "skip%d:", lastIndex);
+                writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+            }
             walkTree(node->children[i], lines, lineIndices);
         }
-        skipIndex++;
-        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
-        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
 
-        free(buffer1);
-        free(buffer2);
-    }else if(strcmp(node->value, "else if") == 0){
-        char *buffer1 = malloc(MAX_LINE_LEN);
-        char *buffer2 = malloc(MAX_LINE_LEN);
-
-        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
-        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
-        
-        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
-        writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
-        writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
-        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
-
-        writeExpression(node->children[0], lines, lineIndices);
-
-        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
-        writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
-        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
-
-        int i = 1;
-        for(i; i < node->numChildren; i++){
-            walkTree(node->children[i], lines, lineIndices);
+        if(strcmp(node->children[i - 1]->value, "else") != 0){
+            writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+            snprintf(buffer1, MAX_LINE_LEN, "skip%d:", lastIndex);
+            writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
         }
-        
 
+        
+        
         free(buffer1);
         free(buffer2);
-
     }else if(strcmp(node->value, "else") == 0){
         char *buffer1 = malloc(MAX_LINE_LEN);
         char *buffer2 = malloc(MAX_LINE_LEN);
 
-        snprintf(buffer1, MAX_LINE_LEN, "skip%d:", skipIndex);
-        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", skipIndex);
         skipIndex++;
-        writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
+        int lastIndex = skipIndex;
+        
 
-
+        snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", lastIndex);
+        writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
+        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
+        
         int i = 0;
         for(i; i < node->numChildren; i++){
             walkTree(node->children[i], lines, lineIndices);
         }
+        
+        snprintf(buffer2, MAX_LINE_LEN, "skip%d:", lastIndex);
+        writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
 
         free(buffer1);
         free(buffer2);

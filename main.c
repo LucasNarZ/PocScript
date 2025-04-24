@@ -46,7 +46,11 @@ int main(){
     lineIndices->currentLine = 1;
     lineIndices->globalVariblesLine = 4;
 
-    generateAssembly(root, OUTPUT, lineIndices);
+    LineIndices *functionLineIndices = malloc(sizeof(LineIndices));
+    functionLineIndices->currentLine = 1;
+    functionLineIndices->globalVariblesLine = 4;
+
+    generateAssembly(root, OUTPUT, lineIndices, functionLineIndices);
     cleanStack(&stack, &scopesStack);
     return 0;
 }

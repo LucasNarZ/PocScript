@@ -11,10 +11,10 @@
 
 
 
-void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices);
+void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices, LineIndices *functionLineIndices);
 void writeFile(const char *filename, char **lines, LineIndices *lineIndices);
 void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex);
 void writeAssignGlobalVaribleInt(const char *name, const char *value, char **lines, LineIndices *lineIndices);
-void walkTree(Node *node, char **lines, LineIndices *lineIndices);
+void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices);
 
 #endif

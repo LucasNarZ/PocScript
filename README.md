@@ -35,9 +35,8 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Integers  
 - [x] Identifiers  
 - [x] Floating-point numbers  
-- [x] Character and String literals  
-- [x] Primitive Types
-- [x] Comments
+- [x] Character and String literals(need to fix bug)
+- [ ] Comments
 
 ### ✅ Parser
 - [x] Variable declarations  
@@ -77,10 +76,10 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Default `print` function
 - [x] Function Call
 - [ ] Compound assignment (`+=`, `-=`, etc.)
-- [ ] If statements (`if`)
-- [ ] Else and else-if chaining (`else`, `else if`)
-- [ ] While loops
-- [ ] For loops
+- [x] If statements (`if`)
+- [x] Else and else-if chaining (`else`, `else if`)
+- [x] While loops
+- [x] For loops
 - [ ] Local Variable declaration
 - [ ] Function declaration
 - [ ] Support 1D arrays (declaration and access)
@@ -120,8 +119,10 @@ echo "a::int = 2 + 3;" > input.ps
 ```
 2. Run the compiler:
 ```bash
-./compiler
+make clean
+make 
+./output
 ```
-3. (In future versions) The output will be an .asm file to be compiled with NASM.
+
 ## 📌 Notes
 This project is intended for **learning purposes**, so the implementation favors simplicity and clarity over performance or completeness. Contributions, feedback, or suggestions are welcome!

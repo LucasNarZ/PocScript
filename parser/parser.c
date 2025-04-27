@@ -5,7 +5,7 @@ Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
     if((*token) != NULL && (strcmp((*token)->type, "NUMBER") == 0 || strcmp((*token)->type, "STRING") == 0 || strcmp((*token)->type, "BOOL") == 0)){
-        Node *node = createNode((*token)->value, "LITERAL");
+        Node *node = createNode((*token)->value, (*token)->type);
         *token = (*token)->next;
         return node;
     }

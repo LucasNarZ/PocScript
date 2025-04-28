@@ -9,7 +9,7 @@ TokenType types[NUM_TYPES] = {
     {"COMPOSED_TYPE", "^(Array)"},
     {"TYPE", "^(int|float|char|bool)\\b"},
     {"KEY", "^(if|else|for|while|func|else if|ret)\\b"},
-    {"STRING", "^(['\"])([^\\\\\\1]|\\\\.)*\\1"},
+    {"STRING", "^(['\"])([^\\\\\\]|\\\\.)*\\1"},
     {"SYMBOL", "^(==|>=|<=|!=|>|<|!)"},
     {"ASSIGN", "^(\\+=|=|-=)"},
     {"IDENTIFIER", "^[_a-zA-Z][_a-zA-Z0-9]*"},

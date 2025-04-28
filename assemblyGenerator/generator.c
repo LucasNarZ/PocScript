@@ -5,9 +5,9 @@ char *argsRegisters[4] = {"rdi", "rsi", "rcx", "rdx"};
 char *variableTypes[3] = {"NUMBER", "BOOL", "CHAR"};
 char *skip = "skip";
 char *strValue = "strValue";
-int stringIndex = 0;
 int skipIndex = 0;
 int functionIndex = 0;
+int stringIndex = 0;
 
 void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex){
     lines[lineIndex] = malloc(MAX_LINE_LEN);
@@ -266,22 +266,35 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
             }
         }
         free(buffer);
-    }else if(node->children != NULL && strcmp(node->children[0]->value, "CALL_ARGS") == 0){
+    }else if(node->numChildren != 0 && strcmp(node->children[0]->value, "CALL_ARGS") == 0){
         char *buffer = malloc(MAX_LINE_LEN);
+        char *buffer2 = malloc(MAX_LINE_LEN);
         for(int i = 0;i < node->children[0]->numChildren;i++){
             Node *arg = node->children[0]->children[i];
-            if(arrayContains(variableTypes, 3, arg->description) || strcmp(getVarType(arg->value, &stack), "char") == 0){
-                snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], arg->value);
+            if(strcmp(arg->description, "STRING") == 0){
+                snprintf(buffer, MAX_LINE_LEN, "STR%d", stringIndex);
+                
+                char *strBuffer = malloc(MAX_LINE_LEN);
+                strcpy(strBuffer, buffer);
+                Node *variableNameBuffer = createNode(strBuffer, "LITERAL");
+                snprintf(buffer, MAX_LINE_LEN, "db %s, 0x0A, 0", arg->value);
+                writeGlobalVariable(variableNameBuffer, buffer, lines, lineIndices);
+                snprintf(buffer2, MAX_LINE_LEN, "STR%d", stringIndex);
+                snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], buffer2);
+                stringIndex++;
             }else if(arrayContains(variableTypes, 3, arg->description) || strcmp(getVarType(arg->value, &stack), "char") == 0){
                 snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], arg->value);
             }else{
                 snprintf(buffer, MAX_LINE_LEN, "    mov %s, [%s]", argsRegisters[i], arg->value);
             }
             writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
+            free(arg);
         }
         snprintf(buffer, MAX_LINE_LEN, "    call %s", node->value);
         writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
         free(buffer);
+        free(buffer2);
+        
     }else if(strcmp(node->value, "if") == 0){
         writeExpression(node->children[0], lines, lineIndices);
         char *buffer1 = malloc(MAX_LINE_LEN);
@@ -424,7 +437,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         printf("asdasd");
     }
     for(int i = 0; i < node->numChildren; i++){
-        if(!arrayContains(operators, 10, node->value) && strcmp(node->children[0]->value ,"ARGS") != 0){
+        if(!arrayContains(operators, 10, node->value) && strcmp(node->children[0]->value ,"ARGS") != 0 && strcmp(node->children[0]->value ,"CALL_ARGS") != 0){
             walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
         }
     }

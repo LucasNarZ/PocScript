@@ -334,7 +334,6 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         skipIndex++;
         int lastIndex = skipIndex;
         
-
         snprintf(buffer2, MAX_LINE_LEN, "    jne skip%d", lastIndex);
         writeAtLine("    cmp rax, 0", lines, lineIndices, lineIndices->currentLine);
         writeAtLine(buffer2, lines, lineIndices, lineIndices->currentLine);
@@ -389,7 +388,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
 
         walkTree(node->children[0], lines, lineIndices, functionLines, functionLineIndices);
 
-        writeExpression(node->children[2], lines, lineIndices);
+        writeExpression(node->children[1], lines, lineIndices);
         writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
         snprintf(buffer1, MAX_LINE_LEN, "    jne skip%d", lastIndex2);
         writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);

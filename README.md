@@ -36,7 +36,7 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Identifiers  
 - [x] Floating-point numbers  
 - [x] Character and String literals(need to fix bug)
-- [ ] Comments
+- [x] Comments
 
 ### ✅ Parser
 - [x] Variable declarations  

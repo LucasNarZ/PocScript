@@ -8,6 +8,7 @@
 #include "../constants.h"
 #include "../utils/utils.h"
 #include "../parser/parser.h"
+#include "./hashTable.h"
 
 extern Stack stack;
 extern ScopeStack scopesStack;

@@ -109,4 +109,10 @@ typedef struct lineIndices {
     int pastInstructionLine;
 } LineIndices;
 
+typedef struct pair {
+    char *key;
+    char *value;
+    struct pair *next;
+} Pair;
+
 #endif

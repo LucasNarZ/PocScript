@@ -19,5 +19,6 @@ void printTreePretty(Node *root);
 void printTreeWithBranches(Node *node, int depth, int is_last[]);
 void popVaribles(Stack *stack, int value);
 void cleanStack(Stack *stack, ScopeStack *ScopeStack);
+void printHashTable(Pair *hashTable[HASH_TABLE_SIZE]);
 
 #endif

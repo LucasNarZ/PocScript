@@ -131,3 +131,22 @@ void cleanStack(Stack *stack, ScopeStack *ScopeStack){
     ScopeStack->size = 0;
     ScopeStack->scope[0] = 2;
 }
+
+void printHashTable(Pair *hashTable[HASH_TABLE_SIZE]){
+    printf("Hash Table Contents:\n");
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        printf("[%2d]: ", i);
+        Pair *current = hashTable[i];
+        if (!current) {
+            printf("NULL\n");
+            continue;
+        }
+
+        while (current) {
+            printf("(%s -> %s)", current->key, current->value);
+            if (current->next) printf(" -> ");
+            current = current->next;
+        }
+        printf("\n");
+    }
+}

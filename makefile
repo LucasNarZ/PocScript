@@ -1,6 +1,6 @@
 TARGET = output
 
-SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c ./assemblyGenerator/generator.c 
+SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c ./assemblyGenerator/generator.c ./assemblyGenerator/hashTable.c
 
 OBJ = $(SRC:.c=.o)
 SRC_NASM = output.asm

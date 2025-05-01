@@ -6,5 +6,7 @@
 #define NUM_TYPES 13
 #define MAX_LINES 1000
 #define MAX_LINE_LEN 256
+#define HASH_TABLE_SIZE 500
+#define MAX_VAR_NAME 30
 
 #endif

@@ -110,7 +110,6 @@ void writeGlobalVariable(Node *node, const char *value, char **lines, LineIndice
     lineIndices->currentLine--;
 
     free(buffer);
-
 }
 
 void writeComparison(const char *label, char **lines, LineIndices *lineIndices){
@@ -240,14 +239,22 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
     if(strcmp(node->value, "=") == 0){
         char *buffer = malloc(MAX_LINE_LEN);
         if(node->children[0]->numChildren != 0){
+            
             if(strcmp(node->children[0]->children[0]->value, "char") == 0){
                 snprintf(buffer, MAX_LINE_LEN, "db %s, 0x0A, 0", node->children[1]->value);
-                writeGlobalVariable(node->children[0], buffer, lines, lineIndices);
+                createPair(hashTable, node->children[0]->value, node->children[0]->value);
+                if(strcmp(node->parent->value, "ROOT") == 0){
+                    writeGlobalVariable(node->children[0], buffer, lines, lineIndices);
+                }else{
+
+                }
             }else{
                 snprintf(buffer, MAX_LINE_LEN, "dq %s", node->children[1]->value);
                 writeExpression(node->children[1], lines, lineIndices);
                 writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
                 writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
+                createPair(hashTable, node->children[0]->value, node->children[0]->value);
+                printHashTable(hashTable);
                 writeGlobalVariable(node->children[0], "dq 0", lines, lineIndices);
             }
             Node *type = NULL;
@@ -429,11 +436,15 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
             offset += 4;
         }
         
+        i = 1;
+        for(i;i < node->numChildren;i++){
+            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+        }
+
         writeAtLine("   pop rbp", functionLines, functionLineIndices, functionLineIndices->currentLine);
         writeAtLine("   ret", functionLines, functionLineIndices, functionLineIndices->currentLine);
 
         free(buffer1);
-        printf("asdasd");
     }
     for(int i = 0; i < node->numChildren; i++){
         if(!arrayContains(operators, 10, node->value) && strcmp(node->children[0]->value ,"ARGS") != 0 && strcmp(node->children[0]->value ,"CALL_ARGS") != 0){

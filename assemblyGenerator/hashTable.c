@@ -3,28 +3,33 @@
 #include <string.h>
 #include "../constants.h"
 
-Variable hashTable[HASH_TABLE_SIZE];
+Pair *hashTable[HASH_TABLE_SIZE] = {0};
 
-int createHash(char *key, int size){
-    int sum = 0;
-    for(int i = 0; i < size;i++){
-        sum += (unsigned char)key[i];
+int createHash(char *key){
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *key++)) {
+        hash = ((hash << 5) + hash) + c;
     }
-    return sum;
+    hash = hash % HASH_TABLE_SIZE;
+    return hash;
 }
 
-Pair *createPair(Pair *hashTable[HASH_TABLE_SIZE], char *key, int size, char *variable){
-    int hash = createHash(key, size);
+Pair *createPair(Pair *hashTable[HASH_TABLE_SIZE], char *key, char *value){
+    int hash = createHash(key);
     Pair *pair = (Pair *)malloc(sizeof(Pair));
+    pair->key = (char *)malloc(MAX_VAR_NAME);
+    pair->value = (char *)malloc(MAX_VAR_NAME);
     strcpy(pair->key, key);
-    strcpy(pair->value, variable);
+    strcpy(pair->value, value);
     pair->next = hashTable[hash];
     hashTable[hash] = pair;
-    return variable;
+    return value;
 }
 
-Variable *getValue(Pair *hashTable[HASH_TABLE_SIZE], char *key, int size){
-    int hash = createHash(key, size);
+Variable *getValue(Pair *hashTable[HASH_TABLE_SIZE], char *key){
+    int hash = createHash(key);
     Pair *current = hashTable[hash];
     while(current != NULL){
         if(strcmp(current->key, key) == 0){

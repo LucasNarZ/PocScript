@@ -3,10 +3,10 @@
 
 #include "../types.h"
 
-extern hashTable;
+extern Pair *hashTable[HASH_TABLE_SIZE];
 
-int createHash(char *key, int size);
-Pair *createPair(Pair *hashTable[HASH_TABLE_SIZE], char *key, int size, char *variable);
-Variable *getValue(Pair *hashTable[HASH_TABLE_SIZE], char *key, int size);
+int createHash(char *key);
+Pair *createPair(Pair *hashTable[HASH_TABLE_SIZE], char *key, char *variable);
+Variable *getValue(Pair *hashTable[HASH_TABLE_SIZE], char *key);
 
 #endif

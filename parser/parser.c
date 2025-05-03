@@ -41,7 +41,9 @@ Node *parseFactor(Token **token){
                 allocNode(node, args);
                 *token = (*token)->next->next;
                 parseCallArguments(args, token);
-                *token = (*token)->anterior;
+                if(args->numChildren != 0){
+                    *token = (*token)->anterior;
+                }
             }else if(strcmp(getVarType((*token)->value, &stack), "Array") == 0){
                 Node *indices = createNode("ARRAY_INDICES", "ARRAY_INDICES");
                 allocNode(node, indices);

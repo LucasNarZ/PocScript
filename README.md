@@ -34,6 +34,7 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Assignment Operators  
 - [x] Integers  
 - [x] Identifiers  
+- [ ] `*=` and `/=` operators
 - [x] Floating-point numbers  
 - [x] Character and String literals(need to fix bug)
 - [x] Comments
@@ -49,6 +50,7 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] Function declaration
 - [x] Primitive types  
 - [x] `+=` operator  
+- [ ] `*=` and `/=` operators
 - [x] Variable scopes  
 - [x] Vectors
 - [x] Matrices 
@@ -65,7 +67,8 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 ### ✅ Assembly Generator
 - [x] Generate `.asm` output file
 - [x] Add `.data`, `.text`, and `_start` sections
-- [ ] Declare scalar variables in `.data` (`int`, `float`, etc.)
+- [ ] Integer declaration and initialization
+- [ ] Float declaration and initialization
 - [x] Support variable initialization with literals
 - [x] Simple assignment (`=`)
 - [x] Generate code for number literals
@@ -82,6 +85,8 @@ The final step takes the AST and converts it to **x86 assembly** (requires an as
 - [x] For loops
 - [ ] Local Variable declaration
 - [ ] Function declaration
+- [ ] `ret` statement
+- [ ] Float math
 - [ ] Support 1D arrays (declaration and access)
 - [ ] Support 2D matrices (declaration and access)
 

@@ -6,7 +6,8 @@
 
 Stack stack = {0};
 ScopeStack scopesStack;
-
+LineIndices *functionLineIndices;
+LineIndices *lineIndices;
 
 int main(){
     FILE *file_ptr = fopen("input.ps", "r");
@@ -42,15 +43,15 @@ int main(){
     cleanStack(&stack, &scopesStack);
 
     FILE *OUTPUT = NULL;
-    LineIndices *lineIndices = malloc(sizeof(LineIndices));
+    lineIndices = malloc(sizeof(LineIndices));
     lineIndices->currentLine = 1;
     lineIndices->globalVariblesLine = 4;
 
-    LineIndices *functionLineIndices = malloc(sizeof(LineIndices));
+    functionLineIndices = malloc(sizeof(LineIndices));
     functionLineIndices->currentLine = 1;
     functionLineIndices->globalVariblesLine = 4;
 
-    generateAssembly(root, OUTPUT, lineIndices, functionLineIndices);
+    generateAssembly(root, OUTPUT, lineIndices);
     cleanStack(&stack, &scopesStack);
     return 0;
 }

@@ -4,10 +4,14 @@ char *operators[10] = {"-", "+", "*", "/", "=", "if", "else", "else if", "while"
 char *argsRegisters[4] = {"rdi", "rsi", "rcx", "rdx"};
 char *variableTypes[3] = {"NUMBER", "BOOL", "CHAR"};
 char *skip = "skip";
-char *strValue = "strValue";
 int skipIndex = 0;
 int functionIndex = 0;
 int stringIndex = 0;
+
+char **functionLines;
+char **lines;
+
+int globalVarsIndex = 4;
 
 void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex){
     lines[lineIndex] = malloc(MAX_LINE_LEN);
@@ -96,17 +100,17 @@ void writeBaseFile(char **lines, LineIndices *lineIndices){
     writeAtLine("_start:", lines, lineIndices, lineIndices->currentLine);
 }
 
-void writeGlobalVariable(Node *node, const char *value, char **lines, LineIndices *lineIndices){
+void writeGlobalVariable(Node *node, const char *value){
     char *buffer = malloc(MAX_LINE_LEN);
     snprintf(buffer, MAX_LINE_LEN, "    %s %s", node->value, value);
 
-    for (int i = lineIndices->currentLine; i > lineIndices->globalVariblesLine; i--) {
+    for (int i = lineIndices->currentLine; i > globalVarsIndex; i--) {
         lines[i] = lines[i - 1];
     }
 
-    writeAtLine("", lines, lineIndices, lineIndices->globalVariblesLine);
-    writeAtLine(buffer, lines, lineIndices, lineIndices->globalVariblesLine);
-    lineIndices->globalVariblesLine++;
+    writeAtLine("", lines, lineIndices, globalVarsIndex);
+    writeAtLine(buffer, lines, lineIndices, globalVarsIndex);
+    globalVarsIndex++;
     lineIndices->currentLine--;
 
     free(buffer);
@@ -149,45 +153,12 @@ void writeOperator(const char *operator, char **lines, LineIndices *lineIndices)
     free(buffer);
 }
 
-void writeAssignString(char *name, char *value, int size, char **lines, LineIndices *lineIndices){
-    char *buffer = malloc(MAX_LINE_LEN);
-
-    writeAtLine("    mov rcx, TAMANHO_MAX_STRING", lines, lineIndices, lineIndices->currentLine++);
-    writeAtLine("    mov rdi, addr_string", lines, lineIndices, lineIndices->currentLine++);
-    writeAtLine("    xor rax, rax", lines, lineIndices, lineIndices->currentLine++);
-    writeAtLine("    rep stosb", lines, lineIndices, lineIndices->currentLine++);
-
-    for(int i = 0; i < size;i++){
-        snprintf(buffer, MAX_LINE_LEN, "    mov [%s + %d], '%c'", name, i, value[i]);
-        writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
-    }
-}
-
 void writeAssignGlobalVaribleInt(const char *name, const char *value, char **lines, LineIndices *lineIndices){
     char *buffer = malloc(MAX_LINE_LEN);
 
     snprintf(buffer, MAX_LINE_LEN, "    mov qword [%s], %s", name, value);
     writeAtLine(buffer, lines, lineIndices, lineIndices->currentLine);
     free(buffer);
-}
-
-void writeFile(const char *filename, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices){
-    FILE *file = fopen(filename, "w");
-    if(file == NULL){
-        fprintf(stderr, "Error opening file %s\n", filename);
-        return;
-    }
-
-    for(int i = 1; i < lineIndices->currentLine; i++){
-        fprintf(file, "%s\n", lines[i]);
-        free(lines[i]);
-    }
-    fprintf(file, "%s\n", "");
-    for(int i = 1; i < functionLineIndices->currentLine; i++){
-        fprintf(file, "%s\n", functionLines[i]);
-        free(functionLines[i]);
-    }
-    fclose(file);
 }
 
 void writeExpression(Node *node, char **lines, LineIndices *lineIndices){
@@ -233,7 +204,7 @@ void writeExpression(Node *node, char **lines, LineIndices *lineIndices){
     }
 }
 
-void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices){
+void walkTree(Node *node, char **lines, LineIndices *lineIndices){
     if(node == NULL) return;
 
     if(strcmp(node->value, "=") == 0){
@@ -244,9 +215,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
                 snprintf(buffer, MAX_LINE_LEN, "db %s, 0x0A, 0", node->children[1]->value);
                 createPair(hashTable, node->children[0]->value, node->children[0]->value);
                 if(strcmp(node->parent->value, "ROOT") == 0){
-                    writeGlobalVariable(node->children[0], buffer, lines, lineIndices);
-                }else{
-
+                    writeGlobalVariable(node->children[0], buffer);
                 }
             }else{
                 snprintf(buffer, MAX_LINE_LEN, "dq %s", node->children[1]->value);
@@ -254,8 +223,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
                 writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
                 writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
                 createPair(hashTable, node->children[0]->value, node->children[0]->value);
-                printHashTable(hashTable);
-                writeGlobalVariable(node->children[0], "dq 0", lines, lineIndices);
+                writeGlobalVariable(node->children[0], "dq 0");
             }
             Node *type = NULL;
 
@@ -264,13 +232,11 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
             
             defineVariables(node->children[0]->value, type, &stack, &scopesStack);
         }else{
-            if(strcmp(getVarType(node->children[0]->value, &stack), "char") == 0){
-                writeAssignString(node->children[0]->value, node->children[1]->value, sizeof(node->children[0]->value), lines, lineIndices);
-            }else{
-                writeExpression(node->children[1], lines, lineIndices);
-                writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
-                writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
-            }
+
+            writeExpression(node->children[1], lines, lineIndices);
+            writeAtLine("    pop rax", lines, lineIndices, lineIndices->currentLine);
+            writeAssignGlobalVaribleInt(node->children[0]->value, "rax", lines, lineIndices);
+            
         }
         free(buffer);
     }else if(node->numChildren != 0 && strcmp(node->children[0]->value, "CALL_ARGS") == 0){
@@ -285,7 +251,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
                 strcpy(strBuffer, buffer);
                 Node *variableNameBuffer = createNode(strBuffer, "LITERAL");
                 snprintf(buffer, MAX_LINE_LEN, "db %s, 0x0A, 0", arg->value);
-                writeGlobalVariable(variableNameBuffer, buffer, lines, lineIndices);
+                writeGlobalVariable(variableNameBuffer, buffer);
                 snprintf(buffer2, MAX_LINE_LEN, "STR%d", stringIndex);
                 snprintf(buffer, MAX_LINE_LEN, "    mov %s, %s", argsRegisters[i], buffer2);
                 stringIndex++;
@@ -321,7 +287,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
                 snprintf(buffer1, MAX_LINE_LEN, "skip%d:", lastIndex);
                 writeAtLine(buffer1, lines, lineIndices, lineIndices->currentLine);
             }
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], lines, lineIndices);
         }
 
         if(strcmp(node->children[i - 1]->value, "else") != 0){
@@ -347,7 +313,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         
         int i = 0;
         for(i; i < node->numChildren; i++){
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], lines, lineIndices);
         }
         
         snprintf(buffer2, MAX_LINE_LEN, "skip%d:", lastIndex);
@@ -374,7 +340,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);
         int i = 1;
         for(i; i < node->numChildren; i++){
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], lines, lineIndices);
         }
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);
         writeExpression(node->children[0], lines, lineIndices);
@@ -393,7 +359,7 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         int lastIndex2 = skipIndex + 1;
         skipIndex++;
 
-        walkTree(node->children[0], lines, lineIndices, functionLines, functionLineIndices);
+        walkTree(node->children[0], lines, lineIndices);
 
         writeExpression(node->children[1], lines, lineIndices);
         writeAtLine("    cmp rax, 1", lines, lineIndices, lineIndices->currentLine);
@@ -405,9 +371,9 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);
         int i = 3;
         for(i; i < node->numChildren; i++){
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], lines, lineIndices);
         }
-        walkTree(node->children[2], lines, lineIndices, functionLines, functionLineIndices);   
+        walkTree(node->children[2], lines, lineIndices);   
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);   
         
         writeAtLine("", lines, lineIndices, lineIndices->currentLine);
@@ -425,8 +391,8 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         functionIndex++;
         snprintf(buffer1, MAX_LINE_LEN, "%s:", node->value);
         writeAtLine(buffer1, functionLines, functionLineIndices, functionLineIndices->currentLine);
-        writeAtLine("   push rbp", functionLines, functionLineIndices, functionLineIndices->currentLine);
-        writeAtLine("   mov rbp, rsp", functionLines, functionLineIndices, functionLineIndices->currentLine);
+        writeAtLine("    push rbp", functionLines, functionLineIndices, functionLineIndices->currentLine);
+        writeAtLine("    mov rbp, rsp", functionLines, functionLineIndices, functionLineIndices->currentLine);
 
         int i = 0;
         int offset = 4;
@@ -438,26 +404,45 @@ void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functio
         
         i = 1;
         for(i;i < node->numChildren;i++){
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], functionLines, functionLineIndices);
         }
 
-        writeAtLine("   pop rbp", functionLines, functionLineIndices, functionLineIndices->currentLine);
-        writeAtLine("   ret", functionLines, functionLineIndices, functionLineIndices->currentLine);
+        writeAtLine("    pop rbp", functionLines, functionLineIndices, functionLineIndices->currentLine);
+        writeAtLine("    ret", functionLines, functionLineIndices, functionLineIndices->currentLine);
 
         free(buffer1);
     }
     for(int i = 0; i < node->numChildren; i++){
         if(!arrayContains(operators, 10, node->value) && strcmp(node->children[0]->value ,"ARGS") != 0 && strcmp(node->children[0]->value ,"CALL_ARGS") != 0){
-            walkTree(node->children[i], lines, lineIndices, functionLines, functionLineIndices);
+            walkTree(node->children[i], lines, lineIndices);
         }
     }
 }
 
-void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices, LineIndices *functionLineIndices){
+void writeFile(const char *filename, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices){
+    FILE *file = fopen(filename, "w");
+    if(file == NULL){
+        fprintf(stderr, "Error opening file %s\n", filename);
+        return;
+    }
+
+    for(int i = 1; i < lineIndices->currentLine; i++){
+        fprintf(file, "%s\n", lines[i]);
+        free(lines[i]);
+    }
+    fprintf(file, "%s\n", "");
+    for(int i = 1; i < functionLineIndices->currentLine; i++){
+        fprintf(file, "%s\n", functionLines[i]);
+        free(functionLines[i]);
+    }
+    fclose(file);
+}
+
+void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices){
     if(root == NULL) return;
 
-    char **lines = malloc(sizeof(char*) * MAX_LINES);
-    char **functionLines = malloc(sizeof(char*) * MAX_LINES);
+    lines = malloc(sizeof(char*) * MAX_LINES);
+    functionLines = malloc(sizeof(char*) * MAX_LINES);
 
     outputFile = fopen("output.asm", "w");
     if(outputFile == NULL){
@@ -467,7 +452,7 @@ void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices, Li
 
     writeBaseFile(lines, lineIndices);
 
-    walkTree(root, lines, lineIndices, functionLines, functionLineIndices);
+    walkTree(root, lines, lineIndices);
 
     writeAtLine("    call end", lines, lineIndices, lineIndices->currentLine);
 

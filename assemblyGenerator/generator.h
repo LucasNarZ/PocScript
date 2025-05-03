@@ -12,11 +12,13 @@
 
 extern Stack stack;
 extern ScopeStack scopesStack;
+extern LineIndices *functionLineIndices;
+extern LineIndices *lineIndices;
 
-void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices, LineIndices *functionLineIndices);
+void generateAssembly(Node *root, FILE *outputFile, LineIndices *lineIndices);
 void writeFile(const char *filename, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices);
 void writeAtLine(const char *text, char **lines, LineIndices *lineIndices, int lineIndex);
 void writeAssignGlobalVaribleInt(const char *name, const char *value, char **lines, LineIndices *lineIndices);
-void walkTree(Node *node, char **lines, LineIndices *lineIndices, char **functionLines, LineIndices *functionLineIndices);
+void walkTree(Node *node, char **lines, LineIndices *lineIndices);
 
 #endif

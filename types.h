@@ -3,25 +3,55 @@
 #ifndef TYPE_H
 #define TYPE_H
 
+typedef enum {
+    TOKEN_NUMBER,
+    TOKEN_BOOL,
+    TOKEN_COMMENT,
+    TOKEN_TYPE_ARRAY,
+    TOKEN_TYPE_INT,
+    TOKEN_TYPE_FLOAT,
+    TOKEN_TYPE_CHAR,
+    TOKEN_TYPE_BOOL,
+    TOKEN_KW_IF,
+    TOKEN_KW_ELSE,
+    TOKEN_KW_FOR,
+    TOKEN_KW_WHILE,
+    TOKEN_KW_FUNC,
+    TOKEN_KW_RET,
+    TOKEN_STRING,
+    TOKEN_EQ_EQ,
+    TOKEN_GT_EQ,
+    TOKEN_LT_EQ,
+    TOKEN_NOT_EQ,
+    TOKEN_GT,
+    TOKEN_LT,
+    TOKEN_BANG,
+    TOKEN_PLUS_ASSIGN,
+    TOKEN_MINUS_ASSIGN,
+    TOKEN_ASSIGN,
+    TOKEN_DOUBLE_COLON,
+    TOKEN_IDENTIFIER,
+    TOKEN_OR_OR,
+    TOKEN_AND_AND,
+    TOKEN_PLUS,
+    TOKEN_MINUS,
+    TOKEN_STAR,
+    TOKEN_SLASH,
+    TOKEN_DELIMITER,
+    TOKEN_WHITESPACE
+} TokenType;
+
 typedef struct Token {
-    char *type;
+    TokenType type;
     char *value;
     struct Token *next;
     struct Token *anterior;
 } Token;
 
 typedef struct {
-    char *type;
+    TokenType type;
     char *pattern;
-} TokenType;
-
-// typedef struct typeNode {
-//     union {
-//         char *type;
-//         struct typeNode *typeNode;
-//     };
-    
-// } TypeNode;
+} TokenDefinition;
 
 typedef struct Node {
     char *value;
@@ -31,62 +61,6 @@ typedef struct Node {
     int numChildren;
 } Node;
 
-// typedef struct literalNode {
-//     char *value;
-//     struct typeNode *type;
-// } LiteralNode;
-
-// typedef struct assignmentNode {
-//     char *value;
-//     struct variableNode *var;
-//     struct literalNode *literal;
-// } AssignmentNode;
-
-// typedef struct operatorNode {
-//     char *value;
-//     struct literalNode *left;
-//     struct literalNode *right;
-// } OperatorNode;
-
-// typedef struct arrayNode {
-//     char *value;
-//     union {
-//         struct literalNode *literal;
-//         struct variableNode *var;
-//         struct arrayNode *array;
-//     } data;
-//     struct typeNode *type;
-// } ArrayNode;
-
-// typedef struct functionNode {
-//     char *value;
-//     struct variableNode *var;
-//     struct literalNode *literal;
-// } FunctionNode;
-
-// typedef struct logicalNode {
-//     char *value;
-//     union {
-//         struct logicalNode *logical;
-//         struct comparisonNode *comparison;
-//         struct literalNode *literal;
-//     };
-// } LogicalNode;
-
-// typedef struct comparisonNode {
-//     char *value;
-//     union {
-//         struct comparisonNode *comparison;
-//         struct operatorNode *operator;
-//         struct literalNode *literal;
-//     };
-// } ComparisonNode;
-
-
-// typedef struct primitiveVariableNode {
-//     char *value;
-//     struct typeNode *type;
-// } PrimitiveVariableNode;
 
 typedef struct variable {
     char *name;

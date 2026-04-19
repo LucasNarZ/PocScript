@@ -1,7 +1,7 @@
-#include "constants.h"
+#ifndef TOKEN_H
+#define TOKEN_H
 
-#ifndef TYPE_H
-#define TYPE_H
+#include "../constants.h"
 
 typedef enum {
     TOKEN_NUMBER,
@@ -59,41 +59,5 @@ typedef struct {
     TokenType type;
     char *pattern;
 } TokenDefinition;
-
-typedef struct Node {
-    char *value;
-    char *description;
-    struct Node *parent;
-    struct Node **children;
-    int numChildren;
-} Node;
-
-
-typedef struct variable {
-    char *name;
-    struct Node *type;
-} Variable;
-
-typedef struct Stack {
-    struct variable *variables[MAX_SIZE_STACK];
-    int size;
-} Stack;
-
-typedef struct ScopeStack {
-    int scope[MAX_SIZE_SCOPE];
-    int size;
-} ScopeStack;
-
-typedef struct lineIndices {
-    int currentLine;
-    int globalVariblesLine;
-    int pastInstructionLine;
-} LineIndices;
-
-typedef struct pair {
-    char *key;
-    char *value;
-    struct pair *next;
-} Pair;
 
 #endif

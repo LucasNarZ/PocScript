@@ -7,7 +7,7 @@
 #include <regex.h>
 #include <stdbool.h>
 #include "../utils/utils.h"
-#include "../types.h"
+#include "token.h"
 
 extern Token *head;
 extern TokenDefinition types[NUM_TYPES];

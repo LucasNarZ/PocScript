@@ -1,56 +1,51 @@
 #include "parser.h"
 #include "../utils/utils.h"
+#include "../lexer/lexer.h"
+
+static bool isTypeToken(const Token *token){
+    if(token == NULL){
+        return false;
+    }
+
+    return token->type == TOKEN_TYPE_ARRAY || token->type == TOKEN_TYPE_INT || token->type == TOKEN_TYPE_FLOAT || token->type == TOKEN_TYPE_CHAR || token->type == TOKEN_TYPE_BOOL;
+}
 
 Node *parseFactor(Token **token){
     if(*token == NULL) return NULL;
     
-    if((*token) != NULL && (strcmp((*token)->type, "NUMBER") == 0 || strcmp((*token)->type, "STRING") == 0 || strcmp((*token)->type, "BOOL") == 0)){
-        Node *node = createNode((*token)->value, (*token)->type);
+    if((*token) != NULL && ((*token)->type == TOKEN_NUMBER || (*token)->type == TOKEN_STRING || (*token)->type == TOKEN_BOOL)){
+        Node *node = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
         *token = (*token)->next;
         return node;
     }
 
-    if((*token) != NULL && (strcmp((*token)->type, "IDENTIFIER") == 0)){
-        Node *node = createNode((*token)->value, (*token)->type);
-        char **names = (char **)(malloc(stack.size * sizeof(char *)));
-        getVarsNames(names, &stack);
-        if(!(arrayContains(names, stack.size, (*token)->value))){
-            if(strcmp((*token)->next->next->next->type, "TYPE") != 0 && strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") != 0){
-                fprintf(stderr, "NameError: Undefined Variable: %s\n", (*token)->value);
-                exit(1);
-            }
-            char *name = (*token)->value;
-            
-            *token = (*token)->next->next->next;
+    if((*token) != NULL && ((*token)->type == TOKEN_IDENTIFIER)){
+        Node *node = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
+        bool isDeclaration = (*token)->next != NULL && strcmp((*token)->next->value, "::") == 0 && (*token)->next->next != NULL && isTypeToken((*token)->next->next);
+
+        if(isDeclaration){
+            *token = (*token)->next->next;
             Node *type = NULL;
-            if(strcmp((*token)->type, "COMPOSED_TYPE") == 0){
+            if((*token)->type == TOKEN_TYPE_ARRAY){
                 type = parseType(node, token);
             }else{
-                type = createNode((*token)->value, (*token)->type);
+                type = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
                 node = allocNode(node, type);
             }
-            defineVariables(name, type, &stack, &scopesStack);
-        }else{
-            if((*token)->next->next != NULL && (*token)->next->next->next != NULL && (strcmp((*token)->next->next->next->type, "TYPE") == 0 || strcmp((*token)->next->next->next->type, "COMPOSED_TYPE") == 0)){
-                fprintf(stderr, "NameError: redeclared Variable: %s\n", (*token)->value);
-                exit(1);
-            }
-
-            if(strcmp(getVarType((*token)->value, &stack), "FUNCTION") == 0){
-                Node *args = createNode("CALL_ARGS", "ARGS");
-                allocNode(node, args);
-                *token = (*token)->next->next;
-                parseCallArguments(args, token);
-                if(args->numChildren != 0){
-                    *token = (*token)->anterior;
-                }
-            }else if(strcmp(getVarType((*token)->value, &stack), "Array") == 0){
-                Node *indices = createNode("ARRAY_INDICES", "ARRAY_INDICES");
-                allocNode(node, indices);
-                (*token) = (*token)->next->next;
-                parseArrayIndices(indices, token);
+        }else if((*token)->next != NULL && strcmp((*token)->next->value, "(") == 0){
+            Node *args = createNode("CALL_ARGS", "ARGS");
+            allocNode(node, args);
+            *token = (*token)->next->next;
+            parseCallArguments(args, token);
+            if(args->numChildren != 0){
                 *token = (*token)->anterior;
             }
+        }else if((*token)->next != NULL && strcmp((*token)->next->value, "[") == 0){
+            Node *indices = createNode("ARRAY_INDICES", "ARRAY_INDICES");
+            allocNode(node, indices);
+            (*token) = (*token)->next->next;
+            parseArrayIndices(indices, token);
+            *token = (*token)->anterior;
         }
         *token = (*token)->next;
         return node;
@@ -190,8 +185,6 @@ Node *parseStatement(Node *root, Token **token){
 
 Node *parseBlock(Node *root, Token **token){
     if((*token) != NULL && (strcmp((*token)->value, "if") == 0 || strcmp((*token)->value, "else if") == 0)){
-        scopesStack.size++;
-        scopesStack.scope[scopesStack.size] = 0;
         Node *opNode;
         if(strcmp((*token)->value, "else if") == 0){
             Node *opNode2 = createNode("else", "BLOCK");
@@ -206,21 +199,15 @@ Node *parseBlock(Node *root, Token **token){
         opNode = allocNode(opNode, parseLogical(token));
         *token = (*token)->next->next;
         parseBlock(opNode, token);
-        popVaribles(&stack, scopesStack.scope[scopesStack.size]);
-        scopesStack.size--;
         if((*token)->next != NULL){
             *token = (*token)->next;
             if(strcmp((*token)->value, "else if") == 0){
                 parseBlock(opNode, token);
             }else if(strcmp((*token)->value, "else") == 0){
-                scopesStack.size++;
-                scopesStack.scope[scopesStack.size] = 0;
                 Node *elseNode = createNode((*token)->value, "BLOCK");
                 *token = (*token)->next->next;
                 allocNode(opNode, parseBlock(elseNode, token));
                 if((*token)->next != NULL){
-                    popVaribles(&stack, scopesStack.scope[scopesStack.size]);
-                    scopesStack.size--;
                     *token = (*token)->next;
                 }
             }
@@ -229,23 +216,16 @@ Node *parseBlock(Node *root, Token **token){
             }
         }
     }else if((*token) != NULL &&  strcmp((*token)->value, "while") == 0){
-        scopesStack.size++;
-        scopesStack.scope[scopesStack.size] = 0;
         Node *opNode = createNode((*token)->value, "BLOCK");
         *token = (*token)->next->next;
         opNode = allocNode(opNode, parseLogical(token));
         *token = (*token)->next->next;
         allocNode(root, parseBlock(opNode, token));
         if((*token)->next != NULL){
-            popVaribles(&stack, scopesStack.scope[scopesStack.size]);
-            scopesStack.size--;
             *token = (*token)->next;
             parseBlock(root, token);
         }
     }else if((*token) != NULL && (strcmp((*token)->value, "for") == 0)){
-        scopesStack.size++;
-        scopesStack.scope[scopesStack.size] = 0;
-        
         Node *opNode = createNode((*token)->value, "BLOCK");
         *token = (*token)->next->next;
         opNode = allocNode(opNode, parseAssign(token));
@@ -256,26 +236,12 @@ Node *parseBlock(Node *root, Token **token){
         *token = (*token)->next->next;
         allocNode(root, parseBlock(opNode, token));
         if((*token)->next != NULL){
-            popVaribles(&stack, scopesStack.scope[scopesStack.size]);
-            scopesStack.size--;
             *token = (*token)->next;
             parseBlock(root, token);
         }
     }else if((*token) != NULL && (strcmp((*token)->value, "func") == 0)){
         *token = (*token)->next;
-        char *functionName = (*token)->value;
-
         Node *func = createNode("FUNCTION", "FUNCTION");
-        char **names = (char **)(malloc(stack.size * sizeof(char *)));
-        getVarsNames(names, &stack);
-        if(arrayContains(names, stack.size, functionName)){
-            fprintf(stderr, "NameError: redeclared Variable: %s\n", functionName);
-            exit(1);
-        }
-        defineVariables(functionName, func, &stack, &scopesStack);
-
-        scopesStack.size++;
-        scopesStack.scope[scopesStack.size] = 0;
         Node *opNode = createNode((*token)->value, "DECLARATION");
         Node *args = createNode("ARGS", "ARGS");
         allocNode(opNode, args);
@@ -286,8 +252,6 @@ Node *parseBlock(Node *root, Token **token){
 
         allocNode(root, parseBlock(opNode, token));
         if((*token)->next != NULL){
-            popVaribles(&stack, scopesStack.scope[scopesStack.size]);
-            scopesStack.size--;
             *token = (*token)->next;
             parseBlock(root, token);
         }
@@ -298,10 +262,10 @@ Node *parseBlock(Node *root, Token **token){
 }
 
 void parseArguments(Node *func, Token **token){
-    if(strcmp((*token)->type, "DELIMITER") == 0){
+    if((*token)->type == TOKEN_DELIMITER){
         *token = (*token)->next;
     }
-    while(strcmp((*token)->type, "DELIMITER") != 0){
+    while((*token)->type != TOKEN_DELIMITER){
         allocNode(func, parseFactor(token));
         *token = (*token)->next;
     };
@@ -309,14 +273,14 @@ void parseArguments(Node *func, Token **token){
 
 Node *parseType(Node *var, Token **token){
     Node *currentNode = var;
-    Node *type = createNode((*token)->value, (*token)->type);
-    Node *initialType = createNode((*token)->value, (*token)->type);
+    Node *type = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
+    Node *initialType = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
     allocNode(currentNode, type);
     currentNode = type;
     (*token) = (*token)->next;
     while(strcmp((*token)->value, "<") == 0){
         (*token) = (*token)->next;
-        type = createNode((*token)->value, (*token)->type);
+        type = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
         allocNode(currentNode, type);
         currentNode = type;
         (*token) = (*token)->next;
@@ -336,8 +300,8 @@ Node *parseType(Node *var, Token **token){
 }
 
 void parseVector(Node *node, Token **token){
-    while((*token)->next != NULL && strcmp((*token)->type, "DELIMITER") != 0){
-        Node *element = createNode((*token)->value, (*token)->type);
+    while((*token)->next != NULL && (*token)->type != TOKEN_DELIMITER){
+        Node *element = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
         allocNode(node, element);
         (*token) = (*token)->next->next;
     }
@@ -367,8 +331,8 @@ void parseArray(Node *node, Token **token){
 }
 
 void parseCallArguments(Node *func, Token **token){
-    while(strcmp((*token)->type, "DELIMITER") != 0){
-        Node *arg = createNode((*token)->value, (*token)->type);
+    while((*token)->type != TOKEN_DELIMITER){
+        Node *arg = createNode((*token)->value, (char *)tokenTypeName((*token)->type));
         allocNode(func, arg);
         *token = (*token)->next->next;
         
@@ -376,7 +340,7 @@ void parseCallArguments(Node *func, Token **token){
 }
 
 void parseArrayIndices(Node *array, Token **token){
-    while(strcmp((*token)->type, "NUMBER") == 0 || strcmp((*token)->type, "IDENTIFIER") == 0){
+    while((*token)->type == TOKEN_NUMBER || (*token)->type == TOKEN_IDENTIFIER){
         Node *index = createNode((*token)->value, "LIMIT");
         allocNode(array, index);
         (*token) = (*token)->next->next;

@@ -36,7 +36,14 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_MINUS, "^(-)"},
     {TOKEN_STAR, "^(\\*)"},
     {TOKEN_SLASH, "^(\\/)"},
-    {TOKEN_DELIMITER, "^[]\\[;{}():,]"},
+    {TOKEN_LPAREN, "^(\\()"},
+    {TOKEN_RPAREN, "^(\\))"},
+    {TOKEN_LBRACE, "^(\\{)"},
+    {TOKEN_RBRACE, "^(\\})"},
+    {TOKEN_LBRACKET, "^(\\[)"},
+    {TOKEN_RBRACKET, "^(\\])"},
+    {TOKEN_SEMICOLON, "^(;)"},
+    {TOKEN_COMMA, "^(,)"},
     {TOKEN_WHITESPACE, "^[ \t\n]+"}
 };
 
@@ -75,7 +82,14 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_MINUS: return "MINUS";
         case TOKEN_STAR: return "STAR";
         case TOKEN_SLASH: return "SLASH";
-        case TOKEN_DELIMITER: return "DELIMITER";
+        case TOKEN_LPAREN: return "LPAREN";
+        case TOKEN_RPAREN: return "RPAREN";
+        case TOKEN_LBRACE: return "LBRACE";
+        case TOKEN_RBRACE: return "RBRACE";
+        case TOKEN_LBRACKET: return "LBRACKET";
+        case TOKEN_RBRACKET: return "RBRACKET";
+        case TOKEN_SEMICOLON: return "SEMICOLON";
+        case TOKEN_COMMA: return "COMMA";
         case TOKEN_WHITESPACE: return "WHITESPACE";
     }
 

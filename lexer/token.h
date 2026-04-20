@@ -45,12 +45,15 @@ typedef enum {
     TOKEN_RBRACKET,
     TOKEN_SEMICOLON,
     TOKEN_COMMA,
+    TOKEN_EOF,
     TOKEN_WHITESPACE
 } TokenType;
 
 typedef struct Token {
     TokenType type;
     char *value;
+    int line;
+    int column;
     struct Token *next;
     struct Token *anterior;
 } Token;

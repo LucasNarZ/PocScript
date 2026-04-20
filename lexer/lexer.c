@@ -2,6 +2,32 @@
 
 Token *head = NULL;
 
+static void appendToken(Token **head, TokenType type, const char *value, int line, int column) {
+    Token *token = malloc(sizeof(Token));
+
+    token->type = type;
+    token->value = malloc(strlen(value) + 1);
+    strcpy(token->value, value);
+    token->line = line;
+    token->column = column;
+    token->anterior = NULL;
+    token->next = NULL;
+
+    if (*head == NULL) {
+        *head = token;
+        return;
+    }
+
+    {
+        Token *temp = *head;
+        while (temp->next != NULL) {
+            temp = temp->next;
+        }
+        temp->next = token;
+        token->anterior = temp;
+    }
+}
+
 TokenDefinition types[NUM_TYPES] = {
     {TOKEN_NUMBER, "^([0-9]*\\.[0-9]+|[0-9]+)"},
     {TOKEN_BOOL, "^(true|false)\\b"},
@@ -90,6 +116,7 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_RBRACKET: return "RBRACKET";
         case TOKEN_SEMICOLON: return "SEMICOLON";
         case TOKEN_COMMA: return "COMMA";
+        case TOKEN_EOF: return "EOF";
         case TOKEN_WHITESPACE: return "WHITESPACE";
     }
 
@@ -97,7 +124,7 @@ const char *tokenTypeName(TokenType type){
 }
 
 
-void getTokens(Token **head, char **input){
+void getTokens(Token **head, char **input, int *line, int *column){
     regex_t regex;
     regmatch_t match;
     bool matched = false;
@@ -113,25 +140,23 @@ void getTokens(Token **head, char **input){
             if(regexec(&regex, *input, 1, &match, 0) == 0){
                 int length = match.rm_eo - match.rm_so;
                 if(types[i].type != TOKEN_WHITESPACE && types[i].type != TOKEN_COMMENT){
-                    Token *token = (Token*)(malloc(sizeof(Token)));
-                    token->type = types[i].type;
-                    token->value = (char*)(malloc(length + 1));
-                    strncpy(token->value, *input, length);
-                    token->value[length] = '\0'; 
-                    token->anterior = NULL;
-                    token->next = NULL;
+                    char *value = malloc(length + 1);
 
-                    if(*head == NULL){
-                        *head = token;
+                    strncpy(value, *input, length);
+                    value[length] = '\0';
+                    appendToken(head, types[i].type, value, *line, *column);
+                    free(value);
+                }
+
+                for(int j = 0; j < length; j++){
+                    if((*input)[j] == '\n'){
+                        (*line)++;
+                        *column = 1;
                     }else{
-                        Token *temp = *head;
-                        while(temp->next != NULL){
-                            temp = temp->next;
-                        }
-                        temp->next = token;
-                        token->anterior = temp;
+                        (*column)++;
                     }
                 }
+
                 *input += length;
                 matched = true;
                 regfree(&regex);
@@ -145,17 +170,34 @@ void getTokens(Token **head, char **input){
         }
     }
 
+    appendToken(head, TOKEN_EOF, "", *line, *column);
+
 }
 
 Token *tokenizeString(const char *input){
     Token *tokens = NULL;
     char *buffer = malloc(strlen(input) + 1);
     char *cursor = buffer;
+    int line = 1;
+    int column = 1;
 
     strcpy(buffer, input);
-    getTokens(&tokens, &cursor);
+    getTokens(&tokens, &cursor, &line, &column);
 
     free(buffer);
+    return tokens;
+}
+
+Token *tokenizeFile(const char *path) {
+    char *input = readFileToString(path);
+    Token *tokens;
+
+    if (input == NULL) {
+        return NULL;
+    }
+
+    tokens = tokenizeString(input);
+    free(input);
     return tokens;
 }
 
@@ -201,6 +243,11 @@ char *tokensToString(Token *head){
     buffer[0] = '\0';
 
     while(current != NULL){
+        if (current->type == TOKEN_EOF) {
+            current = current->next;
+            continue;
+        }
+
         size_t lineLength = strlen(tokenTypeName(current->type)) + strlen(current->value) + 2;
         char *nextBuffer = realloc(buffer, size + lineLength);
 
@@ -251,6 +298,8 @@ void print(Token *head){
     while(temp != NULL){
         printf("%s\n", tokenTypeName(temp->type));
         printf("%s\n", temp->value);
+        printf("%d\n", temp->line);
+        printf("%d\n", temp->column);
         printf("\n");
         temp = temp->next;
     }

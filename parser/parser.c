@@ -7,14 +7,23 @@ static bool isTokenType(const Token *token, TokenType type) {
     return token != NULL && token->type == type;
 }
 
-static void syntaxError(const char *message) {
-    fprintf(stderr, "SyntaxError: %s\n", message);
+static bool isAtEnd(const Token *token) {
+   return token == NULL || token->type == TOKEN_EOF;
+}
+
+static void syntaxError(const Token *token, const char *message) {
+    if (token == NULL) {
+        fprintf(stderr, "SyntaxError at end of input: %s\n", message);
+        exit(1);
+    }
+
+    fprintf(stderr, "SyntaxError at line %d, column %d: %s\n", token->line, token->column, message);
     exit(1);
 }
 
 static void expectToken(Token **token, TokenType type, const char *message) {
     if (!isTokenType(*token, type)) {
-        syntaxError(message);
+        syntaxError(*token, message);
     }
 
     *token = (*token)->next;
@@ -25,6 +34,10 @@ static bool isTypeToken(const Token *token) {
 }
 
 static bool isDeclarationStart(const Token *token) {
+    if (token == NULL || token->next == NULL || token->next->next == NULL) {
+        return false;
+    }
+
     return isTokenType(token, TOKEN_IDENTIFIER) && isTokenType(token->next, TOKEN_DOUBLE_COLON) && isTypeToken(token->next->next);
 }
 
@@ -145,7 +158,7 @@ static AstNode *parseParameter(Token **token) {
     AstNode *param = astNewNode(AST_PARAM);
 
     if (!isTokenType(*token, TOKEN_IDENTIFIER)) {
-        syntaxError("expected parameter name");
+        syntaxError(*token, "expected parameter name");
     }
 
     param->data.param.name = (*token)->value;
@@ -160,7 +173,7 @@ static AstNode *parseFunction(Token **token) {
 
     *token = (*token)->next;
     if (!isTokenType(*token, TOKEN_IDENTIFIER)) {
-        syntaxError("expected function name after func");
+        syntaxError(*token, "expected function name after func");
     }
 
     node->data.func_decl.name = (*token)->value;
@@ -183,7 +196,7 @@ static AstNode *parseFunction(Token **token) {
 AstNode *parseProgram(Token **token) {
     AstNode *program = astNewNode(AST_PROGRAM);
 
-    while (*token != NULL) {
+    while (!isAtEnd(*token)) {
         AstNode *item = parseStatement(token);
         if (item != NULL) {
             astAppendNode(&program->data.program.items, &program->data.program.count, item);
@@ -200,7 +213,7 @@ AstNode *parseBlock(Token **token) {
         *token = (*token)->next;
     }
 
-    while (*token != NULL && !isTokenType(*token, TOKEN_RBRACE)) {
+    while (!isAtEnd(*token) && !isTokenType(*token, TOKEN_RBRACE)) {
         AstNode *item = parseStatement(token);
         if (item != NULL) {
             astAppendNode(&block->data.block.items, &block->data.block.count, item);
@@ -217,7 +230,7 @@ AstNode *parseBlock(Token **token) {
 AstNode *parseStatement(Token **token) {
     AstNode *node;
 
-    if (*token == NULL) {
+    if (isAtEnd(*token)) {
         return NULL;
     }
 
@@ -278,7 +291,7 @@ AstNode *parseAssign(Token **token) {
 
     {
         AstNode *node = parseLogical(token);
-        if (*token != NULL && (isTokenType(*token, TOKEN_ASSIGN) || isTokenType(*token, TOKEN_PLUS_ASSIGN) || isTokenType(*token, TOKEN_MINUS_ASSIGN))) {
+        if (!isAtEnd(*token) && (isTokenType(*token, TOKEN_ASSIGN) || isTokenType(*token, TOKEN_PLUS_ASSIGN) || isTokenType(*token, TOKEN_MINUS_ASSIGN))) {
             AstNode *assign = astNewNode(AST_ASSIGN);
             assign->data.assign.op = assignOpFromToken((*token)->type);
             assign->data.assign.target = node;
@@ -293,7 +306,7 @@ AstNode *parseAssign(Token **token) {
 AstNode *parseLogical(Token **token) {
     AstNode *node = parseComparison(token);
 
-    while (*token != NULL && (isTokenType(*token, TOKEN_AND_AND) || isTokenType(*token, TOKEN_OR_OR))) {
+    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_AND_AND) || isTokenType(*token, TOKEN_OR_OR))) {
         AstNode *binary = astNewNode(AST_BINARY);
         binary->data.binary.op = binaryOpFromToken((*token)->type);
         binary->data.binary.left = node;
@@ -308,7 +321,7 @@ AstNode *parseLogical(Token **token) {
 AstNode *parseComparison(Token **token) {
     AstNode *node = parseExpression(token);
 
-    while (*token != NULL && (isTokenType(*token, TOKEN_GT) || isTokenType(*token, TOKEN_LT) || isTokenType(*token, TOKEN_GT_EQ) || isTokenType(*token, TOKEN_LT_EQ) || isTokenType(*token, TOKEN_EQ_EQ) || isTokenType(*token, TOKEN_NOT_EQ))) {
+    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_GT) || isTokenType(*token, TOKEN_LT) || isTokenType(*token, TOKEN_GT_EQ) || isTokenType(*token, TOKEN_LT_EQ) || isTokenType(*token, TOKEN_EQ_EQ) || isTokenType(*token, TOKEN_NOT_EQ))) {
         AstNode *binary = astNewNode(AST_BINARY);
         binary->data.binary.op = binaryOpFromToken((*token)->type);
         binary->data.binary.left = node;
@@ -323,7 +336,7 @@ AstNode *parseComparison(Token **token) {
 AstNode *parseExpression(Token **token) {
     AstNode *node = parseTerm(token);
 
-    while (*token != NULL && (isTokenType(*token, TOKEN_PLUS) || isTokenType(*token, TOKEN_MINUS))) {
+    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_PLUS) || isTokenType(*token, TOKEN_MINUS))) {
         AstNode *binary = astNewNode(AST_BINARY);
         binary->data.binary.op = binaryOpFromToken((*token)->type);
         binary->data.binary.left = node;
@@ -338,7 +351,7 @@ AstNode *parseExpression(Token **token) {
 AstNode *parseTerm(Token **token) {
     AstNode *node = parseNegation(token);
 
-    while (*token != NULL && (isTokenType(*token, TOKEN_STAR) || isTokenType(*token, TOKEN_SLASH))) {
+    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_STAR) || isTokenType(*token, TOKEN_SLASH))) {
         AstNode *binary = astNewNode(AST_BINARY);
         binary->data.binary.op = binaryOpFromToken((*token)->type);
         binary->data.binary.left = node;
@@ -365,7 +378,8 @@ AstNode *parseNegation(Token **token) {
 AstNode *parseFactor(Token **token) {
     AstNode *node;
 
-    if (*token == NULL) {
+    if (isAtEnd(*token)) {
+        syntaxError(*token, "unexpected end of input in expression");
         return NULL;
     }
 
@@ -395,7 +409,7 @@ AstNode *parseFactor(Token **token) {
         base->data.identifier.name = (*token)->value;
         *token = (*token)->next;
 
-        while (*token != NULL) {
+        while (!isAtEnd(*token)) {
             if (isTokenType(*token, TOKEN_LPAREN)) {
                 AstNode *call = astNewNode(AST_CALL);
                 call->data.call.callee = base;
@@ -438,7 +452,7 @@ AstNode *parseFactor(Token **token) {
         return node;
     }
 
-    syntaxError("unexpected token in expression");
+    syntaxError(*token, "unexpected token in expression");
     return NULL;
 }
 
@@ -446,7 +460,7 @@ AstNode *parseType(Token **token) {
     AstNode *base;
 
     if (!isTypeToken(*token)) {
-        syntaxError("expected type");
+        syntaxError(*token, "expected type");
     }
 
     if (isTokenType(*token, TOKEN_TYPE_ARRAY)) {

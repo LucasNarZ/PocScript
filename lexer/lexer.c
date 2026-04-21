@@ -28,6 +28,10 @@ static void appendToken(Token **head, TokenType type, const char *value, int lin
     }
 }
 
+static void lexerAppendToken(Lexer *lexer, TokenType type, const char *value) {
+    appendToken(&lexer->tokens, type, value, lexer->line, lexer->column);
+}
+
 TokenDefinition types[NUM_TYPES] = {
     {TOKEN_NUMBER, "^([0-9]*\\.[0-9]+|[0-9]+)"},
     {TOKEN_BOOL, "^(true|false)\\b"},
@@ -124,11 +128,27 @@ const char *tokenTypeName(TokenType type){
 }
 
 
-void getTokens(Token **head, char **input, int *line, int *column){
+void lexerInit(Lexer *lexer, char *input) {
+    lexer->input = input;
+    lexer->cursor = input;
+    lexer->tokens = NULL;
+    lexer->line = 1;
+    lexer->column = 1;
+}
+
+Token *lexerTakeTokens(Lexer *lexer) {
+    Token *tokens = lexer->tokens;
+
+    lexer->tokens = NULL;
+    return tokens;
+}
+
+void lexerScan(Lexer *lexer) {
     regex_t regex;
     regmatch_t match;
     bool matched = false;
-    while(**input != '\0'){
+
+    while(*lexer->cursor != '\0'){
         matched = false;
         for(int i = 0;i < NUM_TYPES;i++){
             if (regcomp(&regex, types[i].pattern, REG_EXTENDED) != 0) {
@@ -137,27 +157,27 @@ void getTokens(Token **head, char **input, int *line, int *column){
                 fprintf(stderr, "Regex compilation failed for type %s: %s\n", tokenTypeName(types[i].type), errbuf);
                 exit(1);
             }
-            if(regexec(&regex, *input, 1, &match, 0) == 0){
+            if(regexec(&regex, lexer->cursor, 1, &match, 0) == 0){
                 int length = match.rm_eo - match.rm_so;
                 if(types[i].type != TOKEN_WHITESPACE && types[i].type != TOKEN_COMMENT){
                     char *value = malloc(length + 1);
 
-                    strncpy(value, *input, length);
+                    strncpy(value, lexer->cursor, length);
                     value[length] = '\0';
-                    appendToken(head, types[i].type, value, *line, *column);
+                    lexerAppendToken(lexer, types[i].type, value);
                     free(value);
                 }
 
                 for(int j = 0; j < length; j++){
-                    if((*input)[j] == '\n'){
-                        (*line)++;
-                        *column = 1;
+                    if(lexer->cursor[j] == '\n'){
+                        lexer->line++;
+                        lexer->column = 1;
                     }else{
-                        (*column)++;
+                        lexer->column++;
                     }
                 }
 
-                *input += length;
+                lexer->cursor += length;
                 matched = true;
                 regfree(&regex);
                 break;
@@ -165,24 +185,23 @@ void getTokens(Token **head, char **input, int *line, int *column){
             regfree(&regex);
         }
         if (!matched) {
-            fprintf(stderr, "Unrecognized token: %.10s\n", *input);
+            fprintf(stderr, "Unrecognized token: %.10s\n", lexer->cursor);
             exit(1);
         }
     }
 
-    appendToken(head, TOKEN_EOF, "", *line, *column);
-
+    appendToken(&lexer->tokens, TOKEN_EOF, "", lexer->line, lexer->column);
 }
 
 Token *tokenizeString(const char *input){
-    Token *tokens = NULL;
+    Lexer lexer;
     char *buffer = malloc(strlen(input) + 1);
-    char *cursor = buffer;
-    int line = 1;
-    int column = 1;
+    Token *tokens;
 
     strcpy(buffer, input);
-    getTokens(&tokens, &cursor, &line, &column);
+    lexerInit(&lexer, buffer);
+    lexerScan(&lexer);
+    tokens = lexerTakeTokens(&lexer);
 
     free(buffer);
     return tokens;

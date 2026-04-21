@@ -11,7 +11,17 @@
 extern Token *head;
 extern TokenDefinition types[NUM_TYPES];
 
-void getTokens(Token **head, char **input, int *line, int *column);
+typedef struct {
+    char *input;
+    char *cursor;
+    Token *tokens;
+    int line;
+    int column;
+} Lexer;
+
+void lexerInit(Lexer *lexer, char *input);
+void lexerScan(Lexer *lexer);
+Token *lexerTakeTokens(Lexer *lexer);
 const char *tokenTypeName(TokenType type);
 Token *tokenizeString(const char *input);
 Token *tokenizeFile(const char *path);

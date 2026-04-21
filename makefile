@@ -1,8 +1,8 @@
 TARGET = output
 TEST_TARGET = tests_runner
 
-SRC = main.c ./lexer/lexer.c ./parser/parser.c ./parser/ast.c  
-TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c ./lexer/lexer.c  ./parser/parser.c ./parser/ast.c 
+SRC = main.c ./lexer/lexer.c ./parser/parser.c ./parser/ast.c ./semantic/semantic.c ./semantic/errors.c ./semantic/types.c ./semantic/scope.c
+TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c tests/semantic/test_semantic.c ./lexer/lexer.c ./parser/parser.c ./parser/ast.c ./semantic/semantic.c ./semantic/errors.c ./semantic/types.c ./semantic/scope.c
 
 OBJ = $(SRC:.c=.o)
 TEST_OBJ = $(TEST_SRC:.c=.o)

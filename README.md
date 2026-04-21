@@ -6,7 +6,7 @@ PocScript is a study project focused on implementing the core building blocks of
 
 - `lexer/`: converts source code into a linked list of tokens with `type`, `value`, `line`, and `column`
 - `parser/`: consumes the token list and produces an AST for declarations, expressions, blocks, functions, conditionals, loops, and arrays
-- `semantic/`: walks the AST in two passes to validate declarations, scopes, types, function calls, and array access
+- `semantic/`: walks the AST in two passes to validate declarations, scopes, types, function calls, function returns, and array access
 - `tests/`: contains unit and integration tests for the lexer, parser, semantic analyzer, and AST serialization
 - `main.c`: main debug executable; reads `input.ps`, prints recognized tokens, prints the resulting AST, and then prints semantic analysis results
 
@@ -63,7 +63,7 @@ In practice, this binary works as a simple way to inspect the language frontend 
 ## Features Covered By The Current Code
 
 - variable declarations with `::`
-- primitive types `int`, `float`, `char`, `bool`
+- primitive types `int`, `float`, `char`, `bool`, `void`
 - `Array` type and types with `[]` suffixes
 - integer, float, string, and bool literals
 - binary expressions: `+`, `-`, `*`, `/`, `>`, `<`, `>=`, `<=`, `==`, `!=`, `&&`, `||`
@@ -71,11 +71,11 @@ In practice, this binary works as a simple way to inspect the language frontend 
 - assignments `=`, `+=`, `-=`
 - blocks
 - `if`, `else`, `while`, `for`
-- function declarations and `ret`
+- function declarations with mandatory explicit return types and `ret`
 - function calls
 - array access with one or more indices
 - nested array literals
-- semantic validation for scope, duplicate declarations, initializer types, conditions, function calls, and array indexing
+- semantic validation for scope, duplicate declarations, initializer types, conditions, function calls, function return contracts, and array indexing
 
 ## Build And Run
 

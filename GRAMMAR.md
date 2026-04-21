@@ -11,6 +11,8 @@ It documents the language as it exists in the implementation today, not as it id
 - Declarations use `::`.
 - `ret` always requires an expression.
 - The parser supports array literals, indexed access, function calls, and types with `Array<...>` and `[]` suffixes.
+- Function declarations require an explicit return type after `->`.
+- `void` is valid only as a function return type.
 
 ## Grammar
 
@@ -38,7 +40,9 @@ for-statement   = "for" "("
                     [ assignment-or-declaration-or-expression ]
                   ")" block ;
 
-function-declaration = "func" identifier "(" [ parameter { "," parameter } ] ")" block ;
+function-declaration = "func" identifier "(" [ parameter { "," parameter } ] ")" "->" return-type block ;
+
+return-type     = "void" | type ;
 
 parameter       = identifier "::" type ;
 
@@ -151,7 +155,7 @@ buffer::Array<float>[n];
 ### Function
 
 ```text
-func soma(a::int, b::int) {
+func soma(a::int, b::int) -> int {
     ret a + b;
 }
 ```
@@ -198,7 +202,8 @@ arr[0](x);
 - `initializer`, `array-element`, and the right-hand side of `assignment` are documented through `logical-expression`, which already includes array literals via `primary-expression`.
 - Consecutive indexing is documented as repeated `index-suffix` occurrences in `postfix-expression`, for example `arr[0][1]`.
 - The left-hand side of an assignment is restricted syntactically to `assign-target`, which means an identifier followed by zero or more index operations.
-- Function declarations do not have a syntactic return type, even though the AST has a field for it.
+- Function declarations require an explicit return type after `->`.
+- `void` is valid only as a function return type.
 - `ret` without an expression is not accepted.
 - `if`, `while`, `for`, and `func` do not accept a single statement without braces.
 

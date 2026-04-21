@@ -16,6 +16,18 @@ static AstNode *parseFactor(Parser *parser);
 static AstNode *parseType(Parser *parser);
 static AstNode *parseArrayLiteral(Parser *parser);
 
+static AstNode *astNewNodeFromToken(AstNodeType type, const Token *token) {
+    if (token == NULL) {
+        return astNewNode(type);
+    }
+
+    return astNewNodeAt(type, token->line, token->column);
+}
+
+static AstNode *astNewNodeFromCurrent(Parser *parser, AstNodeType type) {
+    return astNewNodeFromToken(type, parser->current);
+}
+
 static bool parserIs(const Parser *parser, TokenType type) {
     return parser->current != NULL && parser->current->type == type;
 }
@@ -126,7 +138,7 @@ static AstTypeKind typeKindFromToken(const Parser *parser) {
 
 static AstNode *wrapArrayTypes(AstNode *base, Parser *parser) {
     while (parserIs(parser, TOKEN_LBRACKET)) {
-        AstNode *arrayType = astNewNode(AST_TYPE_ARRAY);
+        AstNode *arrayType = astNewNodeFromCurrent(parser, AST_TYPE_ARRAY);
         AstNode *sizeExpr = NULL;
 
         parserAdvance(parser);
@@ -143,7 +155,7 @@ static AstNode *wrapArrayTypes(AstNode *base, Parser *parser) {
 }
 
 static AstNode *parseIf(Parser *parser) {
-    AstNode *node = astNewNode(AST_IF);
+    AstNode *node = astNewNodeFromCurrent(parser, AST_IF);
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after if");
@@ -164,7 +176,7 @@ static AstNode *parseIf(Parser *parser) {
 }
 
 static AstNode *parseWhile(Parser *parser) {
-    AstNode *node = astNewNode(AST_WHILE);
+    AstNode *node = astNewNodeFromCurrent(parser, AST_WHILE);
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after while");
@@ -175,7 +187,7 @@ static AstNode *parseWhile(Parser *parser) {
 }
 
 static AstNode *parseFor(Parser *parser) {
-    AstNode *node = astNewNode(AST_FOR);
+    AstNode *node = astNewNodeFromCurrent(parser, AST_FOR);
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after for");
@@ -196,7 +208,7 @@ static AstNode *parseFor(Parser *parser) {
 }
 
 static AstNode *parseParameter(Parser *parser) {
-    AstNode *param = astNewNode(AST_PARAM);
+    AstNode *param = astNewNodeFromCurrent(parser, AST_PARAM);
 
     if (!parserIs(parser, TOKEN_IDENTIFIER)) {
         parserSyntaxError(parser->current, "expected parameter name");
@@ -210,7 +222,7 @@ static AstNode *parseParameter(Parser *parser) {
 }
 
 static AstNode *parseFunction(Parser *parser) {
-    AstNode *node = astNewNode(AST_FUNC_DECL);
+    AstNode *node = astNewNodeFromCurrent(parser, AST_FUNC_DECL);
 
     parserAdvance(parser);
     if (!parserIs(parser, TOKEN_IDENTIFIER)) {
@@ -243,7 +255,7 @@ void parserInit(Parser *parser, Token *tokens) {
 }
 
 AstNode *parserParseProgram(Parser *parser) {
-    AstNode *program = astNewNode(AST_PROGRAM);
+    AstNode *program = astNewNodeFromCurrent(parser, AST_PROGRAM);
 
     while (!parserAtEnd(parser)) {
         AstNode *item = parseStatement(parser);
@@ -256,7 +268,7 @@ AstNode *parserParseProgram(Parser *parser) {
 }
 
 static AstNode *parseBlock(Parser *parser) {
-    AstNode *block = astNewNode(AST_BLOCK);
+    AstNode *block = astNewNodeFromCurrent(parser, AST_BLOCK);
 
     parserExpect(parser, TOKEN_LBRACE, "expected '{' to start block");
 
@@ -305,6 +317,8 @@ static AstNode *parseStatement(Parser *parser) {
 
     {
         AstNode *exprStmt = astNewNode(AST_EXPR_STMT);
+        exprStmt->line = node->line;
+        exprStmt->column = node->column;
         exprStmt->data.expr_stmt.expression = node;
         return exprStmt;
     }
@@ -314,7 +328,7 @@ static AstNode *parseReturn(Parser *parser) {
     AstNode *node;
 
     if (parserIs(parser, TOKEN_KW_RET)) {
-        node = astNewNode(AST_RETURN);
+        node = astNewNodeFromCurrent(parser, AST_RETURN);
         parserAdvance(parser);
         node->data.return_stmt.value = parseLogical(parser);
         return node;
@@ -325,7 +339,7 @@ static AstNode *parseReturn(Parser *parser) {
 
 static AstNode *parseAssign(Parser *parser) {
     if (isDeclarationStart(parser)) {
-        AstNode *decl = astNewNode(AST_VAR_DECL);
+        AstNode *decl = astNewNodeFromCurrent(parser, AST_VAR_DECL);
         decl->data.var_decl.name = copyTokenValue(parser->current);
         parserAdvance(parser);
         parserExpect(parser, TOKEN_DOUBLE_COLON, "expected '::' after declaration name");
@@ -342,7 +356,7 @@ static AstNode *parseAssign(Parser *parser) {
     {
         AstNode *node = parseLogical(parser);
         if (!parserAtEnd(parser) && (parserIs(parser, TOKEN_ASSIGN) || parserIs(parser, TOKEN_PLUS_ASSIGN) || parserIs(parser, TOKEN_MINUS_ASSIGN))) {
-            AstNode *assign = astNewNode(AST_ASSIGN);
+            AstNode *assign = astNewNodeFromCurrent(parser, AST_ASSIGN);
             assign->data.assign.op = assignOpFromToken(parser->current->type);
             assign->data.assign.target = node;
             parserAdvance(parser);
@@ -357,7 +371,7 @@ static AstNode *parseLogical(Parser *parser) {
     AstNode *node = parseComparison(parser);
 
     while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_AND_AND) || parserIs(parser, TOKEN_OR_OR))) {
-        AstNode *binary = astNewNode(AST_BINARY);
+        AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
         binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
         parserAdvance(parser);
@@ -372,7 +386,7 @@ static AstNode *parseComparison(Parser *parser) {
     AstNode *node = parseExpression(parser);
 
     while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_GT) || parserIs(parser, TOKEN_LT) || parserIs(parser, TOKEN_GT_EQ) || parserIs(parser, TOKEN_LT_EQ) || parserIs(parser, TOKEN_EQ_EQ) || parserIs(parser, TOKEN_NOT_EQ))) {
-        AstNode *binary = astNewNode(AST_BINARY);
+        AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
         binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
         parserAdvance(parser);
@@ -387,7 +401,7 @@ static AstNode *parseExpression(Parser *parser) {
     AstNode *node = parseTerm(parser);
 
     while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_PLUS) || parserIs(parser, TOKEN_MINUS))) {
-        AstNode *binary = astNewNode(AST_BINARY);
+        AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
         binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
         parserAdvance(parser);
@@ -402,7 +416,7 @@ static AstNode *parseTerm(Parser *parser) {
     AstNode *node = parseNegation(parser);
 
     while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_STAR) || parserIs(parser, TOKEN_SLASH))) {
-        AstNode *binary = astNewNode(AST_BINARY);
+        AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
         binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
         parserAdvance(parser);
@@ -415,7 +429,7 @@ static AstNode *parseTerm(Parser *parser) {
 
 static AstNode *parseNegation(Parser *parser) {
     if (parserIs(parser, TOKEN_BANG)) {
-        AstNode *node = astNewNode(AST_UNARY);
+        AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
         node->data.unary.op = AST_UNARY_NOT;
         parserAdvance(parser);
         node->data.unary.operand = parseNegation(parser);
@@ -435,23 +449,23 @@ static AstNode *parseFactor(Parser *parser) {
 
     if (parserIs(parser, TOKEN_NUMBER)) {
         if (strchr(parser->current->value, '.') != NULL) {
-            node = astNewNode(AST_FLOAT_LITERAL);
+            node = astNewNodeFromCurrent(parser, AST_FLOAT_LITERAL);
             node->data.float_literal.value = strtod(parser->current->value, NULL);
         } else {
-            node = astNewNode(AST_INT_LITERAL);
+            node = astNewNodeFromCurrent(parser, AST_INT_LITERAL);
             node->data.int_literal.value = strtol(parser->current->value, NULL, 10);
         }
         parserAdvance(parser);
         return node;
     }
     if (parserIs(parser, TOKEN_STRING)) {
-        node = astNewNode(AST_STRING_LITERAL);
+        node = astNewNodeFromCurrent(parser, AST_STRING_LITERAL);
         node->data.string_literal.value = copyTokenValue(parser->current);
         parserAdvance(parser);
         return node;
     }
     if (parserIs(parser, TOKEN_BOOL)) {
-        node = astNewNode(AST_BOOL_LITERAL);
+        node = astNewNodeFromCurrent(parser, AST_BOOL_LITERAL);
         node->data.bool_literal.value = strcmp(parser->current->value, "true") == 0;
         parserAdvance(parser);
         return node;
@@ -460,13 +474,13 @@ static AstNode *parseFactor(Parser *parser) {
         return parseArrayLiteral(parser);
     }
     if (parserIs(parser, TOKEN_IDENTIFIER)) {
-        AstNode *base = astNewNode(AST_IDENTIFIER);
+        AstNode *base = astNewNodeFromCurrent(parser, AST_IDENTIFIER);
         base->data.identifier.name = copyTokenValue(parser->current);
         parserAdvance(parser);
 
         while (!parserAtEnd(parser)) {
             if (parserIs(parser, TOKEN_LPAREN)) {
-                AstNode *call = astNewNode(AST_CALL);
+                AstNode *call = astNewNodeAt(AST_CALL, base->line, base->column);
                 call->data.call.callee = base;
                 parserAdvance(parser);
                 if (!parserIs(parser, TOKEN_RPAREN)) {
@@ -485,7 +499,7 @@ static AstNode *parseFactor(Parser *parser) {
             }
 
             if (parserIs(parser, TOKEN_LBRACKET)) {
-                AstNode *access = astNewNode(AST_ARRAY_ACCESS);
+                AstNode *access = astNewNodeAt(AST_ARRAY_ACCESS, base->line, base->column);
                 access->data.array_access.base = base;
                 while (parserIs(parser, TOKEN_LBRACKET)) {
                     AstNode *index;
@@ -522,7 +536,7 @@ static AstNode *parseType(Parser *parser) {
     }
 
     if (parserIs(parser, TOKEN_TYPE_ARRAY)) {
-        AstNode *arrayType = astNewNode(AST_TYPE_ARRAY);
+        AstNode *arrayType = astNewNodeFromCurrent(parser, AST_TYPE_ARRAY);
 
         parserAdvance(parser);
         if (parserIs(parser, TOKEN_LT)) {
@@ -534,7 +548,7 @@ static AstNode *parseType(Parser *parser) {
         return wrapArrayTypes(arrayType, parser);
     }
 
-    base = astNewNode(AST_TYPE_NAME);
+    base = astNewNodeFromCurrent(parser, AST_TYPE_NAME);
     base->data.type_name.kind = typeKindFromToken(parser);
     base->data.type_name.name = copyTokenValue(parser->current);
     parserAdvance(parser);
@@ -542,7 +556,7 @@ static AstNode *parseType(Parser *parser) {
 }
 
 static AstNode *parseArrayLiteral(Parser *parser) {
-    AstNode *array = astNewNode(AST_ARRAY_LITERAL);
+    AstNode *array = astNewNodeFromCurrent(parser, AST_ARRAY_LITERAL);
 
     parserExpect(parser, TOKEN_LBRACE, "expected '{' to start array literal");
 

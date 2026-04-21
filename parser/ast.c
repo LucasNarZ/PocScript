@@ -5,6 +5,10 @@
 #include <string.h>
 
 AstNode *astNewNode(AstNodeType type) {
+    return astNewNodeAt(type, 0, 0);
+}
+
+AstNode *astNewNodeAt(AstNodeType type, int line, int column) {
     AstNode *node = calloc(1, sizeof(AstNode));
 
     if (node == NULL) {
@@ -12,6 +16,8 @@ AstNode *astNewNode(AstNodeType type) {
     }
 
     node->type = type;
+    node->line = line;
+    node->column = column;
     return node;
 }
 

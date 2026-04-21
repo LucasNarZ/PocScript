@@ -155,6 +155,8 @@ typedef struct {
 
 struct AstNode {
     AstNodeType type;
+    int line;
+    int column;
     union {
         AstNodeList program;
         AstNodeList block;
@@ -197,6 +199,7 @@ struct AstNode {
 };
 
 AstNode *astNewNode(AstNodeType type);
+AstNode *astNewNodeAt(AstNodeType type, int line, int column);
 void astAppendNode(AstNode ***items, size_t *count, AstNode *item);
 char *astToString(AstNode *root);
 void astPrintPretty(AstNode *root);

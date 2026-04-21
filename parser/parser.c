@@ -335,7 +335,9 @@ static AstNode *parseReturn(Parser *parser) {
     if (parserIs(parser, TOKEN_KW_RET)) {
         node = astNewNodeFromCurrent(parser, AST_RETURN);
         parserAdvance(parser);
-        node->data.return_stmt.value = parseLogical(parser);
+        if (!parserIs(parser, TOKEN_SEMICOLON)) {
+            node->data.return_stmt.value = parseLogical(parser);
+        }
         return node;
     }
 

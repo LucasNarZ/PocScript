@@ -265,3 +265,35 @@ void test_semantic_accepts_matching_function_return_type(void) {
 
     semanticResultFree(&result);
 }
+
+void test_semantic_accepts_empty_return_inside_void_function(void) {
+    SemanticResult result = analyzeRootFromString("func foo() -> void { ret; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_empty_return_inside_non_void_function(void) {
+    SemanticResult result = analyzeRootFromString("func foo() -> int { ret; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "function 'foo' with return type int cannot use empty return") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_reports_empty_return_outside_function(void) {
+    SemanticResult result = analyzeRootFromString("ret;");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "return statement outside function") != NULL);
+    }
+
+    semanticResultFree(&result);
+}

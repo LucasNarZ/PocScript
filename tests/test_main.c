@@ -30,7 +30,7 @@ int main(void) {
     RUN_TEST(test_parser_rejects_invalid_assignment_targets, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_requires_explicit_function_return_type, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_function_return_types, "tests/parser/test_parser.c");
-    RUN_TEST(test_parser_rejects_return_without_expression_even_in_void_function, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_parses_empty_return_in_void_function, "tests/parser/test_parser.c");
     RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");
@@ -52,6 +52,9 @@ int main(void) {
     RUN_TEST(test_semantic_rejects_value_return_inside_void_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_return_statement_outside_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_matching_function_return_type, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_empty_return_inside_void_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_empty_return_inside_non_void_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_empty_return_outside_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_tokenize_file_appends_single_eof_for_multiline_input, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_input_program_ast, "tests/integration/test_integration.c");
 

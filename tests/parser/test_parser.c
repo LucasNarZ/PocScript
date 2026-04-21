@@ -476,6 +476,20 @@ void test_parser_parses_function_return_types(void) {
     freeTokens(tokens);
 }
 
-void test_parser_rejects_return_without_expression_even_in_void_function(void) {
-    assertParseError("func foo() -> void { ret; }", "unexpected token in expression");
+void test_parser_parses_empty_return_in_void_function(void) {
+    Token *tokens = tokenizeString("func foo() -> void { ret; }");
+    Parser parser;
+    AstNode *root;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+
+    EXPECT_TRUE(root->data.program.count == 1);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+    EXPECT_TRUE(root->data.program.items[0]->data.func_decl.body->data.block.count == 1);
+    EXPECT_TRUE(root->data.program.items[0]->data.func_decl.body->data.block.items[0]->type == AST_RETURN);
+    EXPECT_TRUE(root->data.program.items[0]->data.func_decl.body->data.block.items[0]->data.return_stmt.value == NULL);
+
+    astFree(root);
+    freeTokens(tokens);
 }

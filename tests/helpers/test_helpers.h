@@ -69,7 +69,7 @@ void test_parser_reports_error_positions(void);
 void test_parser_rejects_invalid_assignment_targets(void);
 void test_parser_requires_explicit_function_return_type(void);
 void test_parser_parses_function_return_types(void);
-void test_parser_rejects_return_without_expression_even_in_void_function(void);
+void test_parser_parses_empty_return_in_void_function(void);
 void test_semantic_starts_with_no_errors_for_empty_program(void);
 void test_semantic_rejects_incompatible_initializer_types(void);
 void test_semantic_reports_duplicate_variable_in_same_scope(void);
@@ -91,6 +91,9 @@ void test_semantic_rejects_incompatible_function_return_type(void);
 void test_semantic_rejects_value_return_inside_void_function(void);
 void test_semantic_reports_return_statement_outside_function(void);
 void test_semantic_accepts_matching_function_return_type(void);
+void test_semantic_accepts_empty_return_inside_void_function(void);
+void test_semantic_rejects_empty_return_inside_non_void_function(void);
+void test_semantic_reports_empty_return_outside_function(void);
 void test_tokenize_file_appends_single_eof_for_multiline_input(void);
 void test_integration_parses_input_program_ast(void);
 

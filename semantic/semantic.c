@@ -264,6 +264,13 @@ static void appendVoidReturnValueError(AstNode *node, SemanticResult *result, co
     appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
 }
 
+static void appendEmptyReturnError(AstNode *node, SemanticResult *result, const char *name, const SemanticType *returnType) {
+    char message[256];
+
+    snprintf(message, sizeof(message), "function '%s' with return type %s cannot use empty return", name, semanticTypeName(returnType));
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
 static bool semanticTypeIsNumeric(const SemanticType *type) {
     return type != NULL && (type->kind == SEM_TYPE_INT || type->kind == SEM_TYPE_FLOAT);
 }
@@ -673,6 +680,14 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
         case AST_RETURN:
             if (currentFunctionContext == NULL || currentFunctionContext->return_type == NULL) {
                 appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "return statement outside function");
+                return;
+            }
+
+            if (node->data.return_stmt.value == NULL) {
+                if (currentFunctionContext->return_type->kind != SEM_TYPE_VOID) {
+                    appendEmptyReturnError(node, result, currentFunctionContext->function_name, currentFunctionContext->return_type);
+                    currentFunctionContext->found_compatible_return = true;
+                }
                 return;
             }
 

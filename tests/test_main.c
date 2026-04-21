@@ -26,6 +26,21 @@ int main(void) {
     RUN_TEST(test_parser_reports_specific_syntax_errors, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_eof_errors_in_last_token_positions, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_error_positions, "tests/parser/test_parser.c");
+    RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_allows_shadowing_in_nested_scope, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_duplicate_function_in_global_scope, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_duplicate_parameter_name, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_undeclared_variable_use, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_invalid_arithmetic_types, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_non_boolean_condition, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_call_to_undeclared_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_wrong_argument_count, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_wrong_argument_type, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_non_integer_array_index, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_indexing_non_array_value, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accumulates_multiple_errors, "tests/semantic/test_semantic.c");
     RUN_TEST(test_tokenize_file_appends_single_eof_for_multiline_input, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_input_program_ast, "tests/integration/test_integration.c");
 

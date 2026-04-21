@@ -15,3 +15,11 @@ AstNode *parseRootFromString(const char *input) {
 char *nodeTreeToString(AstNode *root) {
     return astToString(root);
 }
+
+SemanticResult analyzeRootFromString(const char *input) {
+    AstNode *root = parseRootFromString(input);
+    SemanticResult result = semanticAnalyze(root);
+
+    astFree(root);
+    return result;
+}

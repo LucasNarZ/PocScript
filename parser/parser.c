@@ -8,6 +8,7 @@ static AstNode *parseStatement(Parser *parser);
 static AstNode *parseReturn(Parser *parser);
 static AstNode *parseAssign(Parser *parser);
 static AstNode *parseLogical(Parser *parser);
+static AstNode *parseLogicalAnd(Parser *parser);
 static AstNode *parseComparison(Parser *parser);
 static AstNode *parseExpression(Parser *parser);
 static AstNode *parseTerm(Parser *parser);
@@ -373,9 +374,24 @@ static AstNode *parseAssign(Parser *parser) {
 }
 
 static AstNode *parseLogical(Parser *parser) {
+    AstNode *node = parseLogicalAnd(parser);
+
+    while (!parserAtEnd(parser) && parserIs(parser, TOKEN_OR_OR)) {
+        AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
+        binary->data.binary.op = binaryOpFromToken(parser->current->type);
+        binary->data.binary.left = node;
+        parserAdvance(parser);
+        binary->data.binary.right = parseLogicalAnd(parser);
+        node = binary;
+    }
+
+    return node;
+}
+
+static AstNode *parseLogicalAnd(Parser *parser) {
     AstNode *node = parseComparison(parser);
 
-    while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_AND_AND) || parserIs(parser, TOKEN_OR_OR))) {
+    while (!parserAtEnd(parser) && parserIs(parser, TOKEN_AND_AND)) {
         AstNode *binary = astNewNodeFromCurrent(parser, AST_BINARY);
         binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;

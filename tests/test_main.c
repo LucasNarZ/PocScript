@@ -19,6 +19,7 @@ int main(void) {
     RUN_TEST(test_parser_parses_call_syntax_without_function_type, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_array_index_syntax_without_array_type, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_grouping_with_specific_delimiter_tokens, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_gives_and_higher_precedence_than_or, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_struct_parses_program_from_initialized_state, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_float_literals, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_copies_token_strings_into_ast, "tests/parser/test_parser.c");

@@ -58,6 +58,7 @@ void test_parser_parses_declaration_syntax_without_semantics(void);
 void test_parser_parses_call_syntax_without_function_type(void);
 void test_parser_parses_array_index_syntax_without_array_type(void);
 void test_parser_parses_grouping_with_specific_delimiter_tokens(void);
+void test_parser_gives_and_higher_precedence_than_or(void);
 void test_parser_struct_parses_program_from_initialized_state(void);
 void test_parser_parses_float_literals(void);
 void test_parser_copies_token_strings_into_ast(void);

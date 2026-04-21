@@ -298,6 +298,57 @@ void test_parser_parses_grouping_with_specific_delimiter_tokens(void) {
     freeTokenList(tokens);
 }
 
+void test_parser_gives_and_higher_precedence_than_or(void) {
+    Token *tokens = tokenizeString("a || b && c;");
+    Parser parser;
+    AstNode *root;
+    AstNode *expr;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+
+    EXPECT_TRUE(root->data.program.count == 1);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_EXPR_STMT);
+
+    expr = root->data.program.items[0]->data.expr_stmt.expression;
+    EXPECT_TRUE(expr->type == AST_BINARY);
+
+    if (expr->type == AST_BINARY) {
+        EXPECT_TRUE(expr->data.binary.op == AST_BINARY_OR);
+
+        if (expr->data.binary.left != NULL) {
+            EXPECT_TRUE(expr->data.binary.left->type == AST_IDENTIFIER);
+            if (expr->data.binary.left->type == AST_IDENTIFIER) {
+                EXPECT_STR_EQ("a", expr->data.binary.left->data.identifier.name);
+            }
+        }
+
+        if (expr->data.binary.right != NULL) {
+            EXPECT_TRUE(expr->data.binary.right->type == AST_BINARY);
+            if (expr->data.binary.right->type == AST_BINARY) {
+                EXPECT_TRUE(expr->data.binary.right->data.binary.op == AST_BINARY_AND);
+
+                if (expr->data.binary.right->data.binary.left != NULL) {
+                    EXPECT_TRUE(expr->data.binary.right->data.binary.left->type == AST_IDENTIFIER);
+                    if (expr->data.binary.right->data.binary.left->type == AST_IDENTIFIER) {
+                        EXPECT_STR_EQ("b", expr->data.binary.right->data.binary.left->data.identifier.name);
+                    }
+                }
+
+                if (expr->data.binary.right->data.binary.right != NULL) {
+                    EXPECT_TRUE(expr->data.binary.right->data.binary.right->type == AST_IDENTIFIER);
+                    if (expr->data.binary.right->data.binary.right->type == AST_IDENTIFIER) {
+                        EXPECT_STR_EQ("c", expr->data.binary.right->data.binary.right->data.identifier.name);
+                    }
+                }
+            }
+        }
+    }
+
+    astFree(root);
+    freeTokens(tokens);
+}
+
 void test_parser_struct_parses_program_from_initialized_state(void) {
     Token *tokens = tokenizeString("x::int = 1;");
     Parser parser;

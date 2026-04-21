@@ -65,6 +65,7 @@ void test_parser_reports_syntax_error_at_eof_without_crashing(void);
 void test_parser_reports_specific_syntax_errors(void);
 void test_parser_reports_eof_errors_in_last_token_positions(void);
 void test_parser_reports_error_positions(void);
+void test_parser_rejects_invalid_assignment_targets(void);
 void test_semantic_starts_with_no_errors_for_empty_program(void);
 void test_semantic_rejects_incompatible_initializer_types(void);
 void test_semantic_reports_duplicate_variable_in_same_scope(void);

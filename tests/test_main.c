@@ -26,6 +26,7 @@ int main(void) {
     RUN_TEST(test_parser_reports_specific_syntax_errors, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_eof_errors_in_last_token_positions, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_error_positions, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_invalid_assignment_targets, "tests/parser/test_parser.c");
     RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");

@@ -392,3 +392,8 @@ void test_parser_reports_eof_errors_in_last_token_positions(void) {
     assertParseError("x::Array<int", "expected '>' after array element type");
     assertParseError("x = {1", "expected '}' after array literal");
 }
+
+void test_parser_rejects_invalid_assignment_targets(void) {
+    assertParseError("foo() = 1;", "invalid assignment target");
+    assertParseError("a + b = 1;", "invalid assignment target");
+}

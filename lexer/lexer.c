@@ -41,6 +41,7 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_TYPE_FLOAT, "^(float)\\b"},
     {TOKEN_TYPE_CHAR, "^(char)\\b"},
     {TOKEN_TYPE_BOOL, "^(bool)\\b"},
+    {TOKEN_TYPE_VOID, "^(void)\\b"},
     {TOKEN_KW_IF, "^(if)\\b"},
     {TOKEN_KW_ELSE, "^(else)\\b"},
     {TOKEN_KW_FOR, "^(for)\\b"},
@@ -57,6 +58,7 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_BANG, "^(!)"},
     {TOKEN_PLUS_ASSIGN, "^(\\+=)"},
     {TOKEN_MINUS_ASSIGN, "^(-=)"},
+    {TOKEN_ARROW, "^(->)"},
     {TOKEN_ASSIGN, "^(=)"},
     {TOKEN_DOUBLE_COLON, "^(::)"},
     {TOKEN_IDENTIFIER, "^[_a-zA-Z][_a-zA-Z0-9]*"},
@@ -87,6 +89,7 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_TYPE_FLOAT: return "TYPE_FLOAT";
         case TOKEN_TYPE_CHAR: return "TYPE_CHAR";
         case TOKEN_TYPE_BOOL: return "TYPE_BOOL";
+        case TOKEN_TYPE_VOID: return "TYPE_VOID";
         case TOKEN_KW_IF: return "KW_IF";
         case TOKEN_KW_ELSE: return "KW_ELSE";
         case TOKEN_KW_FOR: return "KW_FOR";
@@ -103,6 +106,7 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_BANG: return "BANG";
         case TOKEN_PLUS_ASSIGN: return "PLUS_ASSIGN";
         case TOKEN_MINUS_ASSIGN: return "MINUS_ASSIGN";
+        case TOKEN_ARROW: return "ARROW";
         case TOKEN_ASSIGN: return "ASSIGN";
         case TOKEN_DOUBLE_COLON: return "DOUBLE_COLON";
         case TOKEN_IDENTIFIER: return "IDENTIFIER";

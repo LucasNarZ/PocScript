@@ -421,7 +421,7 @@ void test_parser_reports_specific_syntax_errors(void) {
     assertParseError("if (x) ret 1;", "expected '{' to start block");
     assertParseError("while (x) ret 1;", "expected '{' to start block");
     assertParseError("for(i = 0; i < 1; i += 1) ret 1;", "expected '{' to start block");
-    assertParseError("func f(a::int) ret 1;", "expected '{' to start block");
+    assertParseError("func f(a::int) -> int ret 1;", "expected '{' to start block");
     assertParseError("x", "expected ';' after statement");
     assertParseError("foo(1;", "expected ')' after call arguments");
     assertParseError("arr[1;", "expected ']' after array index");
@@ -447,4 +447,35 @@ void test_parser_reports_eof_errors_in_last_token_positions(void) {
 void test_parser_rejects_invalid_assignment_targets(void) {
     assertParseError("foo() = 1;", "invalid assignment target");
     assertParseError("a + b = 1;", "invalid assignment target");
+}
+
+void test_parser_requires_explicit_function_return_type(void) {
+    assertParseError("func foo() { ret 1; }", "expected '->' after function parameters");
+}
+
+void test_parser_parses_function_return_types(void) {
+    Token *tokens = tokenizeString(
+        "func soma(a::int, b::int) -> int { ret a + b; }\n"
+        "func logar() -> void { }"
+    );
+    Parser parser;
+    AstNode *root;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+
+    EXPECT_TRUE(root->data.program.count == 2);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+    EXPECT_TRUE(root->data.program.items[0]->data.func_decl.return_type->type == AST_TYPE_NAME);
+    EXPECT_TRUE(root->data.program.items[0]->data.func_decl.return_type->data.type_name.kind == AST_TYPE_INT_KIND);
+    EXPECT_STR_EQ("int", root->data.program.items[0]->data.func_decl.return_type->data.type_name.name);
+    EXPECT_TRUE(root->data.program.items[1]->data.func_decl.return_type->type == AST_TYPE_NAME);
+    EXPECT_STR_EQ("void", root->data.program.items[1]->data.func_decl.return_type->data.type_name.name);
+
+    astFree(root);
+    freeTokens(tokens);
+}
+
+void test_parser_rejects_return_without_expression_even_in_void_function(void) {
+    assertParseError("func foo() -> void { ret; }", "unexpected token in expression");
 }

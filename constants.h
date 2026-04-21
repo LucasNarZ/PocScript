@@ -3,7 +3,7 @@
 
 #define MAX_SIZE_STACK 100
 #define MAX_SIZE_SCOPE 50
-#define NUM_TYPES 42
+#define NUM_TYPES 44
 #define MAX_LINES 1000
 #define MAX_LINE_LEN 256
 #define HASH_TABLE_SIZE 500

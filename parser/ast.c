@@ -169,6 +169,7 @@ static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int
             if (node->data.var_decl.initializer) writeNode(buffer, size, node->data.var_decl.initializer, depth + 1, isLast);
             break;
         case AST_FUNC_DECL:
+            if (node->data.func_decl.return_type) writeNode(buffer, size, node->data.func_decl.return_type, depth + 1, isLast);
             writeList(buffer, size, node->data.func_decl.params, node->data.func_decl.param_count, depth, isLast);
             if (node->data.func_decl.body) writeNode(buffer, size, node->data.func_decl.body, depth + 1, isLast);
             break;

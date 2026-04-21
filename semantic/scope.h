@@ -32,7 +32,7 @@ Symbol *scopeLookupCurrent(Scope *scope, const char *name);
 Symbol *scopeLookup(Scope *scope, const char *name);
 bool scopeDeclare(Scope *scope, Symbol *symbol);
 Symbol *symbolCreateVariable(const char *name, SemanticType *type);
-Symbol *symbolCreateFunction(const char *name, SemanticType **params, size_t param_count);
+Symbol *symbolCreateFunction(const char *name, SemanticType *returnType, SemanticType **params, size_t param_count);
 void symbolFree(Symbol *symbol);
 
 #endif

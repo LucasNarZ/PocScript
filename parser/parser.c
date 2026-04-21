@@ -86,7 +86,7 @@ static void parserExpect(Parser *parser, TokenType type, const char *message) {
 }
 
 static bool isTypeToken(const Parser *parser) {
-    return parserIs(parser, TOKEN_TYPE_ARRAY) || parserIs(parser, TOKEN_TYPE_INT) || parserIs(parser, TOKEN_TYPE_FLOAT) || parserIs(parser, TOKEN_TYPE_CHAR) || parserIs(parser, TOKEN_TYPE_BOOL) || parserIs(parser, TOKEN_IDENTIFIER);
+    return parserIs(parser, TOKEN_TYPE_ARRAY) || parserIs(parser, TOKEN_TYPE_INT) || parserIs(parser, TOKEN_TYPE_FLOAT) || parserIs(parser, TOKEN_TYPE_CHAR) || parserIs(parser, TOKEN_TYPE_BOOL) || parserIs(parser, TOKEN_TYPE_VOID) || parserIs(parser, TOKEN_IDENTIFIER);
 }
 
 static bool isDeclarationStart(const Parser *parser) {
@@ -131,6 +131,7 @@ static AstTypeKind typeKindFromToken(const Parser *parser) {
         case TOKEN_TYPE_FLOAT: return AST_TYPE_FLOAT_KIND;
         case TOKEN_TYPE_CHAR: return AST_TYPE_CHAR_KIND;
         case TOKEN_TYPE_BOOL: return AST_TYPE_BOOL_KIND;
+        case TOKEN_TYPE_VOID: return AST_TYPE_VOID_KIND;
         case TOKEN_TYPE_ARRAY: return AST_TYPE_ARRAY_KIND;
         case TOKEN_IDENTIFIER:
         default:
@@ -247,6 +248,8 @@ static AstNode *parseFunction(Parser *parser) {
     }
 
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after function parameters");
+    parserExpect(parser, TOKEN_ARROW, "expected '->' after function parameters");
+    node->data.func_decl.return_type = parseType(parser);
     node->data.func_decl.body = parseBlock(parser);
     return node;
 }

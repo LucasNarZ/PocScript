@@ -50,8 +50,8 @@ void test_semantic_allows_shadowing_in_nested_scope(void) {
 
 void test_semantic_reports_duplicate_function_in_global_scope(void) {
     AstNode *root = parseRootFromString(
-        "func foo(a::int) { ret a; }\n"
-        "func foo(b::int) { ret b; }\n"
+        "func foo(a::int) -> int { ret a; }\n"
+        "func foo(b::int) -> int { ret b; }\n"
     );
     SemanticResult result = semanticAnalyze(root);
 
@@ -64,7 +64,7 @@ void test_semantic_reports_duplicate_function_in_global_scope(void) {
 }
 
 void test_semantic_reports_duplicate_parameter_name(void) {
-    AstNode *root = parseRootFromString("func foo(a::int, a::int) { ret a; }");
+    AstNode *root = parseRootFromString("func foo(a::int, a::int) -> int { ret a; }");
     SemanticResult result = semanticAnalyze(root);
 
     EXPECT_TRUE(result.errors.count == 1);
@@ -126,7 +126,7 @@ void test_semantic_reports_call_to_undeclared_function(void) {
 }
 
 void test_semantic_reports_wrong_argument_count(void) {
-    AstNode *root = parseRootFromString("func foo(a::int) { ret a; } foo(1, 2);");
+    AstNode *root = parseRootFromString("func foo(a::int) -> int { ret a; } foo(1, 2);");
     SemanticResult result = semanticAnalyze(root);
 
     EXPECT_TRUE(result.errors.count == 1);
@@ -138,7 +138,7 @@ void test_semantic_reports_wrong_argument_count(void) {
 }
 
 void test_semantic_reports_wrong_argument_type(void) {
-    AstNode *root = parseRootFromString("func foo(a::int) { ret a; } foo(true);");
+    AstNode *root = parseRootFromString("func foo(a::int) -> int { ret a; } foo(true);");
     SemanticResult result = semanticAnalyze(root);
 
     EXPECT_TRUE(result.errors.count == 1);
@@ -189,6 +189,79 @@ void test_semantic_accumulates_multiple_errors(void) {
     EXPECT_TRUE(strstr(result.errors.items[2].message, "condition must be bool") != NULL);
     EXPECT_TRUE(result.errors.items[3].kind == SEMANTIC_ERROR_TYPE);
     EXPECT_TRUE(strstr(result.errors.items[3].message, "array index must be int") != NULL);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_initializing_int_with_void_call(void) {
+    AstNode *root = parseRootFromString(
+        "func logar() -> void { }\n"
+        "x::int = logar();"
+    );
+    SemanticResult result = semanticAnalyze(root);
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "cannot initialize variable 'x' of type int with void") != NULL);
+    }
+
+    semanticResultFree(&result);
+    astFree(root);
+}
+
+void test_semantic_rejects_non_void_function_without_return(void) {
+    SemanticResult result = analyzeRootFromString("func soma(a::int, b::int) -> int { }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "function 'soma' with return type int must return a value") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_incompatible_function_return_type(void) {
+    SemanticResult result = analyzeRootFromString("func foo() -> int { ret true; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "return type of function 'foo' expects int but got bool") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_value_return_inside_void_function(void) {
+    SemanticResult result = analyzeRootFromString("func foo() -> void { ret 1; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "function 'foo' with return type void cannot return a value") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_reports_return_statement_outside_function(void) {
+    SemanticResult result = analyzeRootFromString("ret 1;");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "return statement outside function") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_matching_function_return_type(void) {
+    SemanticResult result = analyzeRootFromString("func foo() -> int { ret 1; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
 
     semanticResultFree(&result);
 }

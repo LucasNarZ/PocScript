@@ -8,7 +8,7 @@ The `tests/` directory contains the automated validation for PocScript's current
 - `helpers/`: shared assertion macros and helper functions
 - `lexer/`: unit tests for the lexical analyzer
 - `parser/`: unit tests for the parser and syntax errors
-- `semantic/`: unit tests for scope, symbol resolution, type checking, function calls, and array validation
+- `semantic/`: unit tests for scope, symbol resolution, type checking, function calls, function returns, and array validation
 - `integration/`: full-flow tests, from input to serialized AST
 - `fixtures/`: `.ps` files and expected outputs used by the tests
 
@@ -40,7 +40,7 @@ Checks whether the semantic analyzer:
 - detects duplicate declarations in the same scope
 - allows valid shadowing in nested scopes
 - reports undeclared identifiers and functions
-- validates initializer, expression, and call argument types
+- validates initializer, expression, call argument, and function return types
 - validates boolean conditions and array indexing
 - accumulates multiple semantic errors in one analysis pass
 

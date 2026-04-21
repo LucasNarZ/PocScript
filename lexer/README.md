@@ -58,6 +58,7 @@ These two types help the scanner advance correctly, but they do not appear in th
 - `TOKEN_TYPE_FLOAT`: `float`
 - `TOKEN_TYPE_CHAR`: `char`
 - `TOKEN_TYPE_BOOL`: `bool`
+- `TOKEN_TYPE_VOID`: `void`
 
 ### Keywords
 
@@ -73,11 +74,13 @@ These two types help the scanner advance correctly, but they do not appear in th
 - comparison: `TOKEN_EQ_EQ`, `TOKEN_GT_EQ`, `TOKEN_LT_EQ`, `TOKEN_NOT_EQ`, `TOKEN_GT`, `TOKEN_LT`
 - logical: `TOKEN_AND_AND`, `TOKEN_OR_OR`, `TOKEN_BANG`
 - assignment: `TOKEN_ASSIGN`, `TOKEN_PLUS_ASSIGN`, `TOKEN_MINUS_ASSIGN`
+- function return arrow: `TOKEN_ARROW`
 - arithmetic: `TOKEN_PLUS`, `TOKEN_MINUS`, `TOKEN_STAR`, `TOKEN_SLASH`
 
 ### Delimiters and separators
 
 - `TOKEN_DOUBLE_COLON`: `::`
+- `TOKEN_ARROW`: `->`
 - `TOKEN_LPAREN` and `TOKEN_RPAREN`: `(` and `)`
 - `TOKEN_LBRACE` and `TOKEN_RBRACE`: `{` and `}`
 - `TOKEN_LBRACKET` and `TOKEN_RBRACKET`: `[` and `]`

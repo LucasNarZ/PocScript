@@ -7,6 +7,14 @@ static void collectSymbols(AstNode *node, Scope *scope, SemanticResult *result);
 static void validateNode(AstNode *node, Scope *scope, SemanticResult *result);
 static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticResult *result);
 
+typedef struct {
+    const char *function_name;
+    SemanticType *return_type;
+    bool found_compatible_return;
+} FunctionContext;
+
+static FunctionContext *currentFunctionContext = NULL;
+
 static void appendCategorizedError(AstNode *node, SemanticResult *result, SemanticErrorKind kind, const char *message) {
     int line = 0;
     int column = 0;
@@ -42,6 +50,7 @@ static void collectBlock(AstNode *node, Scope *parentScope, SemanticResult *resu
 
 static void collectFunction(AstNode *node, Scope *scope, SemanticResult *result) {
     SemanticType **params = NULL;
+    SemanticType *returnType;
     Scope *functionScope;
     Symbol *symbol;
     size_t i;
@@ -57,7 +66,9 @@ static void collectFunction(AstNode *node, Scope *scope, SemanticResult *result)
         params[i] = semanticTypeFromAst(node->data.func_decl.params[i]->data.param.declared_type);
     }
 
-    symbol = symbolCreateFunction(node->data.func_decl.name, params, node->data.func_decl.param_count);
+    returnType = semanticTypeFromAst(node->data.func_decl.return_type);
+
+    symbol = symbolCreateFunction(node->data.func_decl.name, returnType, params, node->data.func_decl.param_count);
     for (i = 0; i < node->data.func_decl.param_count; i++) {
         semanticTypeFree(params[i]);
     }
@@ -232,6 +243,27 @@ static void appendWrongArgumentTypeError(AstNode *node, SemanticResult *result, 
     appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
 }
 
+static void appendMissingReturnError(AstNode *node, SemanticResult *result, const char *name, const SemanticType *returnType) {
+    char message[256];
+
+    snprintf(message, sizeof(message), "function '%s' with return type %s must return a value", name, semanticTypeName(returnType));
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
+static void appendIncompatibleReturnTypeError(AstNode *node, SemanticResult *result, const char *name, const SemanticType *expectedType, const SemanticType *actualType) {
+    char message[256];
+
+    snprintf(message, sizeof(message), "return type of function '%s' expects %s but got %s", name, semanticTypeName(expectedType), semanticTypeName(actualType));
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
+static void appendVoidReturnValueError(AstNode *node, SemanticResult *result, const char *name) {
+    char message[256];
+
+    snprintf(message, sizeof(message), "function '%s' with return type void cannot return a value", name);
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
 static bool semanticTypeIsNumeric(const SemanticType *type) {
     return type != NULL && (type->kind == SEM_TYPE_INT || type->kind == SEM_TYPE_FLOAT);
 }
@@ -252,7 +284,7 @@ static Scope *createValidationRoot(const Scope *globalScope) {
         Symbol *current = globalScope->buckets[i];
         while (current != NULL) {
             if (current->kind == SYMBOL_FUNCTION) {
-                Symbol *copy = symbolCreateFunction(current->name, current->params, current->param_count);
+                Symbol *copy = symbolCreateFunction(current->name, semanticTypeClone(current->type), current->params, current->param_count);
                 if (copy != NULL) {
                     scopeDeclare(root, copy);
                 }
@@ -474,7 +506,7 @@ static SemanticType *checkCall(AstNode *node, Scope *scope, SemanticResult *resu
         semanticTypeFree(argType);
     }
 
-    return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+    return semanticTypeClone(callee->type);
 }
 
 static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticResult *result) {
@@ -528,11 +560,18 @@ static void validateBlock(AstNode *node, Scope *scope, SemanticResult *result) {
 
 static void validateFunction(AstNode *node, Scope *scope, SemanticResult *result) {
     Scope *functionScope = scopeCreate(scope);
+    FunctionContext context;
+    FunctionContext *previousContext = currentFunctionContext;
     size_t i;
 
     if (functionScope == NULL) {
         return;
     }
+
+    context.function_name = node->data.func_decl.name;
+    context.return_type = semanticTypeFromAst(node->data.func_decl.return_type);
+    context.found_compatible_return = false;
+    currentFunctionContext = &context;
 
     for (i = 0; i < node->data.func_decl.param_count; i++) {
         AstNode *param = node->data.func_decl.params[i];
@@ -540,6 +579,11 @@ static void validateFunction(AstNode *node, Scope *scope, SemanticResult *result
     }
 
     validateNode(node->data.func_decl.body, functionScope, result);
+    if (context.return_type != NULL && context.return_type->kind != SEM_TYPE_VOID && !context.found_compatible_return) {
+        appendMissingReturnError(node, result, node->data.func_decl.name, context.return_type);
+    }
+    semanticTypeFree(context.return_type);
+    currentFunctionContext = previousContext;
     scopeFree(functionScope);
 }
 
@@ -627,8 +671,24 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
             validateFunction(node, scope, result);
             return;
         case AST_RETURN:
+            if (currentFunctionContext == NULL || currentFunctionContext->return_type == NULL) {
+                appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "return statement outside function");
+                return;
+            }
+
             if (node->data.return_stmt.value != NULL) {
                 SemanticType *returnType = checkExpression(node->data.return_stmt.value, scope, result);
+
+                if (currentFunctionContext->return_type->kind == SEM_TYPE_VOID) {
+                    appendVoidReturnValueError(node, result, currentFunctionContext->function_name);
+                } else {
+                    currentFunctionContext->found_compatible_return = true;
+                }
+
+                if (currentFunctionContext->return_type->kind != SEM_TYPE_VOID && returnType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(currentFunctionContext->return_type, returnType)) {
+                    appendIncompatibleReturnTypeError(node, result, currentFunctionContext->function_name, currentFunctionContext->return_type, returnType);
+                }
+
                 semanticTypeFree(returnType);
             }
             return;

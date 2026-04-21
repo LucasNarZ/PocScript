@@ -73,7 +73,7 @@ Some important shapes are:
 
 - `AST_PROGRAM` and `AST_BLOCK`: store `items[]` lists
 - `AST_VAR_DECL`: `name`, `declared_type`, `initializer`
-- `AST_FUNC_DECL`: `name`, `params[]`, `body`, `return_type`
+- `AST_FUNC_DECL`: `name`, `return_type`, `params[]`, `body`
 - `AST_IF`: `condition`, `then_branch`, `else_branch`
 - `AST_FOR`: `init`, `condition`, `update`, `body`
 - `AST_ASSIGN`: `target`, `value`, `op`
@@ -112,6 +112,7 @@ The real textual format is produced by `astToString` and is the same one used by
 - `AST_TYPE_FLOAT_KIND`
 - `AST_TYPE_CHAR_KIND`
 - `AST_TYPE_BOOL_KIND`
+- `AST_TYPE_VOID_KIND`
 - `AST_TYPE_ARRAY_KIND`
 - `AST_TYPE_CUSTOM_KIND`
 
@@ -139,3 +140,4 @@ The real textual format is produced by `astToString` and is the same one used by
 - The parser assumes the lexer has already removed comments and whitespace.
 - Errors are reported based on the current token, reusing `line` and `column` from the lexer.
 - The textual AST serialization is part of the project's practical contract because it is used to validate parsing in the tests.
+- Function declarations require an explicit return type after `->`, and the AST serialization includes that return type under `AST_FUNC_DECL`.

@@ -149,16 +149,26 @@ Symbol *symbolCreateVariable(const char *name, SemanticType *type) {
     return symbol;
 }
 
-Symbol *symbolCreateFunction(const char *name, SemanticType **params, size_t param_count) {
+Symbol *symbolCreateFunction(const char *name, SemanticType *returnType, SemanticType **params, size_t param_count) {
     Symbol *symbol = calloc(1, sizeof(Symbol));
     size_t i;
 
     if (symbol == NULL) {
+        semanticTypeFree(returnType);
         return NULL;
     }
 
     symbol->name = copyName(name);
     if (symbol->name == NULL) {
+        semanticTypeFree(returnType);
+        free(symbol);
+        return NULL;
+    }
+
+    symbol->type = semanticTypeClone(returnType);
+    semanticTypeFree(returnType);
+    if (symbol->type == NULL) {
+        free(symbol->name);
         free(symbol);
         return NULL;
     }
@@ -166,6 +176,7 @@ Symbol *symbolCreateFunction(const char *name, SemanticType **params, size_t par
     if (param_count > 0) {
         symbol->params = calloc(param_count, sizeof(SemanticType *));
         if (symbol->params == NULL) {
+            semanticTypeFree(symbol->type);
             free(symbol->name);
             free(symbol);
             return NULL;

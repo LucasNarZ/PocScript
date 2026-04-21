@@ -71,6 +71,8 @@ const char *semanticTypeName(const SemanticType *type) {
             return "char";
         case SEM_TYPE_BOOL:
             return "bool";
+        case SEM_TYPE_VOID:
+            return "void";
         case SEM_TYPE_ARRAY:
             return "array";
         case SEM_TYPE_ERROR:
@@ -110,6 +112,8 @@ SemanticType *semanticTypeFromAst(AstNode *typeNode) {
             return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
         case AST_TYPE_BOOL_KIND:
             return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
+        case AST_TYPE_VOID_KIND:
+            return semanticTypeNewPrimitive(SEM_TYPE_VOID);
         case AST_TYPE_ARRAY_KIND:
             type = semanticTypeNewPrimitive(SEM_TYPE_ARRAY);
             if (type == NULL) {

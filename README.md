@@ -1,133 +1,114 @@
 # PocScript
 
-**PocScript** is a *work-in-progress* compiled programming language created for educational purposes. The goal of this project is **not** to implement advanced features like classes, structs, dictionaries, or complex types — the main objective is to understand and build the **core structure of a programming language** from scratch.
+PocScript is a study project focused on implementing the core building blocks of a programming language in C. In the current state of the repository, the main focus is the compiler frontend: source reading, tokenization, parsing, and AST generation/printing.
 
----
+## Current State
 
-## 🧠 Project Structure
+- `lexer/`: converts source code into a linked list of tokens with `type`, `value`, `line`, and `column`
+- `parser/`: consumes the token list and produces an AST for declarations, expressions, blocks, functions, conditionals, loops, and arrays
+- `tests/`: contains unit and integration tests for the lexer, parser, and AST serialization
+- `main.c`: main debug executable; reads `input.ps`, prints recognized tokens, and then prints the resulting AST
 
-PocScript consists of three main components (excluding syntax analysis):
+Today the project is organized as a compiler frontend. The old README described assembly generation as a central part of the flow, but the code currently present in this repository is centered on the lexer, parser, and AST.
 
+## Project Structure
 
-#### **Lexer ➝ Parser ➝ Assembly Generator**
-
-
-### 🔤 Lexer
-The **lexer** reads the input file and converts it into a linked list of tokens, each categorized (e.g., keyword, operator, identifier). This is done using **regex pattern matching**.
-
-### 🌳 Parser
-The **parser** takes the token list from the lexer and builds an **AST (Abstract Syntax Tree)**, representing the grammatical structure of the program.  
-
-PocScript uses a **Top-Down Recursive Descent Parser**, where each grammar rule is implemented as a function. This approach makes the structure more readable and easier to debug during development.
-
-### ⚙️ Assembly Generator
-The final step takes the AST and converts it to **x86 assembly** (requires an assembler like NASM to run the generated code). This part is still under development.
-
----
-
-## 📈 Development Progress
-
-### ✅ Lexer
-- [x] Operators  
-- [x] Keywords  
-- [x] Delimiters  
-- [x] Assignment Operators  
-- [x] Integers  
-- [x] Identifiers  
-- [ ] `*=` and `/=` operators
-- [x] Floating-point numbers  
-- [x] Character and String literals(need to fix bug)
-- [x] Comments
-
-### ✅ Parser
-- [x] Variable declarations  
-- [x] Basic arithmetic and logic expressions  
-- [x] `if` statements 
-- [x] `else` statements
-- [x] `else if` statements
-- [x] `while` loops  
-- [x] `for` loops  
-- [x] Function declaration
-- [x] Primitive types  
-- [x] `+=` operator  
-- [ ] `*=` and `/=` operators
-- [x] Variable scopes  
-- [x] Vectors
-- [x] Matrices 
-- [x] Manage Array scope 
-- [x] Parentheses in expressions  
-- [x] Functions calls
-- [x] `!` operator
-- [x] `true` and `false` keywords
-- [ ] Negative Numbers
-- [x] Access array elements
-- [x] Functions `ret` statement
-- [ ] n-dimention Array(maybe)
-
-### ✅ Assembly Generator
-- [x] Generate `.asm` output file
-- [x] Add `.data`, `.text`, and `_start` sections
-- [ ] Integer declaration and initialization
-- [ ] Float declaration and initialization
-- [x] Support variable initialization with literals
-- [x] Simple assignment (`=`)
-- [x] Generate code for number literals
-- [x] Basic arithmetic operations (`+`, `-`, `*`, `/`)
-- [x] Parentheses and precedence in expressions
-- [x] Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`)
-- [x] Logical operators (`&&`, `||`, `!`)
-- [x] Default `print` function
-- [x] Function Call
-- [ ] Compound assignment (`+=`, `-=`, etc.)
-- [x] If statements (`if`)
-- [x] Else and else-if chaining (`else`, `else if`)
-- [x] While loops
-- [x] For loops
-- [ ] Local Variable declaration
-- [ ] Function declaration
-- [ ] `ret` statement
-- [ ] Float math
-- [ ] Support 1D arrays (declaration and access)
-- [ ] Support 2D matrices (declaration and access)
-
----
-
-## 🛠️ How to Build and Run
-
-### 📦 Dependencies
-To compile and run PocScript, make sure you have the following tools installed:
-
-- `gcc` (GNU Compiler Collection)
-- `make` (Build automation tool)
-- `nasm` (The Netwide Assembler — for x86 assembly)
-
-You can install them using your package manager. For example, on Debian/Ubuntu-based systems:
-
-```bash
-sudo apt update
-sudo apt install build-essential nasm
+```text
+.
+|-- main.c
+|-- constants.h
+|-- input.ps
+|-- makefile
+|-- lexer/
+|   |-- lexer.c
+|   |-- lexer.h
+|   |-- token.h
+|   `-- README.md
+|-- parser/
+|   |-- parser.c
+|   |-- parser.h
+|   |-- ast.c
+|   |-- ast.h
+|   `-- README.md
+`-- tests/
+    |-- lexer/
+    |-- parser/
+    |-- integration/
+    |-- helpers/
+    |-- fixtures/
+    |-- test_main.c
+    `-- README.md
 ```
-### ⚙️ Building the Project
 
-Clone the repository and run make in the project root:
+## Current Flow
+
+1. `tokenizeFile("input.ps")` reads the input file and produces the token list.
+2. `parserParseProgram(...)` walks through that list and builds the AST.
+3. `main.c` prints the token sequence and then the textual tree representation.
+
+In practice, this binary works as a simple way to inspect the language frontend while the grammar evolves.
+
+## Features Covered By The Current Code
+
+- variable declarations with `::`
+- primitive types `int`, `float`, `char`, `bool`
+- `Array` type and types with `[]` suffixes
+- integer, float, string, and bool literals
+- binary expressions: `+`, `-`, `*`, `/`, `>`, `<`, `>=`, `<=`, `==`, `!=`, `&&`, `||`
+- unary `!` operator
+- assignments `=`, `+=`, `-=`
+- blocks
+- `if`, `else`, `while`, `for`
+- function declarations and `ret`
+- function calls
+- array access with one or more indices
+- nested array literals
+
+## Build And Run
+
+### Requirements
+
+- `gcc`
+- `make`
+
+### Build the frontend
+
 ```bash
-git clone https://github.com/LucasNarZ/PocScript.git
-cd PocScript
 make
 ```
 
-### 🧪 Running the Compiler
+This generates the `compiler` executable.
 
-1. Create an input file with the extension .ps. For example:
+### Run with the default input file
+
 ```bash
-echo "a::int = 2 + 3;" > input.ps
+./compiler
 ```
-2. Run the compiler:
+
+The program reads `input.ps`, prints the recognized tokens, and then prints the formatted AST.
+
+### Run the tests
+
+```bash
+make test
+```
+
+This builds and runs `tests_runner`.
+
+### Clean artifacts
+
 ```bash
 make clean
-make 
-./output
 ```
 
-## 📌 Notes
-This project is intended for **learning purposes**, so the implementation favors simplicity and clarity over performance or completeness. Contributions, feedback, or suggestions are welcome!
+## Internal Documentation
+
+- `lexer/README.md`: lexer overview, token categories, and tokenization flow
+- `parser/README.md`: parser organization and general AST format
+- `tests/README.md`: test suite structure and the role of each group
+
+## Notes
+
+- The project prioritizes simplicity and readability over completeness.
+- The AST has its own textual representation in `parser/ast.c`, used by the integration tests.
+- The parser is syntactic: the tests validate structure and parsing errors, not semantic analysis.

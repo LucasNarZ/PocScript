@@ -7,6 +7,25 @@ static bool isTokenType(const Token *token, TokenType type) {
     return token != NULL && token->type == type;
 }
 
+static char *copyTokenValue(const Token *token) {
+    size_t length;
+    char *copy;
+
+    if (token == NULL || token->value == NULL) {
+        return NULL;
+    }
+
+    length = strlen(token->value);
+    copy = malloc(length + 1);
+    if (copy == NULL) {
+        fprintf(stderr, "Out of memory while copying token value\n");
+        exit(1);
+    }
+
+    memcpy(copy, token->value, length + 1);
+    return copy;
+}
+
 static bool isAtEnd(const Token *token) {
    return token == NULL || token->type == TOKEN_EOF;
 }
@@ -34,11 +53,11 @@ static bool isTypeToken(const Token *token) {
 }
 
 static bool isDeclarationStart(const Token *token) {
-    if (token == NULL || token->next == NULL || token->next->next == NULL) {
+    if (token == NULL || token->next == NULL) {
         return false;
     }
 
-    return isTokenType(token, TOKEN_IDENTIFIER) && isTokenType(token->next, TOKEN_DOUBLE_COLON) && isTypeToken(token->next->next);
+    return isTokenType(token, TOKEN_IDENTIFIER) && isTokenType(token->next, TOKEN_DOUBLE_COLON);
 }
 
 static AstBinaryOp binaryOpFromToken(TokenType type) {
@@ -92,9 +111,7 @@ static AstNode *wrapArrayTypes(AstNode *base, Token **token) {
             sizeExpr = parseLogical(token);
         }
         expectToken(token, TOKEN_RBRACKET, "expected ']' after array type size");
-
-        arrayType->data.type_array.element_type = base;
-        arrayType->data.type_array.size_expr = sizeExpr;
+arrayType->data.type_array.element_type = base; arrayType->data.type_array.size_expr = sizeExpr;
         base = arrayType;
     }
 
@@ -161,7 +178,7 @@ static AstNode *parseParameter(Token **token) {
         syntaxError(*token, "expected parameter name");
     }
 
-    param->data.param.name = (*token)->value;
+    param->data.param.name = copyTokenValue(*token);
     *token = (*token)->next;
     expectToken(token, TOKEN_DOUBLE_COLON, "expected '::' after parameter name");
     param->data.param.declared_type = parseType(token);
@@ -176,15 +193,18 @@ static AstNode *parseFunction(Token **token) {
         syntaxError(*token, "expected function name after func");
     }
 
-    node->data.func_decl.name = (*token)->value;
+    node->data.func_decl.name = copyTokenValue(*token);
     *token = (*token)->next;
     expectToken(token, TOKEN_LPAREN, "expected '(' after function name");
 
-    while (!isTokenType(*token, TOKEN_RPAREN)) {
+    if (!isTokenType(*token, TOKEN_RPAREN)) {
         AstNode *param = parseParameter(token);
         astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
-        if (isTokenType(*token, TOKEN_COMMA)) {
+
+        while (isTokenType(*token, TOKEN_COMMA)) {
             *token = (*token)->next;
+            param = parseParameter(token);
+            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
         }
     }
 
@@ -209,9 +229,7 @@ AstNode *parseProgram(Token **token) {
 AstNode *parseBlock(Token **token) {
     AstNode *block = astNewNode(AST_BLOCK);
 
-    if (isTokenType(*token, TOKEN_LBRACE)) {
-        *token = (*token)->next;
-    }
+    expectToken(token, TOKEN_LBRACE, "expected '{' to start block");
 
     while (!isAtEnd(*token) && !isTokenType(*token, TOKEN_RBRACE)) {
         AstNode *item = parseStatement(token);
@@ -222,6 +240,8 @@ AstNode *parseBlock(Token **token) {
 
     if (isTokenType(*token, TOKEN_RBRACE)) {
         *token = (*token)->next;
+    } else {
+        syntaxError(*token, "expected '}' to close block");
     }
 
     return block;
@@ -277,7 +297,7 @@ AstNode *parseReturn(Token **token) {
 AstNode *parseAssign(Token **token) {
     if (isDeclarationStart(*token)) {
         AstNode *decl = astNewNode(AST_VAR_DECL);
-        decl->data.var_decl.name = (*token)->value;
+        decl->data.var_decl.name = copyTokenValue(*token);
         *token = (*token)->next->next;
         decl->data.var_decl.declared_type = parseType(token);
 
@@ -384,14 +404,19 @@ AstNode *parseFactor(Token **token) {
     }
 
     if (isTokenType(*token, TOKEN_NUMBER)) {
-        node = astNewNode(AST_INT_LITERAL);
-        node->data.int_literal.value = strtol((*token)->value, NULL, 10);
+        if (strchr((*token)->value, '.') != NULL) {
+            node = astNewNode(AST_FLOAT_LITERAL);
+            node->data.float_literal.value = strtod((*token)->value, NULL);
+        } else {
+            node = astNewNode(AST_INT_LITERAL);
+            node->data.int_literal.value = strtol((*token)->value, NULL, 10);
+        }
         *token = (*token)->next;
         return node;
     }
     if (isTokenType(*token, TOKEN_STRING)) {
         node = astNewNode(AST_STRING_LITERAL);
-        node->data.string_literal.value = (*token)->value;
+        node->data.string_literal.value = copyTokenValue(*token);
         *token = (*token)->next;
         return node;
     }
@@ -406,7 +431,7 @@ AstNode *parseFactor(Token **token) {
     }
     if (isTokenType(*token, TOKEN_IDENTIFIER)) {
         AstNode *base = astNewNode(AST_IDENTIFIER);
-        base->data.identifier.name = (*token)->value;
+        base->data.identifier.name = copyTokenValue(*token);
         *token = (*token)->next;
 
         while (!isAtEnd(*token)) {
@@ -414,11 +439,14 @@ AstNode *parseFactor(Token **token) {
                 AstNode *call = astNewNode(AST_CALL);
                 call->data.call.callee = base;
                 *token = (*token)->next;
-                while (!isTokenType(*token, TOKEN_RPAREN)) {
+                if (!isTokenType(*token, TOKEN_RPAREN)) {
                     AstNode *arg = parseLogical(token);
                     astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
-                    if (isTokenType(*token, TOKEN_COMMA)) {
+
+                    while (isTokenType(*token, TOKEN_COMMA)) {
                         *token = (*token)->next;
+                        arg = parseLogical(token);
+                        astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
                     }
                 }
                 expectToken(token, TOKEN_RPAREN, "expected ')' after call arguments");
@@ -478,7 +506,7 @@ AstNode *parseType(Token **token) {
 
     base = astNewNode(AST_TYPE_NAME);
     base->data.type_name.kind = typeKindFromToken(*token);
-    base->data.type_name.name = (*token)->value;
+    base->data.type_name.name = copyTokenValue(*token);
     *token = (*token)->next;
     return wrapArrayTypes(base, token);
 }
@@ -487,13 +515,22 @@ AstNode *parseArrayLiteral(Token **token) {
     AstNode *array = astNewNode(AST_ARRAY_LITERAL);
 
     expectToken(token, TOKEN_LBRACE, "expected '{' to start array literal");
-    while (!isTokenType(*token, TOKEN_RBRACE)) {
+
+    if (!isTokenType(*token, TOKEN_RBRACE)) {
         AstNode *element = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
         astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
-        if (isTokenType(*token, TOKEN_COMMA) || isTokenType(*token, TOKEN_SEMICOLON)) {
+
+        while (isTokenType(*token, TOKEN_COMMA) || isTokenType(*token, TOKEN_SEMICOLON)) {
             *token = (*token)->next;
+            if (isTokenType(*token, TOKEN_RBRACE) || isAtEnd(*token)) {
+                break;
+            }
+
+            element = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
+            astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
         }
     }
+
     expectToken(token, TOKEN_RBRACE, "expected '}' after array literal");
     return array;
 }

@@ -200,5 +200,6 @@ AstNode *astNewNode(AstNodeType type);
 void astAppendNode(AstNode ***items, size_t *count, AstNode *item);
 char *astToString(AstNode *root);
 void astPrintPretty(AstNode *root);
+void astFree(AstNode *root);
 
 #endif

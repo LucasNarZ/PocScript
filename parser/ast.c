@@ -90,6 +90,16 @@ static void writeIndent(char **buffer, size_t *size, int depth, int isLast[]) {
 
 static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int isLast[]);
 
+static void freeNodeList(AstNode **items, size_t count) {
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        astFree(items[i]);
+    }
+
+    free(items);
+}
+
 static void writeList(char **buffer, size_t *size, AstNode **items, size_t count, int depth, int isLast[]) {
     size_t i;
     for (i = 0; i < count; i++) {
@@ -232,4 +242,96 @@ void astPrintPretty(AstNode *root) {
         fputs(text, stdout);
         free(text);
     }
+}
+
+void astFree(AstNode *root) {
+    if (root == NULL) {
+        return;
+    }
+
+    switch (root->type) {
+        case AST_PROGRAM:
+            freeNodeList(root->data.program.items, root->data.program.count);
+            break;
+        case AST_BLOCK:
+            freeNodeList(root->data.block.items, root->data.block.count);
+            break;
+        case AST_VAR_DECL:
+            free(root->data.var_decl.name);
+            astFree(root->data.var_decl.declared_type);
+            astFree(root->data.var_decl.initializer);
+            break;
+        case AST_FUNC_DECL:
+            free(root->data.func_decl.name);
+            freeNodeList(root->data.func_decl.params, root->data.func_decl.param_count);
+            astFree(root->data.func_decl.body);
+            astFree(root->data.func_decl.return_type);
+            break;
+        case AST_PARAM:
+            free(root->data.param.name);
+            astFree(root->data.param.declared_type);
+            break;
+        case AST_IF:
+            astFree(root->data.if_stmt.condition);
+            astFree(root->data.if_stmt.then_branch);
+            astFree(root->data.if_stmt.else_branch);
+            break;
+        case AST_WHILE:
+            astFree(root->data.while_stmt.condition);
+            astFree(root->data.while_stmt.body);
+            break;
+        case AST_FOR:
+            astFree(root->data.for_stmt.init);
+            astFree(root->data.for_stmt.condition);
+            astFree(root->data.for_stmt.update);
+            astFree(root->data.for_stmt.body);
+            break;
+        case AST_RETURN:
+            astFree(root->data.return_stmt.value);
+            break;
+        case AST_EXPR_STMT:
+            astFree(root->data.expr_stmt.expression);
+            break;
+        case AST_ASSIGN:
+            astFree(root->data.assign.target);
+            astFree(root->data.assign.value);
+            break;
+        case AST_BINARY:
+            astFree(root->data.binary.left);
+            astFree(root->data.binary.right);
+            break;
+        case AST_UNARY:
+            astFree(root->data.unary.operand);
+            break;
+        case AST_CALL:
+            astFree(root->data.call.callee);
+            freeNodeList(root->data.call.args, root->data.call.arg_count);
+            break;
+        case AST_ARRAY_ACCESS:
+            astFree(root->data.array_access.base);
+            freeNodeList(root->data.array_access.indices, root->data.array_access.index_count);
+            break;
+        case AST_ARRAY_LITERAL:
+            freeNodeList(root->data.array_literal.elements, root->data.array_literal.count);
+            break;
+        case AST_IDENTIFIER:
+            free(root->data.identifier.name);
+            break;
+        case AST_STRING_LITERAL:
+            free(root->data.string_literal.value);
+            break;
+        case AST_TYPE_NAME:
+            free(root->data.type_name.name);
+            break;
+        case AST_TYPE_ARRAY:
+            astFree(root->data.type_array.element_type);
+            astFree(root->data.type_array.size_expr);
+            break;
+        case AST_INT_LITERAL:
+        case AST_FLOAT_LITERAL:
+        case AST_BOOL_LITERAL:
+            break;
+    }
+
+    free(root);
 }

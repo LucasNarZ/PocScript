@@ -15,6 +15,7 @@ static AstNode *parseNegation(Parser *parser);
 static AstNode *parseFactor(Parser *parser);
 static AstNode *parseType(Parser *parser);
 static AstNode *parseArrayLiteral(Parser *parser);
+static bool isAssignableTarget(const AstNode *node);
 
 static AstNode *astNewNodeFromToken(AstNodeType type, const Token *token) {
     if (token == NULL) {
@@ -347,7 +348,7 @@ static AstNode *parseAssign(Parser *parser) {
 
         if (parserIs(parser, TOKEN_ASSIGN)) {
             parserAdvance(parser);
-            decl->data.var_decl.initializer = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
+            decl->data.var_decl.initializer = parseLogical(parser);
         }
 
         return decl;
@@ -356,11 +357,15 @@ static AstNode *parseAssign(Parser *parser) {
     {
         AstNode *node = parseLogical(parser);
         if (!parserAtEnd(parser) && (parserIs(parser, TOKEN_ASSIGN) || parserIs(parser, TOKEN_PLUS_ASSIGN) || parserIs(parser, TOKEN_MINUS_ASSIGN))) {
+            if (!isAssignableTarget(node)) {
+                parserSyntaxError(parser->current, "invalid assignment target");
+            }
+
             AstNode *assign = astNewNodeFromCurrent(parser, AST_ASSIGN);
             assign->data.assign.op = assignOpFromToken(parser->current->type);
             assign->data.assign.target = node;
             parserAdvance(parser);
-            assign->data.assign.value = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
+            assign->data.assign.value = parseLogical(parser);
             return assign;
         }
         return node;
@@ -500,14 +505,13 @@ static AstNode *parseFactor(Parser *parser) {
 
             if (parserIs(parser, TOKEN_LBRACKET)) {
                 AstNode *access = astNewNodeAt(AST_ARRAY_ACCESS, base->line, base->column);
+                AstNode *index;
+
                 access->data.array_access.base = base;
-                while (parserIs(parser, TOKEN_LBRACKET)) {
-                    AstNode *index;
-                    parserAdvance(parser);
-                    index = parseLogical(parser);
-                    astAppendNode(&access->data.array_access.indices, &access->data.array_access.index_count, index);
-                    parserExpect(parser, TOKEN_RBRACKET, "expected ']' after array index");
-                }
+                parserAdvance(parser);
+                index = parseLogical(parser);
+                astAppendNode(&access->data.array_access.indices, &access->data.array_access.index_count, index);
+                parserExpect(parser, TOKEN_RBRACKET, "expected ']' after array index");
                 base = access;
                 continue;
             }
@@ -526,6 +530,22 @@ static AstNode *parseFactor(Parser *parser) {
 
     parserSyntaxError(parser->current, "unexpected token in expression");
     return NULL;
+}
+
+static bool isAssignableTarget(const AstNode *node) {
+    if (node == NULL) {
+        return false;
+    }
+
+    if (node->type == AST_IDENTIFIER) {
+        return true;
+    }
+
+    if (node->type == AST_ARRAY_ACCESS) {
+        return isAssignableTarget(node->data.array_access.base);
+    }
+
+    return false;
 }
 
 static AstNode *parseType(Parser *parser) {
@@ -561,7 +581,7 @@ static AstNode *parseArrayLiteral(Parser *parser) {
     parserExpect(parser, TOKEN_LBRACE, "expected '{' to start array literal");
 
     if (!parserIs(parser, TOKEN_RBRACE)) {
-        AstNode *element = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
+        AstNode *element = parseLogical(parser);
         astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
 
         while (parserIs(parser, TOKEN_COMMA) || parserIs(parser, TOKEN_SEMICOLON)) {
@@ -570,7 +590,7 @@ static AstNode *parseArrayLiteral(Parser *parser) {
                 break;
             }
 
-            element = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
+            element = parseLogical(parser);
             astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
         }
     }

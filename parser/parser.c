@@ -3,8 +3,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static bool isTokenType(const Token *token, TokenType type) {
-    return token != NULL && token->type == type;
+static AstNode *parseBlock(Parser *parser);
+static AstNode *parseStatement(Parser *parser);
+static AstNode *parseReturn(Parser *parser);
+static AstNode *parseAssign(Parser *parser);
+static AstNode *parseLogical(Parser *parser);
+static AstNode *parseComparison(Parser *parser);
+static AstNode *parseExpression(Parser *parser);
+static AstNode *parseTerm(Parser *parser);
+static AstNode *parseNegation(Parser *parser);
+static AstNode *parseFactor(Parser *parser);
+static AstNode *parseType(Parser *parser);
+static AstNode *parseArrayLiteral(Parser *parser);
+
+static bool parserIs(const Parser *parser, TokenType type) {
+    return parser->current != NULL && parser->current->type == type;
 }
 
 static char *copyTokenValue(const Token *token) {
@@ -26,11 +39,11 @@ static char *copyTokenValue(const Token *token) {
     return copy;
 }
 
-static bool isAtEnd(const Token *token) {
-   return token == NULL || token->type == TOKEN_EOF;
+static bool parserAtEnd(const Parser *parser) {
+    return parser->current == NULL || parser->current->type == TOKEN_EOF;
 }
 
-static void syntaxError(const Token *token, const char *message) {
+static void parserSyntaxError(const Token *token, const char *message) {
     if (token == NULL) {
         fprintf(stderr, "SyntaxError at end of input: %s\n", message);
         exit(1);
@@ -40,24 +53,34 @@ static void syntaxError(const Token *token, const char *message) {
     exit(1);
 }
 
-static void expectToken(Token **token, TokenType type, const char *message) {
-    if (!isTokenType(*token, type)) {
-        syntaxError(*token, message);
+static Token *parserAdvance(Parser *parser) {
+    Token *current = parser->current;
+
+    if (parser->current != NULL) {
+        parser->current = parser->current->next;
     }
 
-    *token = (*token)->next;
+    return current;
 }
 
-static bool isTypeToken(const Token *token) {
-    return isTokenType(token, TOKEN_TYPE_ARRAY) || isTokenType(token, TOKEN_TYPE_INT) || isTokenType(token, TOKEN_TYPE_FLOAT) || isTokenType(token, TOKEN_TYPE_CHAR) || isTokenType(token, TOKEN_TYPE_BOOL) || isTokenType(token, TOKEN_IDENTIFIER);
+static void parserExpect(Parser *parser, TokenType type, const char *message) {
+    if (!parserIs(parser, type)) {
+        parserSyntaxError(parser->current, message);
+    }
+
+    parserAdvance(parser);
 }
 
-static bool isDeclarationStart(const Token *token) {
-    if (token == NULL || token->next == NULL) {
+static bool isTypeToken(const Parser *parser) {
+    return parserIs(parser, TOKEN_TYPE_ARRAY) || parserIs(parser, TOKEN_TYPE_INT) || parserIs(parser, TOKEN_TYPE_FLOAT) || parserIs(parser, TOKEN_TYPE_CHAR) || parserIs(parser, TOKEN_TYPE_BOOL) || parserIs(parser, TOKEN_IDENTIFIER);
+}
+
+static bool isDeclarationStart(const Parser *parser) {
+    if (parser->current == NULL || parser->current->next == NULL) {
         return false;
     }
 
-    return isTokenType(token, TOKEN_IDENTIFIER) && isTokenType(token->next, TOKEN_DOUBLE_COLON);
+    return parser->current->type == TOKEN_IDENTIFIER && parser->current->next->type == TOKEN_DOUBLE_COLON;
 }
 
 static AstBinaryOp binaryOpFromToken(TokenType type) {
@@ -88,8 +111,8 @@ static AstAssignOp assignOpFromToken(TokenType type) {
     }
 }
 
-static AstTypeKind typeKindFromToken(const Token *token) {
-    switch (token->type) {
+static AstTypeKind typeKindFromToken(const Parser *parser) {
+    switch (parser->current->type) {
         case TOKEN_TYPE_INT: return AST_TYPE_INT_KIND;
         case TOKEN_TYPE_FLOAT: return AST_TYPE_FLOAT_KIND;
         case TOKEN_TYPE_CHAR: return AST_TYPE_CHAR_KIND;
@@ -101,123 +124,129 @@ static AstTypeKind typeKindFromToken(const Token *token) {
     }
 }
 
-static AstNode *wrapArrayTypes(AstNode *base, Token **token) {
-    while (isTokenType(*token, TOKEN_LBRACKET)) {
+static AstNode *wrapArrayTypes(AstNode *base, Parser *parser) {
+    while (parserIs(parser, TOKEN_LBRACKET)) {
         AstNode *arrayType = astNewNode(AST_TYPE_ARRAY);
         AstNode *sizeExpr = NULL;
 
-        *token = (*token)->next;
-        if (!isTokenType(*token, TOKEN_RBRACKET)) {
-            sizeExpr = parseLogical(token);
+        parserAdvance(parser);
+        if (!parserIs(parser, TOKEN_RBRACKET)) {
+            sizeExpr = parseLogical(parser);
         }
-        expectToken(token, TOKEN_RBRACKET, "expected ']' after array type size");
-arrayType->data.type_array.element_type = base; arrayType->data.type_array.size_expr = sizeExpr;
+        parserExpect(parser, TOKEN_RBRACKET, "expected ']' after array type size");
+        arrayType->data.type_array.element_type = base;
+        arrayType->data.type_array.size_expr = sizeExpr;
         base = arrayType;
     }
 
     return base;
 }
 
-static AstNode *parseIf(Token **token) {
+static AstNode *parseIf(Parser *parser) {
     AstNode *node = astNewNode(AST_IF);
 
-    *token = (*token)->next;
-    expectToken(token, TOKEN_LPAREN, "expected '(' after if");
-    node->data.if_stmt.condition = parseLogical(token);
-    expectToken(token, TOKEN_RPAREN, "expected ')' after if condition");
-    node->data.if_stmt.then_branch = parseBlock(token);
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_LPAREN, "expected '(' after if");
+    node->data.if_stmt.condition = parseLogical(parser);
+    parserExpect(parser, TOKEN_RPAREN, "expected ')' after if condition");
+    node->data.if_stmt.then_branch = parseBlock(parser);
 
-    if (isTokenType(*token, TOKEN_KW_ELSE)) {
-        *token = (*token)->next;
-        if (isTokenType(*token, TOKEN_KW_IF)) {
-            node->data.if_stmt.else_branch = parseIf(token);
+    if (parserIs(parser, TOKEN_KW_ELSE)) {
+        parserAdvance(parser);
+        if (parserIs(parser, TOKEN_KW_IF)) {
+            node->data.if_stmt.else_branch = parseIf(parser);
         } else {
-            node->data.if_stmt.else_branch = parseBlock(token);
+            node->data.if_stmt.else_branch = parseBlock(parser);
         }
     }
 
     return node;
 }
 
-static AstNode *parseWhile(Token **token) {
+static AstNode *parseWhile(Parser *parser) {
     AstNode *node = astNewNode(AST_WHILE);
 
-    *token = (*token)->next;
-    expectToken(token, TOKEN_LPAREN, "expected '(' after while");
-    node->data.while_stmt.condition = parseLogical(token);
-    expectToken(token, TOKEN_RPAREN, "expected ')' after while condition");
-    node->data.while_stmt.body = parseBlock(token);
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_LPAREN, "expected '(' after while");
+    node->data.while_stmt.condition = parseLogical(parser);
+    parserExpect(parser, TOKEN_RPAREN, "expected ')' after while condition");
+    node->data.while_stmt.body = parseBlock(parser);
     return node;
 }
 
-static AstNode *parseFor(Token **token) {
+static AstNode *parseFor(Parser *parser) {
     AstNode *node = astNewNode(AST_FOR);
 
-    *token = (*token)->next;
-    expectToken(token, TOKEN_LPAREN, "expected '(' after for");
-    if (!isTokenType(*token, TOKEN_SEMICOLON)) {
-        node->data.for_stmt.init = parseAssign(token);
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_LPAREN, "expected '(' after for");
+    if (!parserIs(parser, TOKEN_SEMICOLON)) {
+        node->data.for_stmt.init = parseAssign(parser);
     }
-    expectToken(token, TOKEN_SEMICOLON, "expected ';' after for init");
-    if (!isTokenType(*token, TOKEN_SEMICOLON)) {
-        node->data.for_stmt.condition = parseLogical(token);
+    parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after for init");
+    if (!parserIs(parser, TOKEN_SEMICOLON)) {
+        node->data.for_stmt.condition = parseLogical(parser);
     }
-    expectToken(token, TOKEN_SEMICOLON, "expected ';' after for condition");
-    if (!isTokenType(*token, TOKEN_RPAREN)) {
-        node->data.for_stmt.update = parseAssign(token);
+    parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after for condition");
+    if (!parserIs(parser, TOKEN_RPAREN)) {
+        node->data.for_stmt.update = parseAssign(parser);
     }
-    expectToken(token, TOKEN_RPAREN, "expected ')' after for update");
-    node->data.for_stmt.body = parseBlock(token);
+    parserExpect(parser, TOKEN_RPAREN, "expected ')' after for update");
+    node->data.for_stmt.body = parseBlock(parser);
     return node;
 }
 
-static AstNode *parseParameter(Token **token) {
+static AstNode *parseParameter(Parser *parser) {
     AstNode *param = astNewNode(AST_PARAM);
 
-    if (!isTokenType(*token, TOKEN_IDENTIFIER)) {
-        syntaxError(*token, "expected parameter name");
+    if (!parserIs(parser, TOKEN_IDENTIFIER)) {
+        parserSyntaxError(parser->current, "expected parameter name");
     }
 
-    param->data.param.name = copyTokenValue(*token);
-    *token = (*token)->next;
-    expectToken(token, TOKEN_DOUBLE_COLON, "expected '::' after parameter name");
-    param->data.param.declared_type = parseType(token);
+    param->data.param.name = copyTokenValue(parser->current);
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_DOUBLE_COLON, "expected '::' after parameter name");
+    param->data.param.declared_type = parseType(parser);
     return param;
 }
 
-static AstNode *parseFunction(Token **token) {
+static AstNode *parseFunction(Parser *parser) {
     AstNode *node = astNewNode(AST_FUNC_DECL);
 
-    *token = (*token)->next;
-    if (!isTokenType(*token, TOKEN_IDENTIFIER)) {
-        syntaxError(*token, "expected function name after func");
+    parserAdvance(parser);
+    if (!parserIs(parser, TOKEN_IDENTIFIER)) {
+        parserSyntaxError(parser->current, "expected function name after func");
     }
 
-    node->data.func_decl.name = copyTokenValue(*token);
-    *token = (*token)->next;
-    expectToken(token, TOKEN_LPAREN, "expected '(' after function name");
+    node->data.func_decl.name = copyTokenValue(parser->current);
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_LPAREN, "expected '(' after function name");
 
-    if (!isTokenType(*token, TOKEN_RPAREN)) {
-        AstNode *param = parseParameter(token);
+    if (!parserIs(parser, TOKEN_RPAREN)) {
+        AstNode *param = parseParameter(parser);
         astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
 
-        while (isTokenType(*token, TOKEN_COMMA)) {
-            *token = (*token)->next;
-            param = parseParameter(token);
+        while (parserIs(parser, TOKEN_COMMA)) {
+            parserAdvance(parser);
+            param = parseParameter(parser);
             astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
         }
     }
 
-    expectToken(token, TOKEN_RPAREN, "expected ')' after function parameters");
-    node->data.func_decl.body = parseBlock(token);
+    parserExpect(parser, TOKEN_RPAREN, "expected ')' after function parameters");
+    node->data.func_decl.body = parseBlock(parser);
     return node;
 }
 
-AstNode *parseProgram(Token **token) {
+void parserInit(Parser *parser, Token *tokens) {
+    parser->tokens = tokens;
+    parser->current = tokens;
+}
+
+AstNode *parserParseProgram(Parser *parser) {
     AstNode *program = astNewNode(AST_PROGRAM);
 
-    while (!isAtEnd(*token)) {
-        AstNode *item = parseStatement(token);
+    while (!parserAtEnd(parser)) {
+        AstNode *item = parseStatement(parser);
         if (item != NULL) {
             astAppendNode(&program->data.program.items, &program->data.program.count, item);
         }
@@ -226,49 +255,49 @@ AstNode *parseProgram(Token **token) {
     return program;
 }
 
-AstNode *parseBlock(Token **token) {
+static AstNode *parseBlock(Parser *parser) {
     AstNode *block = astNewNode(AST_BLOCK);
 
-    expectToken(token, TOKEN_LBRACE, "expected '{' to start block");
+    parserExpect(parser, TOKEN_LBRACE, "expected '{' to start block");
 
-    while (!isAtEnd(*token) && !isTokenType(*token, TOKEN_RBRACE)) {
-        AstNode *item = parseStatement(token);
+    while (!parserAtEnd(parser) && !parserIs(parser, TOKEN_RBRACE)) {
+        AstNode *item = parseStatement(parser);
         if (item != NULL) {
             astAppendNode(&block->data.block.items, &block->data.block.count, item);
         }
     }
 
-    if (isTokenType(*token, TOKEN_RBRACE)) {
-        *token = (*token)->next;
+    if (parserIs(parser, TOKEN_RBRACE)) {
+        parserAdvance(parser);
     } else {
-        syntaxError(*token, "expected '}' to close block");
+        parserSyntaxError(parser->current, "expected '}' to close block");
     }
 
     return block;
 }
 
-AstNode *parseStatement(Token **token) {
+static AstNode *parseStatement(Parser *parser) {
     AstNode *node;
 
-    if (isAtEnd(*token)) {
+    if (parserAtEnd(parser)) {
         return NULL;
     }
 
-    if (isTokenType(*token, TOKEN_KW_IF)) {
-        return parseIf(token);
+    if (parserIs(parser, TOKEN_KW_IF)) {
+        return parseIf(parser);
     }
-    if (isTokenType(*token, TOKEN_KW_WHILE)) {
-        return parseWhile(token);
+    if (parserIs(parser, TOKEN_KW_WHILE)) {
+        return parseWhile(parser);
     }
-    if (isTokenType(*token, TOKEN_KW_FOR)) {
-        return parseFor(token);
+    if (parserIs(parser, TOKEN_KW_FOR)) {
+        return parseFor(parser);
     }
-    if (isTokenType(*token, TOKEN_KW_FUNC)) {
-        return parseFunction(token);
+    if (parserIs(parser, TOKEN_KW_FUNC)) {
+        return parseFunction(parser);
     }
 
-    node = parseReturn(token);
-    expectToken(token, TOKEN_SEMICOLON, "expected ';' after statement");
+    node = parseReturn(parser);
+    parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after statement");
 
     if (node->type == AST_ASSIGN || node->type == AST_VAR_DECL || node->type == AST_RETURN) {
         return node;
@@ -281,188 +310,189 @@ AstNode *parseStatement(Token **token) {
     }
 }
 
-AstNode *parseReturn(Token **token) {
+static AstNode *parseReturn(Parser *parser) {
     AstNode *node;
 
-    if (isTokenType(*token, TOKEN_KW_RET)) {
+    if (parserIs(parser, TOKEN_KW_RET)) {
         node = astNewNode(AST_RETURN);
-        *token = (*token)->next;
-        node->data.return_stmt.value = parseLogical(token);
+        parserAdvance(parser);
+        node->data.return_stmt.value = parseLogical(parser);
         return node;
     }
 
-    return parseAssign(token);
+    return parseAssign(parser);
 }
 
-AstNode *parseAssign(Token **token) {
-    if (isDeclarationStart(*token)) {
+static AstNode *parseAssign(Parser *parser) {
+    if (isDeclarationStart(parser)) {
         AstNode *decl = astNewNode(AST_VAR_DECL);
-        decl->data.var_decl.name = copyTokenValue(*token);
-        *token = (*token)->next->next;
-        decl->data.var_decl.declared_type = parseType(token);
+        decl->data.var_decl.name = copyTokenValue(parser->current);
+        parserAdvance(parser);
+        parserExpect(parser, TOKEN_DOUBLE_COLON, "expected '::' after declaration name");
+        decl->data.var_decl.declared_type = parseType(parser);
 
-        if (isTokenType(*token, TOKEN_ASSIGN)) {
-            *token = (*token)->next;
-            decl->data.var_decl.initializer = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
+        if (parserIs(parser, TOKEN_ASSIGN)) {
+            parserAdvance(parser);
+            decl->data.var_decl.initializer = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
         }
 
         return decl;
     }
 
     {
-        AstNode *node = parseLogical(token);
-        if (!isAtEnd(*token) && (isTokenType(*token, TOKEN_ASSIGN) || isTokenType(*token, TOKEN_PLUS_ASSIGN) || isTokenType(*token, TOKEN_MINUS_ASSIGN))) {
+        AstNode *node = parseLogical(parser);
+        if (!parserAtEnd(parser) && (parserIs(parser, TOKEN_ASSIGN) || parserIs(parser, TOKEN_PLUS_ASSIGN) || parserIs(parser, TOKEN_MINUS_ASSIGN))) {
             AstNode *assign = astNewNode(AST_ASSIGN);
-            assign->data.assign.op = assignOpFromToken((*token)->type);
+            assign->data.assign.op = assignOpFromToken(parser->current->type);
             assign->data.assign.target = node;
-            *token = (*token)->next;
-            assign->data.assign.value = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
+            parserAdvance(parser);
+            assign->data.assign.value = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
             return assign;
         }
         return node;
     }
 }
 
-AstNode *parseLogical(Token **token) {
-    AstNode *node = parseComparison(token);
+static AstNode *parseLogical(Parser *parser) {
+    AstNode *node = parseComparison(parser);
 
-    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_AND_AND) || isTokenType(*token, TOKEN_OR_OR))) {
+    while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_AND_AND) || parserIs(parser, TOKEN_OR_OR))) {
         AstNode *binary = astNewNode(AST_BINARY);
-        binary->data.binary.op = binaryOpFromToken((*token)->type);
+        binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
-        *token = (*token)->next;
-        binary->data.binary.right = parseComparison(token);
+        parserAdvance(parser);
+        binary->data.binary.right = parseComparison(parser);
         node = binary;
     }
 
     return node;
 }
 
-AstNode *parseComparison(Token **token) {
-    AstNode *node = parseExpression(token);
+static AstNode *parseComparison(Parser *parser) {
+    AstNode *node = parseExpression(parser);
 
-    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_GT) || isTokenType(*token, TOKEN_LT) || isTokenType(*token, TOKEN_GT_EQ) || isTokenType(*token, TOKEN_LT_EQ) || isTokenType(*token, TOKEN_EQ_EQ) || isTokenType(*token, TOKEN_NOT_EQ))) {
+    while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_GT) || parserIs(parser, TOKEN_LT) || parserIs(parser, TOKEN_GT_EQ) || parserIs(parser, TOKEN_LT_EQ) || parserIs(parser, TOKEN_EQ_EQ) || parserIs(parser, TOKEN_NOT_EQ))) {
         AstNode *binary = astNewNode(AST_BINARY);
-        binary->data.binary.op = binaryOpFromToken((*token)->type);
+        binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
-        *token = (*token)->next;
-        binary->data.binary.right = parseExpression(token);
+        parserAdvance(parser);
+        binary->data.binary.right = parseExpression(parser);
         node = binary;
     }
 
     return node;
 }
 
-AstNode *parseExpression(Token **token) {
-    AstNode *node = parseTerm(token);
+static AstNode *parseExpression(Parser *parser) {
+    AstNode *node = parseTerm(parser);
 
-    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_PLUS) || isTokenType(*token, TOKEN_MINUS))) {
+    while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_PLUS) || parserIs(parser, TOKEN_MINUS))) {
         AstNode *binary = astNewNode(AST_BINARY);
-        binary->data.binary.op = binaryOpFromToken((*token)->type);
+        binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
-        *token = (*token)->next;
-        binary->data.binary.right = parseTerm(token);
+        parserAdvance(parser);
+        binary->data.binary.right = parseTerm(parser);
         node = binary;
     }
 
     return node;
 }
 
-AstNode *parseTerm(Token **token) {
-    AstNode *node = parseNegation(token);
+static AstNode *parseTerm(Parser *parser) {
+    AstNode *node = parseNegation(parser);
 
-    while (!isAtEnd(*token) && (isTokenType(*token, TOKEN_STAR) || isTokenType(*token, TOKEN_SLASH))) {
+    while (!parserAtEnd(parser) && (parserIs(parser, TOKEN_STAR) || parserIs(parser, TOKEN_SLASH))) {
         AstNode *binary = astNewNode(AST_BINARY);
-        binary->data.binary.op = binaryOpFromToken((*token)->type);
+        binary->data.binary.op = binaryOpFromToken(parser->current->type);
         binary->data.binary.left = node;
-        *token = (*token)->next;
-        binary->data.binary.right = parseNegation(token);
+        parserAdvance(parser);
+        binary->data.binary.right = parseNegation(parser);
         node = binary;
     }
 
     return node;
 }
 
-AstNode *parseNegation(Token **token) {
-    if (isTokenType(*token, TOKEN_BANG)) {
+static AstNode *parseNegation(Parser *parser) {
+    if (parserIs(parser, TOKEN_BANG)) {
         AstNode *node = astNewNode(AST_UNARY);
         node->data.unary.op = AST_UNARY_NOT;
-        *token = (*token)->next;
-        node->data.unary.operand = parseNegation(token);
+        parserAdvance(parser);
+        node->data.unary.operand = parseNegation(parser);
         return node;
     }
 
-    return parseFactor(token);
+    return parseFactor(parser);
 }
 
-AstNode *parseFactor(Token **token) {
+static AstNode *parseFactor(Parser *parser) {
     AstNode *node;
 
-    if (isAtEnd(*token)) {
-        syntaxError(*token, "unexpected end of input in expression");
+    if (parserAtEnd(parser)) {
+        parserSyntaxError(parser->current, "unexpected end of input in expression");
         return NULL;
     }
 
-    if (isTokenType(*token, TOKEN_NUMBER)) {
-        if (strchr((*token)->value, '.') != NULL) {
+    if (parserIs(parser, TOKEN_NUMBER)) {
+        if (strchr(parser->current->value, '.') != NULL) {
             node = astNewNode(AST_FLOAT_LITERAL);
-            node->data.float_literal.value = strtod((*token)->value, NULL);
+            node->data.float_literal.value = strtod(parser->current->value, NULL);
         } else {
             node = astNewNode(AST_INT_LITERAL);
-            node->data.int_literal.value = strtol((*token)->value, NULL, 10);
+            node->data.int_literal.value = strtol(parser->current->value, NULL, 10);
         }
-        *token = (*token)->next;
+        parserAdvance(parser);
         return node;
     }
-    if (isTokenType(*token, TOKEN_STRING)) {
+    if (parserIs(parser, TOKEN_STRING)) {
         node = astNewNode(AST_STRING_LITERAL);
-        node->data.string_literal.value = copyTokenValue(*token);
-        *token = (*token)->next;
+        node->data.string_literal.value = copyTokenValue(parser->current);
+        parserAdvance(parser);
         return node;
     }
-    if (isTokenType(*token, TOKEN_BOOL)) {
+    if (parserIs(parser, TOKEN_BOOL)) {
         node = astNewNode(AST_BOOL_LITERAL);
-        node->data.bool_literal.value = strcmp((*token)->value, "true") == 0;
-        *token = (*token)->next;
+        node->data.bool_literal.value = strcmp(parser->current->value, "true") == 0;
+        parserAdvance(parser);
         return node;
     }
-    if (isTokenType(*token, TOKEN_LBRACE)) {
-        return parseArrayLiteral(token);
+    if (parserIs(parser, TOKEN_LBRACE)) {
+        return parseArrayLiteral(parser);
     }
-    if (isTokenType(*token, TOKEN_IDENTIFIER)) {
+    if (parserIs(parser, TOKEN_IDENTIFIER)) {
         AstNode *base = astNewNode(AST_IDENTIFIER);
-        base->data.identifier.name = copyTokenValue(*token);
-        *token = (*token)->next;
+        base->data.identifier.name = copyTokenValue(parser->current);
+        parserAdvance(parser);
 
-        while (!isAtEnd(*token)) {
-            if (isTokenType(*token, TOKEN_LPAREN)) {
+        while (!parserAtEnd(parser)) {
+            if (parserIs(parser, TOKEN_LPAREN)) {
                 AstNode *call = astNewNode(AST_CALL);
                 call->data.call.callee = base;
-                *token = (*token)->next;
-                if (!isTokenType(*token, TOKEN_RPAREN)) {
-                    AstNode *arg = parseLogical(token);
+                parserAdvance(parser);
+                if (!parserIs(parser, TOKEN_RPAREN)) {
+                    AstNode *arg = parseLogical(parser);
                     astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
 
-                    while (isTokenType(*token, TOKEN_COMMA)) {
-                        *token = (*token)->next;
-                        arg = parseLogical(token);
+                    while (parserIs(parser, TOKEN_COMMA)) {
+                        parserAdvance(parser);
+                        arg = parseLogical(parser);
                         astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
                     }
                 }
-                expectToken(token, TOKEN_RPAREN, "expected ')' after call arguments");
+                parserExpect(parser, TOKEN_RPAREN, "expected ')' after call arguments");
                 base = call;
                 continue;
             }
 
-            if (isTokenType(*token, TOKEN_LBRACKET)) {
+            if (parserIs(parser, TOKEN_LBRACKET)) {
                 AstNode *access = astNewNode(AST_ARRAY_ACCESS);
                 access->data.array_access.base = base;
-                while (isTokenType(*token, TOKEN_LBRACKET)) {
+                while (parserIs(parser, TOKEN_LBRACKET)) {
                     AstNode *index;
-                    *token = (*token)->next;
-                    index = parseLogical(token);
+                    parserAdvance(parser);
+                    index = parseLogical(parser);
                     astAppendNode(&access->data.array_access.indices, &access->data.array_access.index_count, index);
-                    expectToken(token, TOKEN_RBRACKET, "expected ']' after array index");
+                    parserExpect(parser, TOKEN_RBRACKET, "expected ']' after array index");
                 }
                 base = access;
                 continue;
@@ -473,64 +503,64 @@ AstNode *parseFactor(Token **token) {
 
         return base;
     }
-    if (isTokenType(*token, TOKEN_LPAREN)) {
-        *token = (*token)->next;
-        node = parseLogical(token);
-        expectToken(token, TOKEN_RPAREN, "expected ')' after grouped expression");
+    if (parserIs(parser, TOKEN_LPAREN)) {
+        parserAdvance(parser);
+        node = parseLogical(parser);
+        parserExpect(parser, TOKEN_RPAREN, "expected ')' after grouped expression");
         return node;
     }
 
-    syntaxError(*token, "unexpected token in expression");
+    parserSyntaxError(parser->current, "unexpected token in expression");
     return NULL;
 }
 
-AstNode *parseType(Token **token) {
+static AstNode *parseType(Parser *parser) {
     AstNode *base;
 
-    if (!isTypeToken(*token)) {
-        syntaxError(*token, "expected type");
+    if (!isTypeToken(parser)) {
+        parserSyntaxError(parser->current, "expected type");
     }
 
-    if (isTokenType(*token, TOKEN_TYPE_ARRAY)) {
+    if (parserIs(parser, TOKEN_TYPE_ARRAY)) {
         AstNode *arrayType = astNewNode(AST_TYPE_ARRAY);
 
-        *token = (*token)->next;
-        if (isTokenType(*token, TOKEN_LT)) {
-            *token = (*token)->next;
-            arrayType->data.type_array.element_type = parseType(token);
-            expectToken(token, TOKEN_GT, "expected '>' after array element type");
+        parserAdvance(parser);
+        if (parserIs(parser, TOKEN_LT)) {
+            parserAdvance(parser);
+            arrayType->data.type_array.element_type = parseType(parser);
+            parserExpect(parser, TOKEN_GT, "expected '>' after array element type");
         }
 
-        return wrapArrayTypes(arrayType, token);
+        return wrapArrayTypes(arrayType, parser);
     }
 
     base = astNewNode(AST_TYPE_NAME);
-    base->data.type_name.kind = typeKindFromToken(*token);
-    base->data.type_name.name = copyTokenValue(*token);
-    *token = (*token)->next;
-    return wrapArrayTypes(base, token);
+    base->data.type_name.kind = typeKindFromToken(parser);
+    base->data.type_name.name = copyTokenValue(parser->current);
+    parserAdvance(parser);
+    return wrapArrayTypes(base, parser);
 }
 
-AstNode *parseArrayLiteral(Token **token) {
+static AstNode *parseArrayLiteral(Parser *parser) {
     AstNode *array = astNewNode(AST_ARRAY_LITERAL);
 
-    expectToken(token, TOKEN_LBRACE, "expected '{' to start array literal");
+    parserExpect(parser, TOKEN_LBRACE, "expected '{' to start array literal");
 
-    if (!isTokenType(*token, TOKEN_RBRACE)) {
-        AstNode *element = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
+    if (!parserIs(parser, TOKEN_RBRACE)) {
+        AstNode *element = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
         astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
 
-        while (isTokenType(*token, TOKEN_COMMA) || isTokenType(*token, TOKEN_SEMICOLON)) {
-            *token = (*token)->next;
-            if (isTokenType(*token, TOKEN_RBRACE) || isAtEnd(*token)) {
+        while (parserIs(parser, TOKEN_COMMA) || parserIs(parser, TOKEN_SEMICOLON)) {
+            parserAdvance(parser);
+            if (parserIs(parser, TOKEN_RBRACE) || parserAtEnd(parser)) {
                 break;
             }
 
-            element = isTokenType(*token, TOKEN_LBRACE) ? parseArrayLiteral(token) : parseLogical(token);
+            element = parserIs(parser, TOKEN_LBRACE) ? parseArrayLiteral(parser) : parseLogical(parser);
             astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
         }
     }
 
-    expectToken(token, TOKEN_RBRACE, "expected '}' after array literal");
+    parserExpect(parser, TOKEN_RBRACE, "expected '}' after array literal");
     return array;
 }

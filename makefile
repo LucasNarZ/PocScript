@@ -1,8 +1,11 @@
 TARGET = output
+TEST_TARGET = tests_runner
 
-SRC = main.c ./lexer/lexer.c ./parser/parser.c ./utils/utils.c ./parser/ast.c ./assemblyGenerator/generator.c ./assemblyGenerator/hashTable.c
+SRC = main.c ./lexer/lexer.c ./parser/parser.c ./parser/ast.c  
+TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c ./lexer/lexer.c  ./parser/parser.c ./parser/ast.c 
 
 OBJ = $(SRC:.c=.o)
+TEST_OBJ = $(TEST_SRC:.c=.o)
 SRC_NASM = output.asm
 OBJ_NASM = output.o
 TARGET_AST = compiler
@@ -12,13 +15,19 @@ NASM_FLAGS = -f elf64
 
 CC = gcc
 CFLAGS = -Wall -g
+LDFLAGS =
+
+default: $(TARGET_AST)
 
 $(TARGET): $(SRC_NASM)
 	$(ASSEMBLER) $(NASM_FLAGS) $(SRC_NASM) -o $(OBJ_NASM)
-	ld $(OBJ_NASM) -o $(TARGET)
+	ld $(LDFLAGS) $(OBJ_NASM) -o $(TARGET)
 
 $(TARGET_AST): $(OBJ)
-	$(CC) $(OBJ) -o $(TARGET_AST)
+	$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o $(TARGET_AST)
+
+$(TEST_TARGET): $(TEST_OBJ)
+	$(CC) $(CFLAGS) $(TEST_OBJ) $(LDFLAGS) -o $(TEST_TARGET)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -28,12 +37,13 @@ $(TARGET_AST): $(OBJ)
 
 
 clean:
-	rm -f $(OBJ) $(TARGET) $(OBJ_NASM) $(TARGET_AST) $(SRC_NASM)
+	rm -f $(OBJ) $(TEST_OBJ) $(TARGET) $(OBJ_NASM) $(TARGET_AST) $(TEST_TARGET) $(SRC_NASM)
 
 ast: $(TARGET_AST)
 
-test: test.asm
-	nasm -f elf64 test.asm -o test.o
-	ld test.o -o test
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
 
-all: $(TARGET)
+all: $(TARGET_AST)
+
+assembly: $(TARGET)

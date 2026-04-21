@@ -2,11 +2,14 @@
 #include "./lexer/lexer.h"
 #include "./parser/parser.h"
 #include "./parser/ast.h"
+#include "./semantic/semantic.h"
 
 int main(){
     AstNode *root;
     Parser parser;
+    SemanticResult semantic;
     Token *tokens = tokenizeFile("input.ps");
+    size_t i;
 
     if(tokens == NULL){
         fprintf(stderr, "Error opening input.ps\n");
@@ -17,6 +20,28 @@ int main(){
     parserInit(&parser, tokens);
     root = parserParseProgram(&parser);
     astPrintPretty(root);
+    semantic = semanticAnalyze(root);
+
+    if (semantic.errors.count > 0) {
+        printf("\n");
+        for (i = 0; i < semantic.errors.count; i++) {
+            SemanticError *error = &semantic.errors.items[i];
+
+            if (error->line > 0 && error->column > 0) {
+                printf(
+                    "%s at line %d, column %d: %s\n",
+                    semanticErrorKindName(error->kind),
+                    error->line,
+                    error->column,
+                    error->message
+                );
+            } else {
+                printf("%s: %s\n", semanticErrorKindName(error->kind), error->message);
+            }
+        }
+    }
+
+    semanticResultFree(&semantic);
     astFree(root);
     freeTokens(tokens);
 

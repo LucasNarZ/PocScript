@@ -197,6 +197,8 @@ The current semantic analyzer validates:
 - argument count and argument type compatibility in function calls
 - non-`void` functions containing at least one return statement
 - return expression compatibility with the declared function return type
+- acceptance of empty returns inside `void` functions
+- rejection of empty returns inside non-`void` functions
 - rejection of value returns inside `void` functions
 - rejection of `ret` outside a function
 - array literal element compatibility

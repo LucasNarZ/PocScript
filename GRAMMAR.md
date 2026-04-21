@@ -204,7 +204,8 @@ arr[0](x);
 - The left-hand side of an assignment is restricted syntactically to `assign-target`, which means an identifier followed by zero or more index operations.
 - Function declarations require an explicit return type after `->`.
 - `void` is valid only as a function return type.
-- `ret` without an expression is not accepted.
+- `ret;` is accepted syntactically.
+- `ret;` is valid only in `void` functions.
 - `if`, `while`, `for`, and `func` do not accept a single statement without braces.
 
 ## Source

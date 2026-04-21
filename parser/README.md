@@ -141,3 +141,4 @@ The real textual format is produced by `astToString` and is the same one used by
 - Errors are reported based on the current token, reusing `line` and `column` from the lexer.
 - The textual AST serialization is part of the project's practical contract because it is used to validate parsing in the tests.
 - Function declarations require an explicit return type after `->`, and the AST serialization includes that return type under `AST_FUNC_DECL`.
+- `AST_RETURN` may have `value == NULL` for `ret;`.

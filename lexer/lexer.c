@@ -48,6 +48,8 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_KW_WHILE, "^(while)\\b"},
     {TOKEN_KW_FUNC, "^(func)\\b"},
     {TOKEN_KW_RET, "^(ret)\\b"},
+    {TOKEN_KW_BREAK, "^(break)\\b"},
+    {TOKEN_KW_CONTINUE, "^(continue)\\b"},
     {TOKEN_STRING, "^\"([^\"\\\\]|\\\\.)*\"|^'([^'\\\\]|\\\\.)*'"},
     {TOKEN_EQ_EQ, "^(==)"},
     {TOKEN_GT_EQ, "^(>=)"},
@@ -96,6 +98,8 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_KW_WHILE: return "KW_WHILE";
         case TOKEN_KW_FUNC: return "KW_FUNC";
         case TOKEN_KW_RET: return "KW_RET";
+        case TOKEN_KW_BREAK: return "KW_BREAK";
+        case TOKEN_KW_CONTINUE: return "KW_CONTINUE";
         case TOKEN_STRING: return "STRING";
         case TOKEN_EQ_EQ: return "EQ_EQ";
         case TOKEN_GT_EQ: return "GT_EQ";

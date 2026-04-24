@@ -19,6 +19,8 @@ typedef enum {
     TOKEN_KW_WHILE,
     TOKEN_KW_FUNC,
     TOKEN_KW_RET,
+    TOKEN_KW_BREAK,
+    TOKEN_KW_CONTINUE,
     TOKEN_STRING,
     TOKEN_EQ_EQ,
     TOKEN_GT_EQ,

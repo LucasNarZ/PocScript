@@ -5,11 +5,12 @@ It documents the language as it exists in the implementation today, not as it id
 
 ## Overview
 
-- The input is a `program` with zero or more `statement`s until `EOF`.
+- The input is a `program` with zero or more top-level declarations until `EOF`.
 - `if`, `while`, `for`, and `func` always require a block with `{}`.
 - Regular statements end with `;`.
 - Declarations use `::`.
 - `ret` always requires an expression.
+- `break` and `continue` are parsed as simple statements and require `;`.
 - The parser supports array literals, indexed access, function calls, and types with `Array<...>` and `[]` suffixes.
 - Function declarations require an explicit return type after `->`.
 - `void` is valid only as a function return type.
@@ -17,15 +18,18 @@ It documents the language as it exists in the implementation today, not as it id
 ## Grammar
 
 ```ebnf
-program         = { statement } EOF ;
+program         = { top-level-declaration } EOF ;
+
+top-level-declaration = function-declaration
+                      | declaration ";" ;
 
 statement       = if-statement
                 | while-statement
                 | for-statement
-                | function-declaration
                 | simple-statement ";" ;
 
 simple-statement = return-statement
+                 | loop-control-statement
                  | assignment-or-declaration-or-expression ;
 
 block           = "{" { statement } "}" ;
@@ -47,6 +51,8 @@ return-type     = "void" | type ;
 parameter       = identifier "::" type ;
 
 return-statement = "ret" logical-expression ;
+
+loop-control-statement = "break" | "continue" ;
 
 assignment-or-declaration-or-expression = declaration
                                         | assignment
@@ -77,7 +83,7 @@ additive-expression = multiplicative-expression
 multiplicative-expression = unary-expression
                             { ( "*" | "/" ) unary-expression } ;
 
-unary-expression = "!" unary-expression
+unary-expression = ( "!" | "-" ) unary-expression
                  | primary-expression ;
 
 primary-expression = number
@@ -122,7 +128,7 @@ From lowest to highest within expressions:
 3. comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 4. addition and subtraction: `+`, `-`
 5. multiplication and division: `*`, `/`
-6. negation: `!`
+6. unary prefix: `!`, unary `-`
 7. postfix: call `()` and indexing `[]`
 8. primaries: identifiers, literals, grouping, and array literal
 
@@ -200,6 +206,8 @@ arr[0](x);
 - Array literals accept both `,` and `;` as separators, including mixed usage.
 - The parser allows a trailing separator in array literals, for example `{1, 2,}` and `{1; 2;}`.
 - `initializer`, `array-element`, and the right-hand side of `assignment` are documented through `logical-expression`, which already includes array literals via `primary-expression`.
+- File scope accepts only variable declarations and function declarations.
+- Global variable initializers are restricted semantically to direct literal nodes.
 - Consecutive indexing is documented as repeated `index-suffix` occurrences in `postfix-expression`, for example `arr[0][1]`.
 - The left-hand side of an assignment is restricted syntactically to `assign-target`, which means an identifier followed by zero or more index operations.
 - Function declarations require an explicit return type after `->`.
@@ -207,6 +215,8 @@ arr[0](x);
 - `ret;` is accepted syntactically.
 - `ret;` is valid only in `void` functions.
 - `if`, `while`, `for`, and `func` do not accept a single statement without braces.
+- `break` and `continue` are accepted syntactically anywhere a simple statement is valid.
+- `break` and `continue` are valid semantically only inside `while` and `for`.
 
 ## Source
 

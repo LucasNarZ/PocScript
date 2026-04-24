@@ -56,3 +56,32 @@ void test_integration_parses_input_program_ast(void) {
     free(expected);
     free(actual);
 }
+
+void test_integration_parses_loop_control_and_unary_ast(void) {
+    char *input = readFileToString("tests/fixtures/integration/loop_control_unary.ps");
+    char *expected = readFileToString("tests/fixtures/integration/loop_control_unary_ast.expected");
+    AstNode *root;
+    char *actual;
+
+    EXPECT_TRUE(input != NULL);
+    EXPECT_TRUE(expected != NULL);
+
+    if (input == NULL || expected == NULL) {
+        free(input);
+        free(expected);
+        return;
+    }
+
+    root = parseRootFromString(input);
+    actual = nodeTreeToString(root);
+
+    EXPECT_TRUE(actual != NULL);
+    if (actual != NULL) {
+        EXPECT_STR_EQ(expected, actual);
+    }
+
+    astFree(root);
+    free(input);
+    free(expected);
+    free(actual);
+}

@@ -31,6 +31,14 @@ int main(void) {
     RUN_TEST(test_parser_requires_explicit_function_return_type, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_function_return_types, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_empty_return_in_void_function, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_parses_unary_minus_expression, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_parses_break_and_continue_statements, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_assignment_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_expression_statement_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_if_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_while_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_for_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_return_break_and_continue_at_file_scope, "tests/parser/test_parser.c");
     RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");
@@ -55,8 +63,17 @@ int main(void) {
     RUN_TEST(test_semantic_accepts_empty_return_inside_void_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_empty_return_inside_non_void_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_empty_return_outside_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_unary_minus_for_numeric_operand, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_break_outside_loop, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_reports_continue_outside_loop, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_literal_global_initializers, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_computed_global_initializer, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_identifier_global_initializer, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_break_and_continue_inside_while, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_break_and_continue_inside_for, "tests/semantic/test_semantic.c");
     RUN_TEST(test_tokenize_file_appends_single_eof_for_multiline_input, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_input_program_ast, "tests/integration/test_integration.c");
+    RUN_TEST(test_integration_parses_loop_control_and_unary_ast, "tests/integration/test_integration.c");
 
     printf("\n");
     printf("Tests run: %d\n", tests_run);

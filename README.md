@@ -5,8 +5,8 @@ PocScript is a study project focused on implementing the core building blocks of
 ## Current State
 
 - `lexer/`: converts source code into a linked list of tokens with `type`, `value`, `line`, and `column`
-- `parser/`: consumes the token list and produces an AST for declarations, expressions, blocks, functions, conditionals, loops, and arrays
-- `semantic/`: walks the AST in two passes to validate declarations, scopes, types, function calls, function returns, and array access
+- `parser/`: consumes the token list and produces an AST for global declarations, function bodies, expressions, blocks, conditionals, loops, and arrays
+- `semantic/`: walks the AST in two passes to validate declarations, scopes, types, function calls, function returns, array access, and global initializer rules
 - `tests/`: contains unit and integration tests for the lexer, parser, semantic analyzer, and AST serialization
 - `main.c`: main debug executable; reads `input.ps`, prints recognized tokens, prints the resulting AST, and then prints semantic analysis results
 
@@ -55,7 +55,7 @@ Today the project is organized as a compiler frontend. The old README described 
 
 1. `tokenizeFile("input.ps")` reads the input file and produces the token list.
 2. `parserParseProgram(...)` walks through that list and builds the AST.
-3. `semanticAnalyze(...)` validates declarations, scopes, expressions, calls, and array access.
+3. `semanticAnalyze(...)` validates declarations, scopes, expressions, calls, array access, and global initializer rules.
 4. `main.c` prints the token sequence, the textual tree representation, and the semantic analysis result.
 
 In practice, this binary works as a simple way to inspect the language frontend while the grammar evolves.
@@ -63,19 +63,21 @@ In practice, this binary works as a simple way to inspect the language frontend 
 ## Features Covered By The Current Code
 
 - variable declarations with `::`
+- file scope restricted to global variable declarations and function declarations
 - primitive types `int`, `float`, `char`, `bool`, `void`
 - `Array` type and types with `[]` suffixes
 - integer, float, string, and bool literals
 - binary expressions: `+`, `-`, `*`, `/`, `>`, `<`, `>=`, `<=`, `==`, `!=`, `&&`, `||`
-- unary `!` operator
+- unary operators `!` and `-`
 - assignments `=`, `+=`, `-=`
 - blocks
-- `if`, `else`, `while`, `for`
+- `if`, `else`, `while`, `for`, `break`, `continue`
 - function declarations with mandatory explicit return types and `ret`
+- global variable initializers restricted to direct literals
 - function calls
 - array access with one or more indices
 - nested array literals
-- semantic validation for scope, duplicate declarations, initializer types, conditions, function calls, function return contracts, and array indexing
+- semantic validation for scope, duplicate declarations, initializer types, conditions, function calls, function return contracts, loop control usage, and array indexing
 
 ## Build And Run
 
@@ -126,3 +128,4 @@ make clean
 - The project prioritizes simplicity and readability over completeness.
 - The AST has its own textual representation in `parser/ast.c`, used by the integration tests.
 - The parser remains syntactic; semantic validation is handled in a separate phase under `semantic/`.
+- Executable statements such as `if`, `while`, `for`, assignments, and expression statements are valid inside blocks and functions, not at file scope.

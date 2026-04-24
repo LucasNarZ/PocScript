@@ -16,6 +16,8 @@ typedef enum {
     AST_WHILE,
     AST_FOR,
     AST_RETURN,
+    AST_BREAK,
+    AST_CONTINUE,
     AST_EXPR_STMT,
     AST_ASSIGN,
     AST_BINARY,

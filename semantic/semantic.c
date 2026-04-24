@@ -14,6 +14,7 @@ typedef struct {
 } FunctionContext;
 
 static FunctionContext *currentFunctionContext = NULL;
+static int currentLoopDepth = 0;
 
 static void appendCategorizedError(AstNode *node, SemanticResult *result, SemanticErrorKind kind, const char *message) {
     int line = 0;
@@ -181,6 +182,29 @@ static void appendUndeclaredVariableError(AstNode *node, SemanticResult *result,
 
     snprintf(message, sizeof(message), "use of undeclared variable '%s'", name);
     appendCategorizedError(node, result, SEMANTIC_ERROR_NAME, message);
+}
+
+static void appendInvalidGlobalInitializerError(AstNode *node, SemanticResult *result, const char *name) {
+    char message[256];
+
+    snprintf(message, sizeof(message), "global initializer for '%s' must be a literal", name);
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
+static bool isAllowedGlobalInitializer(AstNode *node) {
+    if (node == NULL) {
+        return true;
+    }
+
+    switch (node->type) {
+        case AST_INT_LITERAL:
+        case AST_FLOAT_LITERAL:
+        case AST_STRING_LITERAL:
+        case AST_BOOL_LITERAL:
+            return true;
+        default:
+            return false;
+    }
 }
 
 static void appendNumericOperandError(AstNode *node, SemanticResult *result, AstBinaryOp op) {
@@ -407,14 +431,24 @@ static SemanticType *checkBinary(AstNode *node, Scope *scope, SemanticResult *re
 static SemanticType *checkUnary(AstNode *node, Scope *scope, SemanticResult *result) {
     SemanticType *operandType = checkExpression(node->data.unary.operand, scope, result);
 
-    if (!semanticTypeIsBool(operandType)) {
-        appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "operator '!' requires bool operand");
+    if (node->data.unary.op == AST_UNARY_NOT) {
+        if (!semanticTypeIsBool(operandType)) {
+            appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "operator '!' requires bool operand");
+            semanticTypeFree(operandType);
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        }
+
+        semanticTypeFree(operandType);
+        return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
+    }
+
+    if (!semanticTypeIsNumeric(operandType)) {
+        appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "operator '-' requires numeric operand");
         semanticTypeFree(operandType);
         return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
     }
 
-    semanticTypeFree(operandType);
-    return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
+    return operandType;
 }
 
 static SemanticType *checkArrayLiteral(AstNode *node, Scope *scope, SemanticResult *result) {
@@ -550,6 +584,25 @@ static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticResult
     }
 }
 
+static void validateVariableDeclaration(AstNode *node, Scope *scope, SemanticResult *result, bool requireLiteralInitializer) {
+    SemanticType *declaredType = semanticTypeFromAst(node->data.var_decl.declared_type);
+
+    if (node->data.var_decl.initializer != NULL) {
+        if (requireLiteralInitializer && !isAllowedGlobalInitializer(node->data.var_decl.initializer)) {
+            appendInvalidGlobalInitializerError(node, result, node->data.var_decl.name);
+        } else {
+            SemanticType *initializerType = checkExpression(node->data.var_decl.initializer, scope, result);
+            if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(declaredType, initializerType)) {
+                appendInitializerTypeError(node, result, node->data.var_decl.name, declaredType, initializerType);
+            }
+            semanticTypeFree(initializerType);
+        }
+    }
+
+    semanticTypeFree(declaredType);
+    declareVariableInScope(node->data.var_decl.name, node->data.var_decl.declared_type, scope);
+}
+
 static void validateBlock(AstNode *node, Scope *scope, SemanticResult *result) {
     Scope *blockScope = scopeCreate(scope);
     size_t i;
@@ -604,27 +657,22 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
     switch (node->type) {
         case AST_PROGRAM:
             for (i = 0; i < node->data.program.count; i++) {
-                validateNode(node->data.program.items[i], scope, result);
+                AstNode *item = node->data.program.items[i];
+
+                if (item != NULL && item->type == AST_VAR_DECL) {
+                    validateVariableDeclaration(item, scope, result, true);
+                    continue;
+                }
+
+                validateNode(item, scope, result);
             }
             return;
         case AST_BLOCK:
             validateBlock(node, scope, result);
             return;
-        case AST_VAR_DECL: {
-            SemanticType *declaredType = semanticTypeFromAst(node->data.var_decl.declared_type);
-
-            if (node->data.var_decl.initializer != NULL) {
-                SemanticType *initializerType = checkExpression(node->data.var_decl.initializer, scope, result);
-                if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(declaredType, initializerType)) {
-                    appendInitializerTypeError(node, result, node->data.var_decl.name, declaredType, initializerType);
-                }
-                semanticTypeFree(initializerType);
-            }
-
-            semanticTypeFree(declaredType);
-            declareVariableInScope(node->data.var_decl.name, node->data.var_decl.declared_type, scope);
+        case AST_VAR_DECL:
+            validateVariableDeclaration(node, scope, result, false);
             return;
-        }
         case AST_EXPR_STMT:
         case AST_ASSIGN: {
             SemanticType *exprType = checkExpression(node->type == AST_EXPR_STMT ? node->data.expr_stmt.expression : node, scope, result);
@@ -647,7 +695,9 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
                 appendConditionTypeError(node->data.while_stmt.condition, result);
             }
             semanticTypeFree(conditionType);
+            currentLoopDepth++;
             validateNode(node->data.while_stmt.body, scope, result);
+            currentLoopDepth--;
             return;
         }
         case AST_FOR: {
@@ -670,7 +720,9 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
                 SemanticType *updateType = checkExpression(node->data.for_stmt.update, forScope, result);
                 semanticTypeFree(updateType);
             }
+            currentLoopDepth++;
             validateNode(node->data.for_stmt.body, forScope, result);
+            currentLoopDepth--;
             scopeFree(forScope);
             return;
         }
@@ -705,6 +757,16 @@ static void validateNode(AstNode *node, Scope *scope, SemanticResult *result) {
                 }
 
                 semanticTypeFree(returnType);
+            }
+            return;
+        case AST_BREAK:
+            if (currentLoopDepth == 0) {
+                appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "break statement outside loop");
+            }
+            return;
+        case AST_CONTINUE:
+            if (currentLoopDepth == 0) {
+                appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "continue statement outside loop");
             }
             return;
         default:

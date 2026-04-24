@@ -4,8 +4,10 @@
 #include <stdlib.h>
 
 static AstNode *parseBlock(Parser *parser);
+static AstNode *parseTopLevel(Parser *parser);
 static AstNode *parseStatement(Parser *parser);
 static AstNode *parseReturn(Parser *parser);
+static AstNode *parseLoopControl(Parser *parser);
 static AstNode *parseAssign(Parser *parser);
 static AstNode *parseLogical(Parser *parser);
 static AstNode *parseLogicalAnd(Parser *parser);
@@ -263,13 +265,33 @@ AstNode *parserParseProgram(Parser *parser) {
     AstNode *program = astNewNodeFromCurrent(parser, AST_PROGRAM);
 
     while (!parserAtEnd(parser)) {
-        AstNode *item = parseStatement(parser);
+        AstNode *item = parseTopLevel(parser);
         if (item != NULL) {
             astAppendNode(&program->data.program.items, &program->data.program.count, item);
         }
     }
 
     return program;
+}
+
+static AstNode *parseTopLevel(Parser *parser) {
+    if (parserAtEnd(parser)) {
+        return NULL;
+    }
+
+    if (parserIs(parser, TOKEN_KW_FUNC)) {
+        return parseFunction(parser);
+    }
+
+    if (!isDeclarationStart(parser)) {
+        parserSyntaxError(parser->current, "expected top-level declaration");
+    }
+
+    {
+        AstNode *node = parseAssign(parser);
+        parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after global declaration");
+        return node;
+    }
 }
 
 static AstNode *parseBlock(Parser *parser) {
@@ -313,10 +335,10 @@ static AstNode *parseStatement(Parser *parser) {
         return parseFunction(parser);
     }
 
-    node = parseReturn(parser);
+    node = parseLoopControl(parser);
     parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after statement");
 
-    if (node->type == AST_ASSIGN || node->type == AST_VAR_DECL || node->type == AST_RETURN) {
+    if (node->type == AST_ASSIGN || node->type == AST_VAR_DECL || node->type == AST_RETURN || node->type == AST_BREAK || node->type == AST_CONTINUE) {
         return node;
     }
 
@@ -342,6 +364,22 @@ static AstNode *parseReturn(Parser *parser) {
     }
 
     return parseAssign(parser);
+}
+
+static AstNode *parseLoopControl(Parser *parser) {
+    if (parserIs(parser, TOKEN_KW_BREAK)) {
+        AstNode *node = astNewNodeFromCurrent(parser, AST_BREAK);
+        parserAdvance(parser);
+        return node;
+    }
+
+    if (parserIs(parser, TOKEN_KW_CONTINUE)) {
+        AstNode *node = astNewNodeFromCurrent(parser, AST_CONTINUE);
+        parserAdvance(parser);
+        return node;
+    }
+
+    return parseReturn(parser);
 }
 
 static AstNode *parseAssign(Parser *parser) {
@@ -457,6 +495,14 @@ static AstNode *parseNegation(Parser *parser) {
     if (parserIs(parser, TOKEN_BANG)) {
         AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
         node->data.unary.op = AST_UNARY_NOT;
+        parserAdvance(parser);
+        node->data.unary.operand = parseNegation(parser);
+        return node;
+    }
+
+    if (parserIs(parser, TOKEN_MINUS)) {
+        AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
+        node->data.unary.op = AST_UNARY_NEGATE;
         parserAdvance(parser);
         node->data.unary.operand = parseNegation(parser);
         return node;

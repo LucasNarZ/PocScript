@@ -126,6 +126,8 @@ static void writeLabel(char **buffer, size_t *size, AstNode *node) {
         case AST_WHILE: appendFormat(buffer, size, " (WHILE)\n"); break;
         case AST_FOR: appendFormat(buffer, size, " (FOR)\n"); break;
         case AST_RETURN: appendFormat(buffer, size, " (RETURN)\n"); break;
+        case AST_BREAK: appendFormat(buffer, size, " (BREAK)\n"); break;
+        case AST_CONTINUE: appendFormat(buffer, size, " (CONTINUE)\n"); break;
         case AST_EXPR_STMT: appendFormat(buffer, size, " (EXPR_STMT)\n"); break;
         case AST_ASSIGN: appendFormat(buffer, size, " ("); appendFormat(buffer, size, assignOpName(node->data.assign.op)); appendFormat(buffer, size, ")\n"); break;
         case AST_BINARY: appendFormat(buffer, size, " ("); appendFormat(buffer, size, binaryOpName(node->data.binary.op)); appendFormat(buffer, size, ")\n"); break;
@@ -193,6 +195,9 @@ static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int
             break;
         case AST_RETURN:
             if (node->data.return_stmt.value) writeNode(buffer, size, node->data.return_stmt.value, depth + 1, isLast);
+            break;
+        case AST_BREAK:
+        case AST_CONTINUE:
             break;
         case AST_EXPR_STMT:
             if (node->data.expr_stmt.expression) writeNode(buffer, size, node->data.expr_stmt.expression, depth + 1, isLast);
@@ -295,6 +300,9 @@ void astFree(AstNode *root) {
             break;
         case AST_RETURN:
             astFree(root->data.return_stmt.value);
+            break;
+        case AST_BREAK:
+        case AST_CONTINUE:
             break;
         case AST_EXPR_STMT:
             astFree(root->data.expr_stmt.expression);

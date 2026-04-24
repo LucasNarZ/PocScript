@@ -18,7 +18,7 @@ The main flow is:
 
 1. `parserInit` receives the token list.
 2. `parserParseProgram` creates an `AST_PROGRAM` node.
-3. Each program item is parsed by recursive functions such as `parseStatement`, `parseAssign`, `parseLogical`, `parseType`, and `parseFactor`.
+3. File-scope items are parsed through a dedicated top-level path, while blocks continue to use recursive functions such as `parseStatement`, `parseAssign`, `parseLogical`, `parseType`, and `parseFactor`.
 4. On error, the parser aborts with a message containing line and column information.
 
 The current parser is strictly syntactic. It builds the tree structure, but it does not perform type checking or semantic resolution.
@@ -29,7 +29,7 @@ The node types defined in `ast.h` cover four main groups.
 
 ### Program structure
 
-- `AST_PROGRAM`: file root
+- `AST_PROGRAM`: file root containing only top-level declarations
 - `AST_BLOCK`: block delimited by `{}`
 - `AST_EXPR_STMT`: expression used as a statement
 
@@ -142,3 +142,4 @@ The real textual format is produced by `astToString` and is the same one used by
 - The textual AST serialization is part of the project's practical contract because it is used to validate parsing in the tests.
 - Function declarations require an explicit return type after `->`, and the AST serialization includes that return type under `AST_FUNC_DECL`.
 - `AST_RETURN` may have `value == NULL` for `ret;`.
+- `AST_PROGRAM` remains a generic node list structurally, but the parser now guarantees that only `AST_VAR_DECL` and `AST_FUNC_DECL` appear there.

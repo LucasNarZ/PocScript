@@ -177,31 +177,135 @@ static void assertParseErrorAt(const char *input, const char *expectedMessage, i
     unlink(pathTemplate);
 }
 
+static void assertParsesWithAstSubstring(const char *input, const char *expectedSubstring) {
+    char pathTemplate[] = "/tmp/pocscript-parser-success-XXXXXX";
+    char buffer[4096];
+    pid_t pid;
+    int fd;
+    int status;
+    ssize_t bytesRead;
+
+    fd = mkstemp(pathTemplate);
+    EXPECT_TRUE(fd >= 0);
+    if (fd < 0) {
+        return;
+    }
+
+    fflush(stdout);
+    pid = fork();
+    EXPECT_TRUE(pid >= 0);
+    if (pid < 0) {
+        close(fd);
+        unlink(pathTemplate);
+        return;
+    }
+
+    if (pid == 0) {
+        Token *tokens = tokenizeString(input);
+        Parser parser;
+        AstNode *root;
+        char *astString;
+
+        parserInit(&parser, tokens);
+        root = parserParseProgram(&parser);
+        astString = astToString(root);
+
+        if (astString != NULL) {
+            write(fd, astString, strlen(astString));
+        }
+
+        close(fd);
+        free(astString);
+        astFree(root);
+        freeTokens(tokens);
+        _exit(0);
+    }
+
+    close(fd);
+    EXPECT_TRUE(waitpid(pid, &status, 0) == pid);
+    EXPECT_TRUE(WIFEXITED(status));
+    EXPECT_TRUE(WEXITSTATUS(status) == 0);
+
+    fd = open(pathTemplate, O_RDONLY);
+    EXPECT_TRUE(fd >= 0);
+    if (fd < 0) {
+        unlink(pathTemplate);
+        return;
+    }
+
+    bytesRead = read(fd, buffer, sizeof(buffer) - 1);
+    EXPECT_TRUE(bytesRead >= 0);
+    if (bytesRead >= 0) {
+        buffer[bytesRead] = '\0';
+        if (strstr(buffer, expectedSubstring) == NULL) {
+            fprintf(stderr, "Expected AST containing '%s', got '%s'\n", expectedSubstring, buffer);
+        }
+        EXPECT_TRUE(strstr(buffer, expectedSubstring) != NULL);
+    }
+
+    close(fd);
+    unlink(pathTemplate);
+}
+
 void test_parser_reports_error_positions(void) {
-    assertParseErrorAt("x::int = 1;\nif (x\n{ ret 1; }", "expected ')' after if condition", 3, 1);
-    assertParseErrorAt("x::int = 1;\nfoo(1;", "expected ')' after call arguments", 2, 6);
+    assertParseErrorAt("func main() -> void {\nif (x\n{ ret 1; }\n}", "expected ')' after if condition", 3, 1);
+    assertParseErrorAt("func main() -> void {\nfoo(1;\n}", "expected ')' after call arguments", 2, 6);
+}
+
+void test_parser_parses_unary_minus_expression(void) {
+    assertParsesWithAstSubstring("x::int = -1;", "(UNARY)");
+}
+
+void test_parser_parses_break_and_continue_statements(void) {
+    assertParsesWithAstSubstring("func main() -> void { while (true) { break; continue; } }", "(BREAK)");
+    assertParsesWithAstSubstring("func main() -> void { while (true) { break; continue; } }", "(CONTINUE)");
+}
+
+void test_parser_rejects_assignment_at_file_scope(void) {
+    assertParseError("x = 1;", "expected top-level declaration");
+}
+
+void test_parser_rejects_expression_statement_at_file_scope(void) {
+    assertParseError("foo();", "expected top-level declaration");
+}
+
+void test_parser_rejects_if_at_file_scope(void) {
+    assertParseError("if (true) { }", "expected top-level declaration");
+}
+
+void test_parser_rejects_while_at_file_scope(void) {
+    assertParseError("while (true) { }", "expected top-level declaration");
+}
+
+void test_parser_rejects_for_at_file_scope(void) {
+    assertParseError("for(i::int = 0; i < 1; i += 1) { }", "expected top-level declaration");
+}
+
+void test_parser_rejects_return_break_and_continue_at_file_scope(void) {
+    assertParseError("ret;", "expected top-level declaration");
+    assertParseError("break;", "expected top-level declaration");
+    assertParseError("continue;", "expected top-level declaration");
 }
 
 void test_parser_parses_assignment_without_symbol_lookup(void) {
-    Token *tokens = NULL;
+    Token *tokens = tokenizeString("func main() -> void { x = y; }");
     AstNode *root;
-
-    appendToken(&tokens, makeToken(TOKEN_IDENTIFIER, "x"));
-    appendToken(&tokens, makeToken(TOKEN_ASSIGN, "="));
-    appendToken(&tokens, makeToken(TOKEN_IDENTIFIER, "y"));
-    appendToken(&tokens, makeToken(TOKEN_SEMICOLON, ";"));
+    AstNode *bodyItem;
 
     root = parseRoot(tokens);
 
     EXPECT_TRUE(root->type == AST_PROGRAM);
     EXPECT_TRUE(root->data.program.count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->type == AST_ASSIGN);
-    EXPECT_TRUE(root->data.program.items[0]->data.assign.target->type == AST_IDENTIFIER);
-    EXPECT_STR_EQ("x", root->data.program.items[0]->data.assign.target->data.identifier.name);
-    EXPECT_STR_EQ("y", root->data.program.items[0]->data.assign.value->data.identifier.name);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+
+    bodyItem = root->data.program.items[0]->data.func_decl.body->data.block.items[0];
+    EXPECT_TRUE(bodyItem->type == AST_ASSIGN);
+    EXPECT_TRUE(bodyItem->data.assign.target->type == AST_IDENTIFIER);
+    EXPECT_STR_EQ("x", bodyItem->data.assign.target->data.identifier.name);
+    EXPECT_STR_EQ("y", bodyItem->data.assign.value->data.identifier.name);
 
     astFree(root);
-    freeTokenList(tokens);
+    freeTokens(tokens);
 }
 
 void test_parser_parses_declaration_syntax_without_semantics(void) {
@@ -229,77 +333,70 @@ void test_parser_parses_declaration_syntax_without_semantics(void) {
 }
 
 void test_parser_parses_call_syntax_without_function_type(void) {
-    Token *tokens = NULL;
+    Token *tokens = tokenizeString("func main() -> void { print(x); }");
     AstNode *root;
-
-    appendToken(&tokens, makeToken(TOKEN_IDENTIFIER, "print"));
-    appendToken(&tokens, makeToken(TOKEN_LPAREN, "("));
-    appendToken(&tokens, makeToken(TOKEN_IDENTIFIER, "x"));
-    appendToken(&tokens, makeToken(TOKEN_RPAREN, ")"));
-    appendToken(&tokens, makeToken(TOKEN_SEMICOLON, ";"));
+    AstNode *exprStmt;
 
     root = parseRoot(tokens);
 
     EXPECT_TRUE(root->data.program.count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->type == AST_EXPR_STMT);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->type == AST_CALL);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.call.callee->type == AST_IDENTIFIER);
-    EXPECT_STR_EQ("print", root->data.program.items[0]->data.expr_stmt.expression->data.call.callee->data.identifier.name);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.call.arg_count == 1);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+
+    exprStmt = root->data.program.items[0]->data.func_decl.body->data.block.items[0];
+    EXPECT_TRUE(exprStmt->type == AST_EXPR_STMT);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->type == AST_CALL);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.call.callee->type == AST_IDENTIFIER);
+    EXPECT_STR_EQ("print", exprStmt->data.expr_stmt.expression->data.call.callee->data.identifier.name);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.call.arg_count == 1);
 
     astFree(root);
-    freeTokenList(tokens);
+    freeTokens(tokens);
 }
 
 void test_parser_parses_array_index_syntax_without_array_type(void) {
-    Token *tokens = NULL;
+    Token *tokens = tokenizeString("func main() -> void { arr[0]; }");
     AstNode *root;
-
-    appendToken(&tokens, makeToken(TOKEN_IDENTIFIER, "arr"));
-    appendToken(&tokens, makeToken(TOKEN_LBRACKET, "["));
-    appendToken(&tokens, makeToken(TOKEN_NUMBER, "0"));
-    appendToken(&tokens, makeToken(TOKEN_RBRACKET, "]"));
-    appendToken(&tokens, makeToken(TOKEN_SEMICOLON, ";"));
+    AstNode *exprStmt;
 
     root = parseRoot(tokens);
 
     EXPECT_TRUE(root->data.program.count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->type == AST_EXPR_STMT);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->type == AST_ARRAY_ACCESS);
-    EXPECT_STR_EQ("arr", root->data.program.items[0]->data.expr_stmt.expression->data.array_access.base->data.identifier.name);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.array_access.index_count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.array_access.indices[0]->type == AST_INT_LITERAL);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+
+    exprStmt = root->data.program.items[0]->data.func_decl.body->data.block.items[0];
+    EXPECT_TRUE(exprStmt->type == AST_EXPR_STMT);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->type == AST_ARRAY_ACCESS);
+    EXPECT_STR_EQ("arr", exprStmt->data.expr_stmt.expression->data.array_access.base->data.identifier.name);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.array_access.index_count == 1);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.array_access.indices[0]->type == AST_INT_LITERAL);
 
     astFree(root);
-    freeTokenList(tokens);
+    freeTokens(tokens);
 }
 
 void test_parser_parses_grouping_with_specific_delimiter_tokens(void) {
-    Token *tokens = NULL;
+    Token *tokens = tokenizeString("func main() -> void { (1 + 2); }");
     AstNode *root;
-
-    appendToken(&tokens, makeToken(TOKEN_LPAREN, "("));
-    appendToken(&tokens, makeToken(TOKEN_NUMBER, "1"));
-    appendToken(&tokens, makeToken(TOKEN_PLUS, "+"));
-    appendToken(&tokens, makeToken(TOKEN_NUMBER, "2"));
-    appendToken(&tokens, makeToken(TOKEN_RPAREN, ")"));
-    appendToken(&tokens, makeToken(TOKEN_SEMICOLON, ";"));
+    AstNode *exprStmt;
 
     root = parseRoot(tokens);
 
     EXPECT_TRUE(root->data.program.count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->type == AST_EXPR_STMT);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->type == AST_BINARY);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.binary.op == AST_BINARY_ADD);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.binary.left->data.int_literal.value == 1);
-    EXPECT_TRUE(root->data.program.items[0]->data.expr_stmt.expression->data.binary.right->data.int_literal.value == 2);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
+
+    exprStmt = root->data.program.items[0]->data.func_decl.body->data.block.items[0];
+    EXPECT_TRUE(exprStmt->type == AST_EXPR_STMT);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->type == AST_BINARY);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.binary.op == AST_BINARY_ADD);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.binary.left->data.int_literal.value == 1);
+    EXPECT_TRUE(exprStmt->data.expr_stmt.expression->data.binary.right->data.int_literal.value == 2);
 
     astFree(root);
-    freeTokenList(tokens);
+    freeTokens(tokens);
 }
 
 void test_parser_gives_and_higher_precedence_than_or(void) {
-    Token *tokens = tokenizeString("a || b && c;");
+    Token *tokens = tokenizeString("func main() -> void { a || b && c; }");
     Parser parser;
     AstNode *root;
     AstNode *expr;
@@ -308,9 +405,9 @@ void test_parser_gives_and_higher_precedence_than_or(void) {
     root = parserParseProgram(&parser);
 
     EXPECT_TRUE(root->data.program.count == 1);
-    EXPECT_TRUE(root->data.program.items[0]->type == AST_EXPR_STMT);
+    EXPECT_TRUE(root->data.program.items[0]->type == AST_FUNC_DECL);
 
-    expr = root->data.program.items[0]->data.expr_stmt.expression;
+    expr = root->data.program.items[0]->data.func_decl.body->data.block.items[0]->data.expr_stmt.expression;
     EXPECT_TRUE(expr->type == AST_BINARY);
 
     if (expr->type == AST_BINARY) {
@@ -401,52 +498,52 @@ void test_parser_copies_token_strings_into_ast(void) {
 }
 
 void test_parser_reports_syntax_error_at_eof_without_crashing(void) {
-    assertParseError("x =", "unexpected end of input in expression");
+    assertParseError("func main() -> void { x =", "unexpected end of input in expression");
 }
 
 void test_parser_reports_specific_syntax_errors(void) {
-    assertParseError("if x) { ret 1; }", "expected '(' after if");
-    assertParseError("if (x { ret 1; }", "expected ')' after if condition");
-    assertParseError("while x) { ret 1; }", "expected '(' after while");
-    assertParseError("while (x { ret 1; }", "expected ')' after while condition");
-    assertParseError("for x; x; x) { ret 1; }", "expected '(' after for");
-    assertParseError("for(i = 0 i < 1; i += 1) { ret 1; }", "expected ';' after for init");
-    assertParseError("for(i = 0; i < 1 i += 1) { ret 1; }", "expected ';' after for condition");
-    assertParseError("for(i = 0; i < 1; i += 1 { ret 1; }", "expected ')' after for update");
+    assertParseError("func main() -> void { if x) { ret 1; } }", "expected '(' after if");
+    assertParseError("func main() -> void { if (x { ret 1; } }", "expected ')' after if condition");
+    assertParseError("func main() -> void { while x) { ret 1; } }", "expected '(' after while");
+    assertParseError("func main() -> void { while (x { ret 1; } }", "expected ')' after while condition");
+    assertParseError("func main() -> void { for x; x; x) { ret 1; } }", "expected '(' after for");
+    assertParseError("func main() -> void { for(i = 0 i < 1; i += 1) { ret 1; } }", "expected ';' after for init");
+    assertParseError("func main() -> void { for(i = 0; i < 1 i += 1) { ret 1; } }", "expected ';' after for condition");
+    assertParseError("func main() -> void { for(i = 0; i < 1; i += 1 { ret 1; } }", "expected ')' after for update");
     assertParseError("func f(::int) { ret 1; }", "expected parameter name");
     assertParseError("func f(a int) { ret 1; }", "expected '::' after parameter name");
     assertParseError("func (a::int) { ret 1; }", "expected function name after func");
     assertParseError("func f a::int) { ret 1; }", "expected '(' after function name");
     assertParseError("func f(a::int { ret 1; }", "expected ')' after function parameters");
-    assertParseError("if (x) ret 1;", "expected '{' to start block");
-    assertParseError("while (x) ret 1;", "expected '{' to start block");
-    assertParseError("for(i = 0; i < 1; i += 1) ret 1;", "expected '{' to start block");
+    assertParseError("func main() -> void { if (x) ret 1; }", "expected '{' to start block");
+    assertParseError("func main() -> void { while (x) ret 1; }", "expected '{' to start block");
+    assertParseError("func main() -> void { for(i = 0; i < 1; i += 1) ret 1; }", "expected '{' to start block");
     assertParseError("func f(a::int) -> int ret 1;", "expected '{' to start block");
-    assertParseError("x", "expected ';' after statement");
-    assertParseError("foo(1;", "expected ')' after call arguments");
-    assertParseError("arr[1;", "expected ']' after array index");
-    assertParseError("(1 + 2;", "expected ')' after grouped expression");
-    assertParseError(";", "unexpected token in expression");
+    assertParseError("x", "expected top-level declaration");
+    assertParseError("func main() -> void { foo(1; }", "expected ')' after call arguments");
+    assertParseError("func main() -> void { arr[1; }", "expected ']' after array index");
+    assertParseError("func main() -> void { (1 + 2; }", "expected ')' after grouped expression");
+    assertParseError("func main() -> void { ; }", "unexpected token in expression");
     assertParseError("x::= 1;", "expected type");
     assertParseError("x::Array<int = 1;", "expected '>' after array element type");
     assertParseError("x::int[1 = 0;", "expected ']' after array type size");
-    assertParseError("x = ];", "unexpected token in expression");
-    assertParseError("x = {1;", "expected '}' after array literal");
+    assertParseError("func main() -> void { x = ]; }", "unexpected token in expression");
+    assertParseError("func main() -> void { x = {1", "expected '}' after array literal");
 }
 
 void test_parser_reports_eof_errors_in_last_token_positions(void) {
-    assertParseError("foo(", "unexpected end of input in expression");
-    assertParseError("arr[1", "expected ']' after array index");
-    assertParseError("(1 + 2", "expected ')' after grouped expression");
+    assertParseError("func main() -> void { foo(", "unexpected end of input in expression");
+    assertParseError("func main() -> void { arr[1", "expected ']' after array index");
+    assertParseError("func main() -> void { (1 + 2", "expected ')' after grouped expression");
     assertParseError("func f(a::int", "expected ')' after function parameters");
     assertParseError("x::", "expected type");
     assertParseError("x::Array<int", "expected '>' after array element type");
-    assertParseError("x = {1", "expected '}' after array literal");
+    assertParseError("func main() -> void { x = {1", "expected '}' after array literal");
 }
 
 void test_parser_rejects_invalid_assignment_targets(void) {
-    assertParseError("foo() = 1;", "invalid assignment target");
-    assertParseError("a + b = 1;", "invalid assignment target");
+    assertParseError("func main() -> void { foo() = 1; }", "invalid assignment target");
+    assertParseError("func main() -> void { a + b = 1; }", "invalid assignment target");
 }
 
 void test_parser_requires_explicit_function_return_type(void) {

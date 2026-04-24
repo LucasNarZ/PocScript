@@ -20,7 +20,7 @@ The current flow is:
 3. `semanticAnalyze(...)` walks the AST in two passes.
 4. The result is a `SemanticResult` with collected semantic errors.
 
-This phase does not try to recover syntax. It assumes the AST is already valid from a syntactic point of view.
+This phase does not try to recover syntax. It assumes the AST is already valid from a syntactic point of view, including the parser invariant that file scope contains only variable declarations and function declarations.
 
 ## High-Level Design
 
@@ -49,6 +49,7 @@ It is responsible for:
 - resolving variable names
 - resolving function calls
 - checking initializer and assignment compatibility
+- enforcing literal-only initializers for global variable declarations
 - checking expression operand types
 - checking boolean conditions in control flow
 - checking function argument count and argument types
@@ -162,6 +163,7 @@ Helpers in `types.c` are responsible for:
 The current implementation keeps type rules intentionally strict:
 
 - no implicit numeric promotion between `int` and `float`
+- global variable initializers must be direct literal nodes
 - array element types must match
 - function arguments must match declared parameter types
 - function return expressions must match the declared return type
@@ -192,6 +194,7 @@ The current semantic analyzer validates:
 - use of undeclared variables
 - calls to undeclared functions
 - initializer and assignment type compatibility
+- literal-only global variable initializers
 - arithmetic, comparison, and logical operand rules
 - boolean conditions in `if`, `while`, and `for`
 - argument count and argument type compatibility in function calls

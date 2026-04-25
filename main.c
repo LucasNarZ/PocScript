@@ -1,25 +1,25 @@
-#include <stdio.h>
+#include "./ir/ir.h"
 #include "./lexer/lexer.h"
-#include "./parser/parser.h"
 #include "./parser/ast.h"
+#include "./parser/parser.h"
 #include "./semantic/semantic.h"
+#include <stdio.h>
 
-int main(){
+int main() {
     AstNode *root;
     Parser parser;
     SemanticResult semantic;
     Token *tokens = tokenizeFile("input.ps");
+    IRModule *module = NULL;
     size_t i;
 
-    if(tokens == NULL){
+    if (tokens == NULL) {
         fprintf(stderr, "Error opening input.ps\n");
         return 1;
     }
 
-    print(tokens);
     parserInit(&parser, tokens);
     root = parserParseProgram(&parser);
-    astPrintPretty(root);
     semantic = semanticAnalyze(root);
 
     if (semantic.errors.count > 0) {
@@ -28,19 +28,27 @@ int main(){
             SemanticError *error = &semantic.errors.items[i];
 
             if (error->line > 0 && error->column > 0) {
-                printf(
-                    "%s at line %d, column %d: %s\n",
-                    semanticErrorKindName(error->kind),
-                    error->line,
-                    error->column,
-                    error->message
-                );
+                printf("%s at line %d, column %d: %s\n",
+                       semanticErrorKindName(error->kind), error->line, error->column,
+                       error->message);
             } else {
                 printf("%s: %s\n", semanticErrorKindName(error->kind), error->message);
             }
         }
+    } else {
+        module = irBuildModule(root, &semantic);
+        if (module == NULL || !irPrintModuleToFile(module, "IR.ll")) {
+            remove("IR.ll");
+            fprintf(stderr, "IR generation failed\n");
+            irModuleFree(module);
+            semanticResultFree(&semantic);
+            astFree(root);
+            freeTokens(tokens);
+            return 1;
+        }
     }
 
+    irModuleFree(module);
     semanticResultFree(&semantic);
     astFree(root);
     freeTokens(tokens);

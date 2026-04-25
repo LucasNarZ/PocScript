@@ -113,5 +113,15 @@ void test_semantic_accepts_break_and_continue_inside_for(void);
 void test_tokenize_file_appends_single_eof_for_multiline_input(void);
 void test_integration_parses_input_program_ast(void);
 void test_integration_parses_loop_control_and_unary_ast(void);
+void test_ir_builder_creates_module_for_empty_program(void);
+void test_ir_builder_predeclares_global_and_function_symbols(void);
+void test_ir_printer_emits_private_string_global(void);
+void test_ir_printer_emits_add_and_return(void);
+void test_ir_printer_lowers_compound_assignment_through_load_compute_store(void);
+void test_ir_printer_emits_conditional_branches_and_labels(void);
+void test_ir_printer_emits_gep_for_array_access(void);
+void test_ir_printer_emits_function_call(void);
+void test_ir_printer_emits_loop_comparisons_and_branches(void);
+void test_ir_printer_reads_and_writes_global_variables(void);
 
 #endif

@@ -1,5 +1,10 @@
 #include "helpers/test_helpers.h"
 
+void test_semantic_accepts_builtin_print_functions(void);
+void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
+void test_ir_builder_predeclares_builtin_runtime_functions(void);
+void test_ir_printer_emits_runtime_function_declarations(void);
+
 int test_failures = 0;
 int tests_run = 0;
 int tests_passed = 0;
@@ -49,6 +54,8 @@ int main(void) {
     RUN_TEST(test_semantic_reports_invalid_arithmetic_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_non_boolean_condition, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_call_to_undeclared_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_builtin_print_functions, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_count, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_type, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_non_integer_array_index, "tests/semantic/test_semantic.c");
@@ -74,6 +81,18 @@ int main(void) {
     RUN_TEST(test_tokenize_file_appends_single_eof_for_multiline_input, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_input_program_ast, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_loop_control_and_unary_ast, "tests/integration/test_integration.c");
+    RUN_TEST(test_ir_builder_creates_module_for_empty_program, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_builder_predeclares_global_and_function_symbols, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_private_string_global, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_add_and_return, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_lowers_compound_assignment_through_load_compute_store, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_conditional_branches_and_labels, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_gep_for_array_access, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_function_call, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_builder_predeclares_builtin_runtime_functions, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_runtime_function_declarations, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_loop_comparisons_and_branches, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_reads_and_writes_global_variables, "tests/ir/test_ir.c");
 
     printf("\n");
     printf("Tests run: %d\n", tests_run);

@@ -131,6 +131,35 @@ void test_semantic_reports_call_to_undeclared_function(void) {
     astFree(root);
 }
 
+void test_semantic_accepts_builtin_print_functions(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void {\n"
+        "    printString(\"hi\");\n"
+        "    printInt(42);\n"
+        "    ret;\n"
+        "}"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_redeclaration_of_builtin_print_function(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func printInt(value::int) -> void { ret; }\n"
+        "func main() -> void { ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DECLARATION);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "duplicate declaration of 'printInt'") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_reports_wrong_argument_count(void) {
     AstNode *root = parseRootFromString("func foo(a::int) -> int { ret a; } func main() -> void { foo(1, 2); }");
     SemanticResult result = semanticAnalyze(root);

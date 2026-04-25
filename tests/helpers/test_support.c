@@ -23,3 +23,29 @@ SemanticResult analyzeRootFromString(const char *input) {
     astFree(root);
     return result;
 }
+
+IRModule *buildIrModuleFromString(const char *input) {
+    AstNode *root = parseRootFromString(input);
+    SemanticResult semantic = semanticAnalyze(root);
+    IRModule *module = NULL;
+
+    if (semantic.errors.count == 0) {
+        module = irBuildModule(root, &semantic);
+    }
+
+    semanticResultFree(&semantic);
+    astFree(root);
+    return module;
+}
+
+char *emitLlvmIrFromString(const char *input) {
+    IRModule *module = buildIrModuleFromString(input);
+    char *text = NULL;
+
+    if (module != NULL) {
+        text = irPrintModuleToString(module);
+        irModuleFree(module);
+    }
+
+    return text;
+}

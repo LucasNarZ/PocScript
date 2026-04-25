@@ -1,3 +1,4 @@
 make clean
 make 
-./compiler
+make assembly
+./output

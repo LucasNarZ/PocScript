@@ -1,6 +1,7 @@
 #include "types.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 SemanticType *semanticTypeNewPrimitive(SemanticTypeKind kind) {
     SemanticType *type = malloc(sizeof(SemanticType));
@@ -71,6 +72,8 @@ const char *semanticTypeName(const SemanticType *type) {
             return "char";
         case SEM_TYPE_BOOL:
             return "bool";
+        case SEM_TYPE_STRING:
+            return "string";
         case SEM_TYPE_VOID:
             return "void";
         case SEM_TYPE_ARRAY:
@@ -122,6 +125,10 @@ SemanticType *semanticTypeFromAst(AstNode *typeNode) {
             type->element_type = semanticTypeNewPrimitive(SEM_TYPE_ERROR);
             return type;
         case AST_TYPE_CUSTOM_KIND:
+            if (typeNode->data.type_name.name != NULL && strcmp(typeNode->data.type_name.name, "string") == 0) {
+                return semanticTypeNewPrimitive(SEM_TYPE_STRING);
+            }
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
         default:
             return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
     }

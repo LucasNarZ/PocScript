@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void collectSymbols(AstNode *node, Scope *scope, SemanticResult *result);
 static void validateNode(AstNode *node, Scope *scope, SemanticResult *result);
@@ -303,6 +304,57 @@ static bool semanticTypeIsBool(const SemanticType *type) {
     return type != NULL && type->kind == SEM_TYPE_BOOL;
 }
 
+static size_t semanticStringLiteralLength(const char *value) {
+    size_t length;
+
+    if (value == NULL) {
+        return 0;
+    }
+
+    length = strlen(value);
+    if (length >= 2 && ((value[0] == '"' && value[length - 1] == '"') || (value[0] == '\'' && value[length - 1] == '\''))) {
+        return length - 2;
+    }
+
+    return length;
+}
+
+static bool declareBuiltinFunction(Scope *scope, const char *name, SemanticType *return_type, SemanticType **params, size_t param_count) {
+    Symbol *symbol = symbolCreateFunction(name, return_type, params, param_count);
+
+    if (symbol == NULL) {
+        return false;
+    }
+
+    if (!scopeDeclare(scope, symbol)) {
+        symbolFree(symbol);
+        return false;
+    }
+
+    return true;
+}
+
+static void declareBuiltinRuntimeFunctions(Scope *scope) {
+    SemanticType *print_string_params[1];
+    SemanticType *print_int_params[1];
+
+    if (scope == NULL) {
+        return;
+    }
+
+    print_string_params[0] = semanticTypeNewPrimitive(SEM_TYPE_STRING);
+    if (print_string_params[0] != NULL) {
+        declareBuiltinFunction(scope, "printString", semanticTypeNewPrimitive(SEM_TYPE_VOID), print_string_params, 1);
+        semanticTypeFree(print_string_params[0]);
+    }
+
+    print_int_params[0] = semanticTypeNewPrimitive(SEM_TYPE_INT);
+    if (print_int_params[0] != NULL) {
+        declareBuiltinFunction(scope, "printInt", semanticTypeNewPrimitive(SEM_TYPE_VOID), print_int_params, 1);
+        semanticTypeFree(print_int_params[0]);
+    }
+}
+
 static Scope *createValidationRoot(const Scope *globalScope) {
     Scope *root = scopeCreate(NULL);
     size_t i;
@@ -564,7 +616,10 @@ static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticResult
         case AST_FLOAT_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_FLOAT);
         case AST_STRING_LITERAL:
-            return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+            if (semanticStringLiteralLength(node->data.string_literal.value) == 1) {
+                return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+            }
+            return semanticTypeNewPrimitive(SEM_TYPE_STRING);
         case AST_BOOL_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
         case AST_ARRAY_LITERAL:
@@ -781,6 +836,7 @@ SemanticResult semanticAnalyze(AstNode *program) {
     semanticErrorListInit(&result.errors);
     result.global_scope = scopeCreate(NULL);
     if (result.global_scope != NULL) {
+        declareBuiltinRuntimeFunctions(result.global_scope);
         collectSymbols(program, result.global_scope, &result);
         validationRoot = createValidationRoot(result.global_scope);
         if (validationRoot != NULL) {

@@ -1,16 +1,96 @@
 # PocScript
 
-PocScript is a study project focused on implementing the core building blocks of a programming language in C. In the current state of the repository, the main focus is the compiler frontend: source reading, tokenization, parsing, semantic validation, and AST generation/printing.
+PocScript is a study project focused on implementing the core building blocks of a programming language in C. The repository currently covers the full path from source code to tokens, AST, semantic validation, internal IR, textual LLVM IR, and a final executable linked with a small assembly runtime.
 
-## Current State
+## Overview
 
-- `lexer/`: converts source code into a linked list of tokens with `type`, `value`, `line`, and `column`
-- `parser/`: consumes the token list and produces an AST for global declarations, function bodies, expressions, blocks, conditionals, loops, and arrays
-- `semantic/`: walks the AST in two passes to validate declarations, scopes, types, function calls, function returns, array access, and global initializer rules
-- `tests/`: contains unit and integration tests for the lexer, parser, semantic analyzer, and AST serialization
-- `main.c`: main debug executable; reads `input.ps`, prints recognized tokens, prints the resulting AST, and then prints semantic analysis results
+The compiler is intentionally split into small, explicit stages:
 
-Today the project is organized as a compiler frontend. The old README described assembly generation as a central part of the flow, but the code currently present in this repository is centered on the lexer, parser, semantic analysis, and AST.
+- `lexer/`: turns source text into a linked list of tokens with `type`, `value`, `line`, and `column`
+- `parser/`: consumes tokens and builds an AST for declarations, statements, expressions, calls, control flow, and arrays
+- `semantic/`: validates scopes, declarations, types, function calls, returns, loop control, builtin runtime functions, and array rules
+- `ir/`: lowers the validated AST to an internal IR and prints LLVM IR to `IR.ll`
+- `runtime/`: provides `_start` and builtin runtime functions linked into the final executable without libc
+- `tests/`: unit and integration tests for lexer, parser, semantic analysis, IR building, and IR printing
+- `main.c`: debug-oriented compiler entry point that reads `input.ps`, runs the full pipeline, and emits `IR.ll`
+
+## Current Architecture
+
+The current pipeline is:
+
+1. `tokenizeFile("input.ps")` reads the source file and produces tokens.
+2. `parserParseProgram(...)` builds the AST.
+3. `semanticAnalyze(...)` validates the AST in two passes.
+4. `irBuildModule(...)` lowers the validated AST to the internal IR.
+5. `irPrintModuleToFile(...)` prints LLVM IR to `IR.ll`.
+6. `make assembly` compiles `IR.ll`, assembles the runtime, and links everything into `output`.
+
+In practice, there are two main artifacts:
+
+- `compiler`: useful for inspecting parsing, semantic validation, and IR generation
+- `output`: the final executable built from generated LLVM IR plus the runtime layer
+
+## Design Decisions
+
+The project makes a few explicit design choices to keep the implementation understandable.
+
+### Simple staged architecture
+
+Each phase has one clear responsibility.
+
+- the lexer only classifies text
+- the parser is syntactic only
+- semantic validation is isolated from parsing
+- IR generation only runs after semantic success
+
+This separation keeps failure modes easier to understand and avoids mixing syntax, typing, and code generation logic in the same pass.
+
+### AST first, semantics second
+
+The parser builds a full AST without trying to resolve identifiers or types on the fly. That makes the parser simpler and keeps semantic rules centralized in `semantic/`.
+
+### Two-pass semantic analysis
+
+Semantic analysis first collects symbols, then validates usage. This is a deliberate choice so the compiler can:
+
+- support forward references to functions
+- separate declaration collection from type checking
+- accumulate multiple semantic errors in one run instead of aborting immediately
+
+### Small LLVM-like IR
+
+The backend does not emit LLVM IR directly from the AST. Instead, it lowers to a small internal IR first and then prints LLVM IR text. This keeps lowering logic independent from LLVM syntax details and makes the backend easier to test in isolation.
+
+### Stack-slot locals instead of aggressive SSA
+
+Named local variables are materialized as stack slots with `alloca`, `store`, and `load`. Temporary expression results still use numbered temporaries such as `%t1`, `%t2`, and `%t3`, but the compiler does not implement full SSA construction or phi nodes yet.
+
+This is a conscious simplicity tradeoff: the generated IR is easier to produce and reason about, even though it is not yet optimized.
+
+### Minimal runtime and no libc dependency
+
+The generated executable is linked directly with `ld` and a tiny assembly runtime. `_start` is provided by `runtime/start.asm`, and runtime helpers such as `printString` and `printInt` live in `runtime/io.asm`.
+
+This keeps the backend close to the machine model and makes the final artifact easier to understand end-to-end.
+
+### End-to-end language as the long-term goal
+
+The long-term goal of PocScript is to make the language work end to end with as many self-hosted or project-owned stages as possible.
+
+That means the intended direction is not to stop at:
+
+- AST -> LLVM IR -> `clang` -> object file
+
+The intended direction is to progressively replace borrowed stages with project-controlled ones, for example:
+
+- AST -> internal IR -> handwritten NASM x86 assembly
+- handwritten assembly emission -> project-controlled object or binary generation in later stages
+
+The current use of LLVM IR is a pragmatic design decision, not the final architectural destination. It was chosen so the language could become executable as early as possible, while the frontend and IR model were still being designed.
+
+The same strategy may be used again in future phases: use a practical intermediate step first, then replace it with a more direct implementation once the surrounding compiler stages are stable enough.
+
+In other words, the project tries to build as much as possible from scratch, but without blocking execution on finishing every low-level stage first.
 
 ## Project Structure
 
@@ -40,6 +120,19 @@ Today the project is organized as a compiler frontend. The old README described 
 |   |-- scope.h
 |   |-- types.c
 |   `-- types.h
+|-- ir/
+|   |-- ir_core.c
+|   |-- ir_instr.c
+|   |-- ir_module.c
+|   |-- ir_scope.c
+|   |-- ir_builder.c
+|   |-- ir_printer.c
+|   |-- ir.h
+|   `-- README.md
+|-- runtime/
+|   |-- io.asm
+|   |-- start.asm
+|   `-- README.md
 `-- tests/
     |-- lexer/
     |-- parser/
@@ -47,46 +140,112 @@ Today the project is organized as a compiler frontend. The old README described 
     |-- integration/
     |-- helpers/
     |-- fixtures/
+    |-- ir/
     |-- test_main.c
     `-- README.md
 ```
 
-## Current Flow
+## Language Coverage
 
-1. `tokenizeFile("input.ps")` reads the input file and produces the token list.
-2. `parserParseProgram(...)` walks through that list and builds the AST.
-3. `semanticAnalyze(...)` validates declarations, scopes, expressions, calls, array access, and global initializer rules.
-4. `main.c` prints the token sequence, the textual tree representation, and the semantic analysis result.
-
-In practice, this binary works as a simple way to inspect the language frontend while the grammar evolves.
-
-## Features Covered By The Current Code
+The current codebase supports:
 
 - variable declarations with `::`
-- file scope restricted to global variable declarations and function declarations
-- primitive types `int`, `float`, `char`, `bool`, `void`
-- `Array` type and types with `[]` suffixes
+- top-level global variable declarations and function declarations only
+- primitive types `int`, `float`, `char`, `bool`, and `void`
+- `Array` and `[]`-style array types
 - integer, float, string, and bool literals
-- binary expressions: `+`, `-`, `*`, `/`, `>`, `<`, `>=`, `<=`, `==`, `!=`, `&&`, `||`
-- unary operators `!` and `-`
-- assignments `=`, `+=`, `-=`
+- array literals, including nested array literals
+- assignments `=`, `+=`, and `-=`
+- binary expressions including arithmetic, comparison, and logical operators at the parser/semantic level
+- unary operators `!` and `-` at the parser/semantic level
 - blocks
-- `if`, `else`, `while`, `for`, `break`, `continue`
-- function declarations with mandatory explicit return types and `ret`
-- global variable initializers restricted to direct literals
+- `if`, `else`, `while`, `for`, `break`, and `continue`
+- function declarations with explicit return types and `ret`
 - function calls
-- array access with one or more indices
-- nested array literals
-- semantic validation for scope, duplicate declarations, initializer types, conditions, function calls, function return contracts, loop control usage, and array indexing
+- builtin runtime calls to `printString` and `printInt`
+- array access syntax with one or more indices in the AST and semantic phases
+- LLVM IR emission for globals, functions, control flow, array access, string storage, and external runtime declarations
+- final executable generation with `_start` and a libc-free runtime linked by `ld`
+
+## Feature Status
+
+The table below distinguishes between features that are currently supported across the full implemented pipeline and features that are already accepted in the frontend but are not yet fully covered by backend code generation.
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| Global variable declarations | `fully-supported` | Parsed, semantically validated, lowered to IR, and emitted to LLVM IR |
+| Function declarations | `fully-supported` | Explicit return type required |
+| Primitive types `int`, `float`, `char`, `bool`, `void` | `fully-supported` | Within the currently implemented semantic and backend rules |
+| String literals | `fully-supported` | Lowered through generated string storage globals |
+| Bool literals | `fully-supported` | Validated semantically and emitted in the backend |
+| Integer and float literals | `fully-supported` | Supported by frontend and backend |
+| Local variable declarations | `fully-supported` | Lowered with stack slots |
+| Function calls | `fully-supported` | Includes calls to user functions and runtime builtins |
+| `printString` and `printInt` | `fully-supported` | Declared in semantic analysis, IR, and resolved by runtime linking |
+| `if` / `else` | `fully-supported` | Lowered to explicit blocks and branches |
+| `while` | `fully-supported` | Lowered to explicit loop blocks |
+| `for` | `fully-supported` | Lowered to init/cond/body/update/end blocks |
+| `ret` | `fully-supported` | Includes default return insertion when needed |
+| Assignments `=` | `fully-supported` | Supported for addressable targets in current backend path |
+| Compound assignments `+=` and `-=` | `fully-supported` | Lowered through load/compute/store |
+| Single-index array access | `fully-supported` | Lowered with `getelementptr` in current backend |
+| Array literals | `fully-supported` | Current backend supports element-by-element initialization |
+| Nested array literals | `frontend-only` | Frontend accepts them, but backend coverage is not yet fully defined end to end |
+| Multi-index array access | `frontend-only` | Parser and semantic analyzer accept it, backend currently lowers one index |
+| Binary arithmetic `+`, `-`, `*`, `/` | `fully-supported` | Lowered in current backend |
+| Comparisons `>`, `<`, `<=` | `fully-supported` | Lowered in current backend |
+| Comparisons `>=`, `==`, `!=` | `frontend-only` | Present in parser/semantic space, not fully lowered in active backend path |
+| Logical operators `&&`, `||` | `frontend-only` | Accepted in the frontend, not fully implemented in current backend lowering |
+| Unary `!` and unary `-` | `frontend-only` | Accepted by parser and semantic analysis, not fully implemented in current backend lowering |
+| `break` and `continue` | `frontend-only` | Accepted and semantically validated, but not yet lowered in the current backend path |
+
+`fully-supported` means the feature is implemented coherently across the currently active pipeline: parser, semantic analysis, IR generation, LLVM IR emission, and executable generation.
+
+`frontend-only` means the feature is already part of the language surface in the parser and usually also in semantic analysis, but it is not yet fully supported end to end by the backend.
+
+## Current Language And Backend Limitations
+
+The project is intentionally incomplete. Some features are accepted earlier in the pipeline than they are currently supported in code generation.
+
+### Language limitations
+
+- file scope is restricted to global variable declarations and function declarations
+- function declarations require an explicit return type after `->`
+- global variable initializers must be direct literals
+- builtin I/O is currently limited to `printString` and `printInt`
+- the language has no user-defined structs, records, classes, enums, modules, or generics
+- there is no explicit memory management model exposed to the language
+- there is no standard library beyond the tiny runtime helpers
+
+### Semantic limitations
+
+- type rules are intentionally strict
+- there is no implicit numeric promotion between `int` and `float`
+- semantic analysis focuses on correctness, not optimization or recovery of malformed syntax
+
+### Backend limitations
+
+- the internal IR enum contains more instruction variants than the current lowering path actually emits
+- the current backend lowers arithmetic and only part of the comparison space in the active path
+- locals are always lowered through stack slots rather than promoted values
+- there are no SSA phi nodes
+- array access lowering in `ir/` currently handles one index in the active backend path, even though the parser and semantic analyzer accept multiple indices
+- the backend depends on semantic analysis to reject unsupported or inconsistent programs before IR generation
+- code generation is focused on readability and correctness, not optimization quality
+
+That last point is important: parser support or semantic support for a construct does not automatically mean the LLVM backend is equally complete for every variant of that construct.
 
 ## Build And Run
 
 ### Requirements
 
 - `gcc`
+- `clang`
+- `nasm`
+- `ld`
 - `make`
 
-### Build the frontend
+### Build the compiler
 
 ```bash
 make
@@ -100,7 +259,29 @@ This generates the `compiler` executable.
 ./compiler
 ```
 
-The program reads `input.ps`, prints the recognized tokens, prints the formatted AST, and then prints semantic validation results.
+The program reads `input.ps`, parses it, runs semantic validation, and writes `IR.ll` when the program is valid. When semantic errors exist, they are printed with line and column information and IR generation is skipped.
+
+### Build the final executable
+
+```bash
+make assembly
+```
+
+This performs the full backend build:
+
+1. runs `./compiler` to generate `IR.ll`
+2. compiles `IR.ll` into `IR.o` with `clang -c`
+3. assembles `runtime/io.asm` into `runtime/io.o`
+4. assembles `runtime/start.asm` into `runtime/start.o`
+5. links `IR.o`, `runtime/io.o`, and `runtime/start.o` into `output` with `ld`
+
+### Run the final executable
+
+```bash
+./output
+```
+
+The final program starts at `_start`, calls the generated `main`, uses the runtime functions linked from `runtime/`, and exits through Linux syscalls without libc.
 
 ### Run the tests
 
@@ -119,13 +300,16 @@ make clean
 ## Internal Documentation
 
 - `lexer/README.md`: lexer overview, token categories, and tokenization flow
-- `parser/README.md`: parser organization and general AST format
+- `parser/README.md`: parser organization and AST structure
 - `semantic/README.md`: semantic analysis flow, data structures, and validation rules
+- `ir/README.md`: IR model, lowering strategy, LLVM printer behavior, and backend limits
+- `runtime/README.md`: runtime entry point, exported symbols, and link flow
 - `tests/README.md`: test suite structure and the role of each group
 
-## Notes
+## Architecture Notes
 
-- The project prioritizes simplicity and readability over completeness.
-- The AST has its own textual representation in `parser/ast.c`, used by the integration tests.
-- The parser remains syntactic; semantic validation is handled in a separate phase under `semantic/`.
-- Executable statements such as `if`, `while`, `for`, assignments, and expression statements are valid inside blocks and functions, not at file scope.
+- the parser remains purely syntactic; all semantic rules live in `semantic/`
+- builtin runtime functions are treated as global functions during semantic analysis and IR generation
+- AST textual serialization in `parser/ast.c` is part of the practical contract because integration tests depend on it
+- the compiler favors simple explicit data structures over compact or heavily abstracted implementations
+- the project prioritizes readability and phase separation over performance and feature completeness

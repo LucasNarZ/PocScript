@@ -1,0 +1,136 @@
+        -:    0:Source:semantic/types.c
+        -:    1:#include "types.h"
+        -:    2:
+        -:    3:#include <stdlib.h>
+        -:    4:#include <string.h>
+        -:    5:
+     1133:    6:SemanticType *semanticTypeNewPrimitive(SemanticTypeKind kind) {
+     1133:    7:    SemanticType *type = malloc(sizeof(SemanticType));
+        -:    8:
+     1133:    9:    if (type == NULL) {
+    #####:   10:        return NULL;
+        -:   11:    }
+        -:   12:
+     1133:   13:    type->kind = kind;
+     1133:   14:    type->element_type = NULL;
+     1133:   15:    return type;
+        -:   16:}
+      651:   17:SemanticType *semanticTypeClone(const SemanticType *type) {
+        -:   18:    SemanticType *copy;
+        -:   19:
+      651:   20:    if (type == NULL) {
+    #####:   21:        return NULL;
+        -:   22:    }
+        -:   23:
+      651:   24:    copy = semanticTypeNewPrimitive(type->kind);
+      651:   25:    if (copy == NULL) {
+    #####:   26:        return NULL;
+        -:   27:    }
+        -:   28:
+      651:   29:    if (type->element_type != NULL) {
+        3:   30:        copy->element_type = semanticTypeClone(type->element_type);
+        -:   31:    }
+        -:   32:
+      651:   33:    return copy;
+        -:   34:}
+        -:   35:
+     2251:   36:void semanticTypeFree(SemanticType *type) {
+     2251:   37:    if (type == NULL) {
+     1118:   38:        return;
+        -:   39:    }
+        -:   40:
+     1133:   41:    semanticTypeFree(type->element_type);
+     1133:   42:    free(type);
+        -:   43:}
+        -:   44:
+       71:   45:bool semanticTypeEquals(const SemanticType *left, const SemanticType *right) {
+       71:   46:    if (left == NULL || right == NULL) {
+    #####:   47:        return false;
+        -:   48:    }
+        -:   49:
+       71:   50:    if (left->kind != right->kind) {
+        5:   51:        return false;
+        -:   52:    }
+        -:   53:
+       66:   54:    if (left->kind != SEM_TYPE_ARRAY) {
+       63:   55:        return true;
+        -:   56:    }
+        -:   57:
+        3:   58:    return semanticTypeEquals(left->element_type, right->element_type);
+        -:   59:}
+        -:   60:
+       13:   61:const char *semanticTypeName(const SemanticType *type) {
+       13:   62:    if (type == NULL) {
+    #####:   63:        return "unknown";
+        -:   64:    }
+        -:   65:
+       13:   66:    switch (type->kind) {
+        8:   67:        case SEM_TYPE_INT:
+        8:   68:            return "int";
+    #####:   69:        case SEM_TYPE_FLOAT:
+    #####:   70:            return "float";
+    #####:   71:        case SEM_TYPE_CHAR:
+    #####:   72:            return "char";
+        4:   73:        case SEM_TYPE_BOOL:
+        4:   74:            return "bool";
+    #####:   75:        case SEM_TYPE_STRING:
+    #####:   76:            return "string";
+        1:   77:        case SEM_TYPE_VOID:
+        1:   78:            return "void";
+    #####:   79:        case SEM_TYPE_ARRAY:
+    #####:   80:            return "array";
+    #####:   81:        case SEM_TYPE_ERROR:
+    #####:   82:            return "error";
+        -:   83:    }
+        -:   84:
+    #####:   85:    return "unknown";
+        -:   86:}
+        -:   87:
+      216:   88:SemanticType *semanticTypeFromAst(AstNode *typeNode) {
+        -:   89:    SemanticType *type;
+        -:   90:
+      216:   91:    if (typeNode == NULL) {
+    #####:   92:        return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        -:   93:    }
+        -:   94:
+      216:   95:    if (typeNode->type == AST_TYPE_ARRAY) {
+        9:   96:        type = semanticTypeNewPrimitive(SEM_TYPE_ARRAY);
+        9:   97:        if (type == NULL) {
+    #####:   98:            return NULL;
+        -:   99:        }
+        -:  100:
+        9:  101:        type->element_type = semanticTypeFromAst(typeNode->data.type_array.element_type);
+        9:  102:        return type;
+        -:  103:    }
+        -:  104:
+      207:  105:    if (typeNode->type != AST_TYPE_NAME) {
+    #####:  106:        return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        -:  107:    }
+        -:  108:
+      207:  109:    switch (typeNode->data.type_name.kind) {
+      141:  110:        case AST_TYPE_INT_KIND:
+      141:  111:            return semanticTypeNewPrimitive(SEM_TYPE_INT);
+        3:  112:        case AST_TYPE_FLOAT_KIND:
+        3:  113:            return semanticTypeNewPrimitive(SEM_TYPE_FLOAT);
+        3:  114:        case AST_TYPE_CHAR_KIND:
+        3:  115:            return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+        6:  116:        case AST_TYPE_BOOL_KIND:
+        6:  117:            return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
+       48:  118:        case AST_TYPE_VOID_KIND:
+       48:  119:            return semanticTypeNewPrimitive(SEM_TYPE_VOID);
+    #####:  120:        case AST_TYPE_ARRAY_KIND:
+    #####:  121:            type = semanticTypeNewPrimitive(SEM_TYPE_ARRAY);
+    #####:  122:            if (type == NULL) {
+    #####:  123:                return NULL;
+        -:  124:            }
+    #####:  125:            type->element_type = semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+    #####:  126:            return type;
+        6:  127:        case AST_TYPE_CUSTOM_KIND:
+        6:  128:            if (typeNode->data.type_name.name != NULL && strcmp(typeNode->data.type_name.name, "string") == 0) {
+        6:  129:                return semanticTypeNewPrimitive(SEM_TYPE_STRING);
+        -:  130:            }
+    #####:  131:            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+    #####:  132:        default:
+    #####:  133:            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        -:  134:    }
+        -:  135:}

@@ -1,6 +1,8 @@
 #include "../helpers/test_helpers.h"
 #include "../helpers/test_support.h"
 
+#include <unistd.h>
+
 void test_ir_builder_creates_module_for_empty_program(void) {
     IRModule *module = buildIrModuleFromString("");
 
@@ -153,4 +155,97 @@ void test_ir_printer_reads_and_writes_global_variables(void) {
         EXPECT_TRUE(strstr(llvm, "load i1, i1* @flag") != NULL);
         free(llvm);
     }
+}
+
+void test_ir_printer_emits_float_values_as_double(void) {
+    char *llvm = emitLlvmIrFromString("ratio::float = 1.5; func main() -> float { ret ratio; }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "@ratio = global double 1.500000") != NULL);
+        EXPECT_TRUE(strstr(llvm, "define double @main()") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_bool_values_as_i1(void) {
+    char *llvm = emitLlvmIrFromString("flag::bool = true; func main() -> bool { ret flag; }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "@flag = global i1 1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "define i1 @main()") != NULL);
+        EXPECT_TRUE(strstr(llvm, "ret i1") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_escapes_special_characters_in_string_literals(void) {
+    char *llvm = emitLlvmIrFromString("func main() -> void { printString(\"line\\nquote\\\"tab\\t\\\\\"); ret; }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "line\\5Cnquote\\5C\\22tab\\5Ct\\5C\\5C") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_sub_mul_and_div_operations(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func math(a::int, b::int, c::int) -> int { ret (a - b) * c / 2; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "sub i32") != NULL);
+        EXPECT_TRUE(strstr(llvm, "mul i32") != NULL);
+        EXPECT_TRUE(strstr(llvm, "sdiv i32") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_default_return_for_empty_function(void) {
+    char *llvm = emitLlvmIrFromString("func zero(flag::bool) -> int { if (flag) { ret 1; } }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "define i32 @zero(i1 %p1)") != NULL);
+        EXPECT_TRUE(strstr(llvm, "ret i32 0") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_writes_module_to_file(void) {
+    IRModule *module = buildIrModuleFromString("func main() -> void { printInt(1); ret; }");
+    char pathTemplate[] = "/tmp/pocscript-ir-XXXXXX.ll";
+    int fd = mkstemps(pathTemplate, 3);
+    char *written;
+    bool ok;
+
+    EXPECT_TRUE(fd >= 0);
+    EXPECT_TRUE(module != NULL);
+    if (fd < 0 || module == NULL) {
+        if (fd >= 0) {
+            close(fd);
+            unlink(pathTemplate);
+        }
+        if (module != NULL) {
+            irModuleFree(module);
+        }
+        return;
+    }
+
+    close(fd);
+    ok = irPrintModuleToFile(module, pathTemplate);
+    written = readFileToString(pathTemplate);
+
+    EXPECT_TRUE(ok);
+    EXPECT_TRUE(written != NULL);
+    if (written != NULL) {
+        EXPECT_TRUE(strstr(written, "call void @printInt") != NULL);
+    }
+
+    free(written);
+    irModuleFree(module);
+    unlink(pathTemplate);
 }

@@ -1,0 +1,1511 @@
+        -:    0:Source:ir/ir_builder.c
+        -:    1:#include "ir.h"
+        -:    2:
+        -:    3:#include <stdio.h>
+        -:    4:#include <stdlib.h>
+        -:    5:#include <string.h>
+        -:    6:
+       26:    7:static char *irBuilderCopyString(const char *value) {
+        -:    8:    size_t length;
+        -:    9:    char *copy;
+        -:   10:
+       26:   11:    if (value == NULL) {
+    #####:   12:        return NULL;
+        -:   13:    }
+        -:   14:
+       26:   15:    length = strlen(value);
+       26:   16:    copy = malloc(length + 1);
+       26:   17:    if (copy == NULL) {
+    #####:   18:        return NULL;
+        -:   19:    }
+        -:   20:
+       26:   21:    memcpy(copy, value, length + 1);
+       26:   22:    return copy;
+        -:   23:}
+        -:   24:
+       16:   25:static char *irBuilderUnquoteString(const char *value) {
+        -:   26:    size_t length;
+        -:   27:    char *copy;
+        -:   28:
+       16:   29:    if (value == NULL) {
+    #####:   30:        return NULL;
+        -:   31:    }
+        -:   32:
+       16:   33:    length = strlen(value);
+      16*:   34:    if (length >= 2 && ((value[0] == '"' && value[length - 1] == '"') || (value[0] == '\'' && value[length - 1] == '\''))) {
+       16:   35:        copy = malloc(length - 1);
+       16:   36:        if (copy == NULL) {
+    #####:   37:            return NULL;
+        -:   38:        }
+        -:   39:
+       16:   40:        memcpy(copy, value + 1, length - 2);
+       16:   41:        copy[length - 2] = '\0';
+       16:   42:        return copy;
+        -:   43:    }
+        -:   44:
+    #####:   45:    return irBuilderCopyString(value);
+        -:   46:}
+        -:   47:
+       74:   48:static IRType *irBuilderTypeFromAst(const AstNode *type_node) {
+        -:   49:    IRType *element_type;
+        -:   50:
+       74:   51:    if (type_node == NULL) {
+    #####:   52:        return NULL;
+        -:   53:    }
+        -:   54:
+       74:   55:    if (type_node->type == AST_TYPE_ARRAY) {
+        3:   56:        element_type = irBuilderTypeFromAst(type_node->data.type_array.element_type);
+        3:   57:        if (type_node->data.type_array.size_expr != NULL && type_node->data.type_array.size_expr->type == AST_INT_LITERAL) {
+        3:   58:            return irTypeCreateSizedArray(element_type, (size_t) type_node->data.type_array.size_expr->data.int_literal.value);
+        -:   59:        }
+    #####:   60:        return irTypeCreateArray(element_type);
+        -:   61:    }
+        -:   62:
+       71:   63:    if (type_node->type != AST_TYPE_NAME) {
+    #####:   64:        return NULL;
+        -:   65:    }
+        -:   66:
+       71:   67:    switch (type_node->data.type_name.kind) {
+       49:   68:        case AST_TYPE_INT_KIND:
+       49:   69:            return irTypeCreate(IR_TYPE_INT);
+        2:   70:        case AST_TYPE_FLOAT_KIND:
+        2:   71:            return irTypeCreate(IR_TYPE_FLOAT);
+    #####:   72:        case AST_TYPE_CHAR_KIND:
+    #####:   73:            return irTypeCreate(IR_TYPE_CHAR);
+        5:   74:        case AST_TYPE_BOOL_KIND:
+        5:   75:            return irTypeCreate(IR_TYPE_BOOL);
+       11:   76:        case AST_TYPE_VOID_KIND:
+       11:   77:            return irTypeCreate(IR_TYPE_VOID);
+        4:   78:        case AST_TYPE_CUSTOM_KIND:
+        4:   79:            if (type_node->data.type_name.name != NULL && strcmp(type_node->data.type_name.name, "string") == 0) {
+        4:   80:                return irTypeCreate(IR_TYPE_STRING);
+        -:   81:            }
+    #####:   82:            return NULL;
+    #####:   83:        default:
+    #####:   84:            return NULL;
+        -:   85:    }
+        -:   86:}
+        -:   87:
+        9:   88:static IRLiteral *irBuilderLiteralFromAst(const AstNode *node) {
+        9:   89:    if (node == NULL) {
+    #####:   90:        return NULL;
+        -:   91:    }
+        -:   92:
+        9:   93:    switch (node->type) {
+        3:   94:        case AST_INT_LITERAL:
+        3:   95:            return irLiteralCreateInt(node->data.int_literal.value);
+        1:   96:        case AST_FLOAT_LITERAL:
+        1:   97:            return irLiteralCreateFloat(node->data.float_literal.value);
+        2:   98:        case AST_STRING_LITERAL: {
+        2:   99:            char *unquoted = irBuilderUnquoteString(node->data.string_literal.value);
+        -:  100:            IRLiteral *literal;
+        -:  101:
+        2:  102:            if (unquoted == NULL) {
+    #####:  103:                return NULL;
+        -:  104:            }
+        -:  105:
+        2:  106:            literal = irLiteralCreateString(unquoted);
+        2:  107:            free(unquoted);
+        2:  108:            return literal;
+        -:  109:        }
+        3:  110:        case AST_BOOL_LITERAL:
+        3:  111:            return irLiteralCreateBool(node->data.bool_literal.value);
+    #####:  112:        default:
+    #####:  113:            return NULL;
+        -:  114:    }
+        -:  115:}
+        -:  116:
+       23:  117:static unsigned int irBuilderNextGlobalId(IRBuilder *builder) {
+       23:  118:    return (unsigned int) builder->module->global_count + 1;
+        -:  119:}
+        -:  120:
+      244:  121:static bool irBuilderAppendInstruction(IRBuilder *builder, IRInstruction *instruction) {
+      244:  122:    if (instruction == NULL) {
+    #####:  123:        return false;
+        -:  124:    }
+        -:  125:
+      244:  126:    if (!irBasicBlockAppendInstruction(builder->current_block, instruction)) {
+    #####:  127:        irInstructionFree(instruction);
+    #####:  128:        return false;
+        -:  129:    }
+        -:  130:
+      244:  131:    return true;
+        -:  132:}
+        -:  133:
+       56:  134:static bool irBuilderCurrentBlockHasTerminator(IRBuilder *builder) {
+        -:  135:    IRInstruction *instruction;
+        -:  136:
+       56:  137:    if (builder == NULL || builder->current_block == NULL || builder->current_block->instruction_count == 0) {
+        7:  138:        return false;
+        -:  139:    }
+        -:  140:
+       49:  141:    instruction = builder->current_block->instructions[builder->current_block->instruction_count - 1];
+       49:  142:    return instruction->kind == IR_INSTR_RET || instruction->kind == IR_INSTR_BR || instruction->kind == IR_INSTR_COND_BR;
+        -:  143:}
+        -:  144:
+      124:  145:static unsigned int irBuilderReserveResult(IRBuilder *builder) {
+      124:  146:    return irFunctionReserveLocalId(builder->current_function);
+        -:  147:}
+        -:  148:
+       62:  149:static IRSymbol *irBuilderLookupLocal(IRBuilder *builder, const char *name) {
+       62:  150:    return irScopeLookup(builder->current_scope, name);
+        -:  151:}
+        -:  152:
+        -:  153:static IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node);
+        -:  154:static IRValue irBuilderLowerLValue(IRBuilder *builder, const AstNode *node);
+        -:  155:
+        4:  156:static size_t irBuilderStringLiteralLength(const char *value) {
+        -:  157:    size_t length;
+        -:  158:
+        4:  159:    if (value == NULL) {
+    #####:  160:        return 0;
+        -:  161:    }
+        -:  162:
+        4:  163:    length = strlen(value);
+       4*:  164:    if (length >= 2 && ((value[0] == '"' && value[length - 1] == '"') || (value[0] == '\'' && value[length - 1] == '\''))) {
+        4:  165:        return length - 2;
+        -:  166:    }
+        -:  167:
+    #####:  168:    return length;
+        -:  169:}
+        -:  170:
+       14:  171:static unsigned int irBuilderAddStringStorage(IRBuilder *builder, const char *value) {
+        -:  172:    IRType *char_type;
+        -:  173:    IRType *array_type;
+        -:  174:    IRLiteral *literal;
+        -:  175:    IRGlobal *global;
+        -:  176:    unsigned int global_id;
+        -:  177:    char name[32];
+        -:  178:    char *unquoted;
+        -:  179:
+       14:  180:    global_id = irBuilderNextGlobalId(builder);
+       14:  181:    snprintf(name, sizeof(name), ".str.%u", global_id);
+        -:  182:
+       14:  183:    unquoted = irBuilderUnquoteString(value);
+       14:  184:    if (unquoted == NULL) {
+    #####:  185:        return 0;
+        -:  186:    }
+        -:  187:
+       14:  188:    char_type = irTypeCreate(IR_TYPE_CHAR);
+       14:  189:    array_type = irTypeCreateSizedArray(char_type, strlen(unquoted) + 1);
+       14:  190:    literal = irLiteralCreateString(unquoted);
+       14:  191:    free(unquoted);
+       14:  192:    global = irGlobalCreate(name, global_id, array_type, literal);
+       14:  193:    if (global == NULL) {
+    #####:  194:        return 0;
+        -:  195:    }
+        -:  196:
+       14:  197:    global->is_constant = true;
+       14:  198:    if (!irModuleAppendGlobal(builder->module, global)) {
+    #####:  199:        irGlobalFree(global);
+    #####:  200:        return 0;
+        -:  201:    }
+        -:  202:
+       14:  203:    return global_id;
+        -:  204:}
+        -:  205:
+        9:  206:static bool irBuilderAppendGlobalSymbol(IRBuilder *builder, const char *name, IRType *type, unsigned int global_id) {
+        9:  207:    IRSymbol *symbol = irSymbolCreateGlobal(name, type, global_id);
+        -:  208:
+        9:  209:    if (symbol == NULL) {
+    #####:  210:        return false;
+        -:  211:    }
+        -:  212:
+        9:  213:    if (!irScopeDeclare(builder->module->global_scope, symbol)) {
+    #####:  214:        irSymbolFree(symbol);
+    #####:  215:        return false;
+        -:  216:    }
+        -:  217:
+        9:  218:    return true;
+        -:  219:}
+        -:  220:
+        9:  221:static bool irBuilderPredeclareGlobal(IRBuilder *builder, const AstNode *node) {
+        9:  222:    IRType *type = irBuilderTypeFromAst(node->data.var_decl.declared_type);
+        9:  223:    IRLiteral *initializer = irBuilderLiteralFromAst(node->data.var_decl.initializer);
+        -:  224:    IRGlobal *global;
+        -:  225:    unsigned int global_id;
+        -:  226:
+        9:  227:    if (type == NULL) {
+    #####:  228:        return false;
+        -:  229:    }
+        -:  230:
+        9:  231:    global_id = irBuilderNextGlobalId(builder);
+        9:  232:    global = irGlobalCreate(node->data.var_decl.name, global_id, type, initializer);
+        9:  233:    if (global == NULL) {
+    #####:  234:        return false;
+        -:  235:    }
+        -:  236:
+        9:  237:    if (node->data.var_decl.initializer != NULL && node->data.var_decl.initializer->type == AST_STRING_LITERAL) {
+        2:  238:        global->storage_global_id = irBuilderAddStringStorage(builder, node->data.var_decl.initializer->data.string_literal.value);
+        2:  239:        global->has_storage_global = global->storage_global_id != 0;
+        -:  240:    }
+        -:  241:
+        9:  242:    if (!irModuleAppendGlobal(builder->module, global)) {
+    #####:  243:        irGlobalFree(global);
+    #####:  244:        return false;
+        -:  245:    }
+        -:  246:
+        9:  247:    return irBuilderAppendGlobalSymbol(builder, node->data.var_decl.name, irTypeClone(global->type), global_id);
+        -:  248:}
+        -:  249:
+       34:  250:static bool irBuilderPopulateFunctionParams(IRFunction *function, const AstNode *node) {
+        -:  251:    size_t i;
+        -:  252:
+       34:  253:    if (node->data.func_decl.param_count == 0) {
+       27:  254:        return true;
+        -:  255:    }
+        -:  256:
+        7:  257:    function->params = calloc(node->data.func_decl.param_count, sizeof(IRParameter));
+        7:  258:    if (function->params == NULL) {
+    #####:  259:        return false;
+        -:  260:    }
+        -:  261:
+        7:  262:    function->param_count = node->data.func_decl.param_count;
+       20:  263:    for (i = 0; i < function->param_count; i++) {
+       13:  264:        function->params[i].name = irBuilderCopyString(node->data.func_decl.params[i]->data.param.name);
+       13:  265:        function->params[i].type = irBuilderTypeFromAst(node->data.func_decl.params[i]->data.param.declared_type);
+       13:  266:        if (function->params[i].name == NULL || function->params[i].type == NULL) {
+    #####:  267:            return false;
+        -:  268:        }
+        -:  269:    }
+        -:  270:
+        7:  271:    return true;
+        -:  272:}
+        -:  273:
+       34:  274:static bool irBuilderPredeclareFunction(IRBuilder *builder, const AstNode *node) {
+       34:  275:    IRType *return_type = irBuilderTypeFromAst(node->data.func_decl.return_type);
+        -:  276:    IRFunction *function;
+       34:  277:    IRType **param_types = NULL;
+        -:  278:    IRSymbol *symbol;
+        -:  279:    size_t i;
+        -:  280:
+       34:  281:    if (return_type == NULL) {
+    #####:  282:        return false;
+        -:  283:    }
+        -:  284:
+       34:  285:    function = irFunctionCreate(node->data.func_decl.name, return_type, builder->module->global_scope);
+       34:  286:    if (function == NULL) {
+    #####:  287:        return false;
+        -:  288:    }
+        -:  289:
+       34:  290:    if (!irBuilderPopulateFunctionParams(function, node)) {
+    #####:  291:        irFunctionFree(function);
+    #####:  292:        return false;
+        -:  293:    }
+        -:  294:
+       34:  295:    if (function->param_count > 0) {
+        7:  296:        param_types = calloc(function->param_count, sizeof(IRType *));
+        7:  297:        if (param_types == NULL) {
+    #####:  298:            irFunctionFree(function);
+    #####:  299:            return false;
+        -:  300:        }
+        -:  301:    }
+        -:  302:
+       47:  303:    for (i = 0; i < function->param_count; i++) {
+       13:  304:        param_types[i] = irTypeClone(function->params[i].type);
+        -:  305:    }
+        -:  306:
+       34:  307:    symbol = irSymbolCreateFunction(function->name, irTypeClone(function->return_type), param_types, function->param_count);
+       47:  308:    for (i = 0; i < function->param_count; i++) {
+       13:  309:        irTypeFree(param_types[i]);
+        -:  310:    }
+       34:  311:    free(param_types);
+        -:  312:
+       34:  313:    if (symbol == NULL) {
+    #####:  314:        irFunctionFree(function);
+    #####:  315:        return false;
+        -:  316:    }
+        -:  317:
+       34:  318:    if (!irScopeDeclare(builder->module->global_scope, symbol)) {
+    #####:  319:        irSymbolFree(symbol);
+    #####:  320:        irFunctionFree(function);
+    #####:  321:        return false;
+        -:  322:    }
+        -:  323:
+       34:  324:    if (!irModuleAppendFunction(builder->module, function)) {
+    #####:  325:        irFunctionFree(function);
+    #####:  326:        return false;
+        -:  327:    }
+        -:  328:
+       34:  329:    return true;
+        -:  330:}
+        -:  331:
+       66:  332:static bool irBuilderDeclareBuiltinFunction(IRBuilder *builder, const char *name, IRType *return_type, IRType **param_types, size_t param_count) {
+       66:  333:    IRSymbol *symbol = irSymbolCreateFunction(name, return_type, param_types, param_count);
+        -:  334:
+       66:  335:    if (symbol == NULL) {
+    #####:  336:        return false;
+        -:  337:    }
+        -:  338:
+       66:  339:    if (!irScopeDeclare(builder->module->global_scope, symbol)) {
+    #####:  340:        irSymbolFree(symbol);
+    #####:  341:        return false;
+        -:  342:    }
+        -:  343:
+       66:  344:    return true;
+        -:  345:}
+        -:  346:
+       33:  347:static bool irBuilderDeclareBuiltinRuntimeFunctions(IRBuilder *builder) {
+        -:  348:    IRType *print_string_params[1];
+        -:  349:    IRType *print_int_params[1];
+        -:  350:
+       33:  351:    print_string_params[0] = irTypeCreate(IR_TYPE_STRING);
+       33:  352:    if (print_string_params[0] == NULL) {
+    #####:  353:        return false;
+        -:  354:    }
+       33:  355:    if (!irBuilderDeclareBuiltinFunction(builder, "printString", irTypeCreate(IR_TYPE_VOID), print_string_params, 1)) {
+    #####:  356:        irTypeFree(print_string_params[0]);
+    #####:  357:        return false;
+        -:  358:    }
+       33:  359:    irTypeFree(print_string_params[0]);
+        -:  360:
+       33:  361:    print_int_params[0] = irTypeCreate(IR_TYPE_INT);
+       33:  362:    if (print_int_params[0] == NULL) {
+    #####:  363:        return false;
+        -:  364:    }
+       33:  365:    if (!irBuilderDeclareBuiltinFunction(builder, "printInt", irTypeCreate(IR_TYPE_VOID), print_int_params, 1)) {
+    #####:  366:        irTypeFree(print_int_params[0]);
+    #####:  367:        return false;
+        -:  368:    }
+       33:  369:    irTypeFree(print_int_params[0]);
+        -:  370:
+       33:  371:    return true;
+        -:  372:}
+        -:  373:
+      392:  374:static bool irBuilderCollectStringLiterals(IRBuilder *builder, const AstNode *node) {
+        -:  375:    size_t i;
+        -:  376:
+      392:  377:    if (node == NULL) {
+       15:  378:        return true;
+        -:  379:    }
+        -:  380:
+      377:  381:    switch (node->type) {
+       33:  382:        case AST_PROGRAM:
+       76:  383:            for (i = 0; i < node->data.program.count; i++) {
+       43:  384:                if (!irBuilderCollectStringLiterals(builder, node->data.program.items[i])) {
+    #####:  385:                    return false;
+        -:  386:                }
+        -:  387:            }
+       33:  388:            return true;
+       46:  389:        case AST_BLOCK:
+      128:  390:            for (i = 0; i < node->data.block.count; i++) {
+       82:  391:                if (!irBuilderCollectStringLiterals(builder, node->data.block.items[i])) {
+    #####:  392:                    return false;
+        -:  393:                }
+        -:  394:            }
+       46:  395:            return true;
+       24:  396:        case AST_VAR_DECL:
+       24:  397:            return irBuilderCollectStringLiterals(builder, node->data.var_decl.initializer);
+       34:  398:        case AST_FUNC_DECL:
+       34:  399:            return irBuilderCollectStringLiterals(builder, node->data.func_decl.body);
+        6:  400:        case AST_IF:
+        6:  401:            return irBuilderCollectStringLiterals(builder, node->data.if_stmt.condition)
+        6:  402:                && irBuilderCollectStringLiterals(builder, node->data.if_stmt.then_branch)
+      12*:  403:                && irBuilderCollectStringLiterals(builder, node->data.if_stmt.else_branch);
+        2:  404:        case AST_WHILE:
+        2:  405:            return irBuilderCollectStringLiterals(builder, node->data.while_stmt.condition)
+       2*:  406:                && irBuilderCollectStringLiterals(builder, node->data.while_stmt.body);
+        2:  407:        case AST_FOR:
+        2:  408:            return irBuilderCollectStringLiterals(builder, node->data.for_stmt.init)
+        2:  409:                && irBuilderCollectStringLiterals(builder, node->data.for_stmt.condition)
+        2:  410:                && irBuilderCollectStringLiterals(builder, node->data.for_stmt.update)
+       4*:  411:                && irBuilderCollectStringLiterals(builder, node->data.for_stmt.body);
+       39:  412:        case AST_RETURN:
+       39:  413:            return irBuilderCollectStringLiterals(builder, node->data.return_stmt.value);
+       10:  414:        case AST_EXPR_STMT:
+       10:  415:            return irBuilderCollectStringLiterals(builder, node->data.expr_stmt.expression);
+       12:  416:        case AST_ASSIGN:
+       12:  417:            return irBuilderCollectStringLiterals(builder, node->data.assign.target)
+      12*:  418:                && irBuilderCollectStringLiterals(builder, node->data.assign.value);
+       15:  419:        case AST_BINARY:
+       15:  420:            return irBuilderCollectStringLiterals(builder, node->data.binary.left)
+      15*:  421:                && irBuilderCollectStringLiterals(builder, node->data.binary.right);
+    #####:  422:        case AST_UNARY:
+    #####:  423:            return irBuilderCollectStringLiterals(builder, node->data.unary.operand);
+       13:  424:        case AST_CALL:
+       13:  425:            if (!irBuilderCollectStringLiterals(builder, node->data.call.callee)) {
+    #####:  426:                return false;
+        -:  427:            }
+       28:  428:            for (i = 0; i < node->data.call.arg_count; i++) {
+       15:  429:                if (!irBuilderCollectStringLiterals(builder, node->data.call.args[i])) {
+    #####:  430:                    return false;
+        -:  431:                }
+        -:  432:            }
+       13:  433:            return true;
+        3:  434:        case AST_ARRAY_ACCESS:
+        3:  435:            if (!irBuilderCollectStringLiterals(builder, node->data.array_access.base)) {
+    #####:  436:                return false;
+        -:  437:            }
+        6:  438:            for (i = 0; i < node->data.array_access.index_count; i++) {
+        3:  439:                if (!irBuilderCollectStringLiterals(builder, node->data.array_access.indices[i])) {
+    #####:  440:                    return false;
+        -:  441:                }
+        -:  442:            }
+        3:  443:            return true;
+        3:  444:        case AST_ARRAY_LITERAL:
+       12:  445:            for (i = 0; i < node->data.array_literal.count; i++) {
+        9:  446:                if (!irBuilderCollectStringLiterals(builder, node->data.array_literal.elements[i])) {
+    #####:  447:                    return false;
+        -:  448:                }
+        -:  449:            }
+        3:  450:            return true;
+        8:  451:        case AST_STRING_LITERAL:
+        8:  452:            return irBuilderAddStringStorage(builder, node->data.string_literal.value) != 0;
+      127:  453:        default:
+      127:  454:            return true;
+        -:  455:    }
+        -:  456:}
+        -:  457:
+       13:  458:static bool irBuilderMaterializeParameter(IRBuilder *builder, IRFunction *function, const IRParameter *parameter, size_t index) {
+       13:  459:    IRType *value_type = irTypeClone(parameter->type);
+       13:  460:    IRType *pointer_type = irTypeCreatePointer(irTypeClone(parameter->type));
+        -:  461:    IRInstruction *alloca_instr;
+        -:  462:    IRInstruction *store_instr;
+        -:  463:    IRSymbol *symbol;
+        -:  464:    unsigned int slot_id;
+        -:  465:
+       13:  466:    if (value_type == NULL || pointer_type == NULL) {
+    #####:  467:        irTypeFree(value_type);
+    #####:  468:        irTypeFree(pointer_type);
+    #####:  469:        return false;
+        -:  470:    }
+        -:  471:
+       13:  472:    slot_id = irBuilderReserveResult(builder);
+       13:  473:    alloca_instr = irInstructionCreate(IR_INSTR_ALLOCA);
+       13:  474:    store_instr = irInstructionCreate(IR_INSTR_STORE);
+       13:  475:    if (alloca_instr == NULL || store_instr == NULL) {
+    #####:  476:        irInstructionFree(alloca_instr);
+    #####:  477:        irInstructionFree(store_instr);
+    #####:  478:        irTypeFree(value_type);
+    #####:  479:        irTypeFree(pointer_type);
+    #####:  480:        return false;
+        -:  481:    }
+        -:  482:
+       13:  483:    alloca_instr->has_result = true;
+       13:  484:    alloca_instr->result_id = slot_id;
+       13:  485:    alloca_instr->result_type = pointer_type;
+       13:  486:    alloca_instr->data.alloca.allocated_type = irTypeClone(parameter->type);
+        -:  487:
+       13:  488:    store_instr->data.store.address = irOperandCreateLocal(irTypeClone(alloca_instr->result_type), slot_id);
+       13:  489:    store_instr->data.store.value = irOperandCreateParam(value_type, (unsigned int) index + 1);
+        -:  490:
+       13:  491:    symbol = irSymbolCreateLocal(parameter->name, irTypeClone(alloca_instr->result_type), slot_id);
+       13:  492:    if (symbol == NULL || !irScopeDeclare(function->scope, symbol)) {
+    #####:  493:        irInstructionFree(alloca_instr);
+    #####:  494:        irInstructionFree(store_instr);
+    #####:  495:        if (symbol != NULL) {
+    #####:  496:            irSymbolFree(symbol);
+        -:  497:        }
+    #####:  498:        return false;
+        -:  499:    }
+        -:  500:
+      13*:  501:    return irBuilderAppendInstruction(builder, alloca_instr) && irBuilderAppendInstruction(builder, store_instr);
+        -:  502:}
+        -:  503:
+       57:  504:static IRValue irBuilderLiteralValue(IRTypeKind kind, IRLiteral *literal) {
+       57:  505:    IRValue result = irValueEmpty();
+       57:  506:    IRType *type = irTypeCreate(kind);
+        -:  507:
+       57:  508:    if (type == NULL || literal == NULL) {
+    #####:  509:        irTypeFree(type);
+    #####:  510:        irLiteralFree(literal);
+    #####:  511:        return result;
+        -:  512:    }
+        -:  513:
+       57:  514:    result.type = irTypeClone(type);
+       57:  515:    result.value = irOperandCreateLiteral(type, literal);
+       57:  516:    result.has_value = true;
+       57:  517:    return result;
+        -:  518:}
+        -:  519:
+       50:  520:static IRValue irBuilderEmitLoad(IRBuilder *builder, IROperand address, IRType *value_type) {
+       50:  521:    IRValue result = irValueEmpty();
+       50:  522:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_LOAD);
+        -:  523:    unsigned int result_id;
+        -:  524:
+       50:  525:    if (instruction == NULL || value_type == NULL) {
+    #####:  526:        irInstructionFree(instruction);
+    #####:  527:        irTypeFree(value_type);
+    #####:  528:        return result;
+        -:  529:    }
+        -:  530:
+       50:  531:    result_id = irBuilderReserveResult(builder);
+       50:  532:    instruction->has_result = true;
+       50:  533:    instruction->result_id = result_id;
+       50:  534:    instruction->result_type = irTypeClone(value_type);
+       50:  535:    instruction->data.load.address = address;
+        -:  536:
+       50:  537:    if (!irBuilderAppendInstruction(builder, instruction)) {
+    #####:  538:        irTypeFree(value_type);
+    #####:  539:        return result;
+        -:  540:    }
+        -:  541:
+       50:  542:    result.type = value_type;
+       50:  543:    result.value = irOperandCreateLocal(irTypeClone(value_type), result_id);
+       50:  544:    result.has_value = true;
+       50:  545:    return result;
+        -:  546:}
+        -:  547:
+       27:  548:static IRValue irBuilderEmitBinary(IRBuilder *builder, IRInstructionKind kind, IROperand left, IROperand right, IRType *type) {
+       27:  549:    IRValue result = irValueEmpty();
+       27:  550:    IRInstruction *instruction = irInstructionCreate(kind);
+        -:  551:    unsigned int result_id;
+        -:  552:
+       27:  553:    if (instruction == NULL || type == NULL) {
+    #####:  554:        irInstructionFree(instruction);
+    #####:  555:        irOperandFree(&left);
+    #####:  556:        irOperandFree(&right);
+    #####:  557:        irTypeFree(type);
+    #####:  558:        return result;
+        -:  559:    }
+        -:  560:
+       27:  561:    result_id = irBuilderReserveResult(builder);
+       27:  562:    instruction->has_result = true;
+       27:  563:    instruction->result_id = result_id;
+       27:  564:    instruction->result_type = irTypeClone(type);
+       27:  565:    instruction->data.binary.left = left;
+       27:  566:    instruction->data.binary.right = right;
+        -:  567:
+       27:  568:    if (!irBuilderAppendInstruction(builder, instruction)) {
+    #####:  569:        irTypeFree(type);
+    #####:  570:        return result;
+        -:  571:    }
+        -:  572:
+       27:  573:    result.type = type;
+       27:  574:    result.value = irOperandCreateLocal(irTypeClone(type), result_id);
+       27:  575:    result.has_value = true;
+       27:  576:    return result;
+        -:  577:}
+        -:  578:
+       16:  579:static IRValue irBuilderEmitGep(IRBuilder *builder, IROperand base, IROperand *indices, size_t index_count, IRType *result_type) {
+       16:  580:    IRValue result = irValueEmpty();
+       16:  581:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_GEP);
+        -:  582:    unsigned int result_id;
+        -:  583:
+       16:  584:    if (instruction == NULL || result_type == NULL) {
+    #####:  585:        irInstructionFree(instruction);
+    #####:  586:        irOperandFree(&base);
+    #####:  587:        free(indices);
+    #####:  588:        irTypeFree(result_type);
+    #####:  589:        return result;
+        -:  590:    }
+        -:  591:
+       16:  592:    result_id = irBuilderReserveResult(builder);
+       16:  593:    instruction->has_result = true;
+       16:  594:    instruction->result_id = result_id;
+       16:  595:    instruction->result_type = irTypeCreatePointer(irTypeClone(result_type));
+       16:  596:    instruction->data.gep.base = base;
+       16:  597:    instruction->data.gep.indices = indices;
+       16:  598:    instruction->data.gep.index_count = index_count;
+        -:  599:
+       16:  600:    if (!irBuilderAppendInstruction(builder, instruction)) {
+    #####:  601:        irTypeFree(result_type);
+    #####:  602:        return result;
+        -:  603:    }
+        -:  604:
+       16:  605:    result.type = result_type;
+       16:  606:    result.address = irOperandCreateLocal(irTypeClone(instruction->result_type), result_id);
+       16:  607:    result.has_address = true;
+       16:  608:    return result;
+        -:  609:}
+        -:  610:
+       14:  611:static bool irBuilderEmitBranch(IRBuilder *builder, IRBasicBlock *target) {
+       14:  612:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_BR);
+        -:  613:
+       14:  614:    if (instruction == NULL) {
+    #####:  615:        return false;
+        -:  616:    }
+        -:  617:
+       14:  618:    instruction->data.br.target_block_id = target->id;
+       14:  619:    return irBuilderAppendInstruction(builder, instruction);
+        -:  620:}
+        -:  621:
+       10:  622:static bool irBuilderEmitCondBranch(IRBuilder *builder, IROperand condition, IRBasicBlock *then_block, IRBasicBlock *else_block) {
+       10:  623:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_COND_BR);
+        -:  624:
+       10:  625:    if (instruction == NULL) {
+    #####:  626:        irOperandFree(&condition);
+    #####:  627:        return false;
+        -:  628:    }
+        -:  629:
+       10:  630:    instruction->data.cond_br.condition = condition;
+       10:  631:    instruction->data.cond_br.then_block_id = then_block->id;
+       10:  632:    instruction->data.cond_br.else_block_id = else_block->id;
+       10:  633:    return irBuilderAppendInstruction(builder, instruction);
+        -:  634:}
+        -:  635:
+       31:  636:static bool irBuilderEmitStore(IRBuilder *builder, IROperand address, IROperand value) {
+       31:  637:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_STORE);
+        -:  638:
+       31:  639:    if (instruction == NULL) {
+    #####:  640:        irOperandFree(&address);
+    #####:  641:        irOperandFree(&value);
+    #####:  642:        return false;
+        -:  643:    }
+        -:  644:
+       31:  645:    instruction->data.store.address = address;
+       31:  646:    instruction->data.store.value = value;
+       31:  647:    return irBuilderAppendInstruction(builder, instruction);
+        -:  648:}
+        -:  649:
+       62:  650:static IRValue irBuilderLowerIdentifier(IRBuilder *builder, const AstNode *node) {
+       62:  651:    IRSymbol *symbol = irBuilderLookupLocal(builder, node->data.identifier.name);
+       62:  652:    IRValue result = irValueEmpty();
+        -:  653:
+       62:  654:    if (symbol == NULL || symbol->type == NULL) {
+    #####:  655:        return result;
+        -:  656:    }
+        -:  657:
+       62:  658:    if (symbol->kind == IR_SYMBOL_LOCAL && symbol->type->kind == IR_TYPE_POINTER) {
+       51:  659:        result.type = irTypeClone(symbol->type->element_type);
+       51:  660:        result.address = irOperandCreateLocal(irTypeClone(symbol->type), symbol->data.local_id);
+       51:  661:        result.has_address = true;
+       51:  662:        return result;
+        -:  663:    }
+        -:  664:
+       11:  665:    if (symbol->kind == IR_SYMBOL_GLOBAL) {
+       11:  666:        IRType *value_type = irTypeClone(symbol->type);
+        -:  667:        IRType *pointer_type;
+        -:  668:
+       11:  669:        if (value_type == NULL) {
+    #####:  670:            return result;
+        -:  671:        }
+        -:  672:
+       11:  673:        pointer_type = irTypeCreatePointer(irTypeClone(symbol->type));
+       11:  674:        if (pointer_type == NULL) {
+    #####:  675:            irTypeFree(value_type);
+    #####:  676:            return result;
+        -:  677:        }
+        -:  678:
+       11:  679:        result.type = value_type;
+       11:  680:        result.address = irOperandCreateGlobal(pointer_type, symbol->data.global_id);
+       11:  681:        result.has_address = true;
+       11:  682:        return result;
+        -:  683:    }
+        -:  684:
+    #####:  685:    return result;
+        -:  686:}
+        -:  687:
+        3:  688:static IRValue irBuilderLowerArrayAccess(IRBuilder *builder, const AstNode *node) {
+        3:  689:    IRValue base = irBuilderLowerLValue(builder, node->data.array_access.base);
+        -:  690:    IRValue index_value;
+        -:  691:    IROperand *indices;
+        -:  692:
+        3:  693:    if (!base.has_address || base.type == NULL || base.type->kind != IR_TYPE_ARRAY || node->data.array_access.index_count != 1) {
+    #####:  694:        irTypeFree(base.type);
+    #####:  695:        if (base.has_address) {
+    #####:  696:            irOperandFree(&base.address);
+        -:  697:        }
+    #####:  698:        return irValueEmpty();
+        -:  699:    }
+        -:  700:
+        3:  701:    index_value = irBuilderLowerRValue(builder, node->data.array_access.indices[0]);
+        3:  702:    if (!index_value.has_value) {
+    #####:  703:        irTypeFree(base.type);
+    #####:  704:        irOperandFree(&base.address);
+    #####:  705:        return irValueEmpty();
+        -:  706:    }
+        -:  707:
+        3:  708:    indices = calloc(2, sizeof(IROperand));
+        3:  709:    if (indices == NULL) {
+    #####:  710:        irTypeFree(base.type);
+    #####:  711:        irOperandFree(&base.address);
+    #####:  712:        irOperandFree(&index_value.value);
+    #####:  713:        irTypeFree(index_value.type);
+    #####:  714:        return irValueEmpty();
+        -:  715:    }
+        -:  716:
+        3:  717:    indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+        3:  718:    indices[1] = index_value.value;
+        3:  719:    irTypeFree(index_value.type);
+        -:  720:
+        3:  721:    return irBuilderEmitGep(builder, base.address, indices, 2, irTypeClone(base.type->element_type));
+        -:  722:}
+        -:  723:
+       27:  724:static IRValue irBuilderLowerLValue(IRBuilder *builder, const AstNode *node) {
+       27:  725:    if (node == NULL) {
+    #####:  726:        return irValueEmpty();
+        -:  727:    }
+        -:  728:
+       27:  729:    if (node->type == AST_IDENTIFIER) {
+       27:  730:        return irBuilderLowerIdentifier(builder, node);
+        -:  731:    }
+        -:  732:
+    #####:  733:    if (node->type == AST_ARRAY_ACCESS) {
+    #####:  734:        return irBuilderLowerArrayAccess(builder, node);
+        -:  735:    }
+        -:  736:
+    #####:  737:    return irValueEmpty();
+        -:  738:}
+        -:  739:
+      127:  740:static IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node) {
+      127:  741:    IRValue result = irValueEmpty();
+        -:  742:    IRValue left;
+        -:  743:    IRValue right;
+        -:  744:    IRValue binary_result;
+        -:  745:
+      127:  746:    if (node == NULL) {
+    #####:  747:        return result;
+        -:  748:    }
+        -:  749:
+      127:  750:    switch (node->type) {
+       57:  751:        case AST_INT_LITERAL:
+       57:  752:            return irBuilderLiteralValue(IR_TYPE_INT, irLiteralCreateInt(node->data.int_literal.value));
+    #####:  753:        case AST_FLOAT_LITERAL:
+    #####:  754:            return irBuilderLiteralValue(IR_TYPE_FLOAT, irLiteralCreateFloat(node->data.float_literal.value));
+    #####:  755:        case AST_BOOL_LITERAL:
+    #####:  756:            return irBuilderLiteralValue(IR_TYPE_BOOL, irLiteralCreateBool(node->data.bool_literal.value));
+        4:  757:        case AST_STRING_LITERAL: {
+        4:  758:            unsigned int global_id = irBuilderAddStringStorage(builder, node->data.string_literal.value);
+        -:  759:            IRType *char_type;
+        -:  760:            IRType *array_type;
+        -:  761:            IRType *pointer_type;
+        -:  762:            IROperand base;
+        -:  763:            IROperand *indices;
+        -:  764:            IRValue address_value;
+        -:  765:
+        4:  766:            if (global_id == 0) {
+    #####:  767:                return irValueEmpty();
+        -:  768:            }
+        -:  769:
+        4:  770:            char_type = irTypeCreate(IR_TYPE_CHAR);
+        4:  771:            array_type = irTypeCreateSizedArray(char_type, irBuilderStringLiteralLength(node->data.string_literal.value) + 1);
+        4:  772:            pointer_type = irTypeCreatePointer(irTypeClone(array_type));
+        4:  773:            if (array_type == NULL || pointer_type == NULL) {
+    #####:  774:                irTypeFree(array_type);
+    #####:  775:                irTypeFree(pointer_type);
+    #####:  776:                return irValueEmpty();
+        -:  777:            }
+        -:  778:
+        4:  779:            indices = calloc(2, sizeof(IROperand));
+        4:  780:            if (indices == NULL) {
+    #####:  781:                irTypeFree(array_type);
+    #####:  782:                irTypeFree(pointer_type);
+    #####:  783:                return irValueEmpty();
+        -:  784:            }
+        -:  785:
+        4:  786:            base = irOperandCreateGlobal(pointer_type, global_id);
+        4:  787:            indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+        4:  788:            indices[1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+        4:  789:            address_value = irBuilderEmitGep(builder, base, indices, 2, irTypeCreate(IR_TYPE_CHAR));
+        4:  790:            irTypeFree(array_type);
+        -:  791:
+        4:  792:            if (!address_value.has_address) {
+    #####:  793:                return irValueEmpty();
+        -:  794:            }
+        -:  795:
+        4:  796:            result.type = irTypeCreate(IR_TYPE_STRING);
+        4:  797:            result.value = address_value.address;
+        4:  798:            result.has_value = true;
+        4:  799:            return result;
+        -:  800:        }
+       35:  801:        case AST_IDENTIFIER:
+       35:  802:            result = irBuilderLowerIdentifier(builder, node);
+       35:  803:            if (!result.has_address || result.type == NULL) {
+    #####:  804:                return irValueEmpty();
+        -:  805:            }
+       35:  806:            return irBuilderEmitLoad(builder, result.address, result.type);
+        3:  807:        case AST_ARRAY_ACCESS:
+        3:  808:            result = irBuilderLowerArrayAccess(builder, node);
+        3:  809:            if (!result.has_address || result.type == NULL) {
+    #####:  810:                return irValueEmpty();
+        -:  811:            }
+        3:  812:            return irBuilderEmitLoad(builder, result.address, result.type);
+       13:  813:        case AST_CALL: {
+        -:  814:            IRSymbol *callee;
+       13:  815:            IROperand *args = NULL;
+        -:  816:            size_t i;
+        -:  817:            IRInstruction *instruction;
+       13:  818:            unsigned int result_id = 0;
+        -:  819:
+       13:  820:            if (node->data.call.callee->type != AST_IDENTIFIER) {
+    #####:  821:                return irValueEmpty();
+        -:  822:            }
+        -:  823:
+       13:  824:            callee = irScopeLookup(builder->module->global_scope, node->data.call.callee->data.identifier.name);
+       13:  825:            if (callee == NULL) {
+    #####:  826:                return irValueEmpty();
+        -:  827:            }
+        -:  828:
+       13:  829:            if (node->data.call.arg_count > 0) {
+       13:  830:                args = calloc(node->data.call.arg_count, sizeof(IROperand));
+       13:  831:                if (args == NULL) {
+    #####:  832:                    return irValueEmpty();
+        -:  833:                }
+        -:  834:            }
+        -:  835:
+       28:  836:            for (i = 0; i < node->data.call.arg_count; i++) {
+       15:  837:                IRValue arg = irBuilderLowerRValue(builder, node->data.call.args[i]);
+       15:  838:                if (!arg.has_value) {
+    #####:  839:                    free(args);
+    #####:  840:                    return irValueEmpty();
+        -:  841:                }
+        -:  842:
+       15:  843:                args[i] = arg.value;
+       15:  844:                irTypeFree(arg.type);
+        -:  845:            }
+        -:  846:
+       13:  847:            instruction = irInstructionCreate(IR_INSTR_CALL);
+       13:  848:            if (instruction == NULL) {
+    #####:  849:                for (i = 0; i < node->data.call.arg_count; i++) {
+    #####:  850:                    irOperandFree(&args[i]);
+        -:  851:                }
+    #####:  852:                free(args);
+    #####:  853:                return irValueEmpty();
+        -:  854:            }
+        -:  855:
+       13:  856:            instruction->data.call.callee = irBuilderCopyString(node->data.call.callee->data.identifier.name);
+       13:  857:            instruction->data.call.args = args;
+       13:  858:            instruction->data.call.arg_count = node->data.call.arg_count;
+       13:  859:            if (callee->type != NULL && callee->type->kind != IR_TYPE_VOID) {
+        3:  860:                result_id = irBuilderReserveResult(builder);
+        3:  861:                instruction->has_result = true;
+        3:  862:                instruction->result_id = result_id;
+        3:  863:                instruction->result_type = irTypeClone(callee->type);
+        -:  864:            }
+        -:  865:
+       13:  866:            if (!irBuilderAppendInstruction(builder, instruction)) {
+    #####:  867:                return irValueEmpty();
+        -:  868:            }
+        -:  869:
+       13:  870:            if (callee->type != NULL && callee->type->kind != IR_TYPE_VOID) {
+        3:  871:                result.type = irTypeClone(callee->type);
+        3:  872:                result.value = irOperandCreateLocal(irTypeClone(callee->type), result_id);
+        3:  873:                result.has_value = true;
+        -:  874:            }
+        -:  875:
+       13:  876:            return result;
+        -:  877:        }
+       15:  878:        case AST_BINARY:
+       15:  879:            left = irBuilderLowerRValue(builder, node->data.binary.left);
+       15:  880:            right = irBuilderLowerRValue(builder, node->data.binary.right);
+       15:  881:            if (!left.has_value || !right.has_value || left.type == NULL) {
+    #####:  882:                irTypeFree(left.type);
+    #####:  883:                irTypeFree(right.type);
+    #####:  884:                return irValueEmpty();
+        -:  885:            }
+        -:  886:
+       15:  887:            switch (node->data.binary.op) {
+        5:  888:                case AST_BINARY_ADD:
+        5:  889:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_ADD, left.value, right.value, left.type);
+        5:  890:                    irTypeFree(right.type);
+        5:  891:                    return binary_result;
+        1:  892:                case AST_BINARY_SUB:
+        1:  893:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_SUB, left.value, right.value, left.type);
+        1:  894:                    irTypeFree(right.type);
+        1:  895:                    return binary_result;
+        1:  896:                case AST_BINARY_MUL:
+        1:  897:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_MUL, left.value, right.value, left.type);
+        1:  898:                    irTypeFree(right.type);
+        1:  899:                    return binary_result;
+        1:  900:                case AST_BINARY_DIV:
+        1:  901:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_DIV, left.value, right.value, left.type);
+        1:  902:                    irTypeFree(right.type);
+        1:  903:                    return binary_result;
+        3:  904:                case AST_BINARY_GT:
+        3:  905:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_GT, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+        3:  906:                    irTypeFree(left.type);
+        3:  907:                    irTypeFree(right.type);
+        3:  908:                    return binary_result;
+        2:  909:                case AST_BINARY_LT:
+        2:  910:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_LT, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+        2:  911:                    irTypeFree(left.type);
+        2:  912:                    irTypeFree(right.type);
+        2:  913:                    return binary_result;
+        2:  914:                case AST_BINARY_LTE:
+        2:  915:                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_LE, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+        2:  916:                    irTypeFree(left.type);
+        2:  917:                    irTypeFree(right.type);
+        2:  918:                    return binary_result;
+    #####:  919:                default:
+    #####:  920:                    irOperandFree(&left.value);
+    #####:  921:                    irOperandFree(&right.value);
+    #####:  922:                    irTypeFree(left.type);
+    #####:  923:                    irTypeFree(right.type);
+    #####:  924:                    return irValueEmpty();
+        -:  925:            }
+    #####:  926:        default:
+    #####:  927:            return result;
+        -:  928:    }
+        -:  929:}
+        -:  930:
+       15:  931:static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
+       15:  932:    IRType *value_type = irBuilderTypeFromAst(node->data.var_decl.declared_type);
+        -:  933:    IRType *pointer_type;
+        -:  934:    IRInstruction *alloca_instr;
+        -:  935:    IRSymbol *symbol;
+        -:  936:    unsigned int slot_id;
+        -:  937:
+       15:  938:    if (value_type == NULL) {
+    #####:  939:        return false;
+        -:  940:    }
+        -:  941:
+       15:  942:    pointer_type = irTypeCreatePointer(irTypeClone(value_type));
+       15:  943:    if (pointer_type == NULL) {
+    #####:  944:        irTypeFree(value_type);
+    #####:  945:        return false;
+        -:  946:    }
+        -:  947:
+       15:  948:    slot_id = irBuilderReserveResult(builder);
+       15:  949:    alloca_instr = irInstructionCreate(IR_INSTR_ALLOCA);
+       15:  950:    if (alloca_instr == NULL) {
+    #####:  951:        irTypeFree(value_type);
+    #####:  952:        irTypeFree(pointer_type);
+    #####:  953:        return false;
+        -:  954:    }
+        -:  955:
+       15:  956:    alloca_instr->has_result = true;
+       15:  957:    alloca_instr->result_id = slot_id;
+       15:  958:    alloca_instr->result_type = pointer_type;
+       15:  959:    alloca_instr->data.alloca.allocated_type = irTypeClone(value_type);
+        -:  960:
+       15:  961:    symbol = irSymbolCreateLocal(node->data.var_decl.name, irTypeClone(pointer_type), slot_id);
+       15:  962:    if (symbol == NULL || !irScopeDeclare(builder->current_scope, symbol)) {
+    #####:  963:        irInstructionFree(alloca_instr);
+    #####:  964:        irTypeFree(value_type);
+    #####:  965:        if (symbol != NULL) {
+    #####:  966:            irSymbolFree(symbol);
+        -:  967:        }
+    #####:  968:        return false;
+        -:  969:    }
+        -:  970:
+       15:  971:    if (!irBuilderAppendInstruction(builder, alloca_instr)) {
+    #####:  972:        irTypeFree(value_type);
+    #####:  973:        return false;
+        -:  974:    }
+        -:  975:
+       18:  976:    if (node->data.var_decl.initializer != NULL && value_type->kind == IR_TYPE_ARRAY && node->data.var_decl.initializer->type == AST_ARRAY_LITERAL) {
+        -:  977:        size_t i;
+        -:  978:
+       12:  979:        for (i = 0; i < node->data.var_decl.initializer->data.array_literal.count; i++) {
+        9:  980:            IROperand *indices = calloc(2, sizeof(IROperand));
+        -:  981:            IRValue slot;
+        -:  982:            IRValue initializer;
+        -:  983:
+        9:  984:            if (indices == NULL) {
+    #####:  985:                irTypeFree(value_type);
+    #####:  986:                return false;
+        -:  987:            }
+        -:  988:
+        9:  989:            indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+        9:  990:            indices[1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt((long) i));
+        9:  991:            slot = irBuilderEmitGep(
+        -:  992:                builder,
+        -:  993:                irOperandCreateLocal(irTypeClone(pointer_type), slot_id),
+        -:  994:                indices,
+        -:  995:                2,
+        9:  996:                irTypeClone(value_type->element_type)
+        -:  997:            );
+        9:  998:            initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer->data.array_literal.elements[i]);
+        9:  999:            if (!slot.has_address || !initializer.has_value) {
+    #####: 1000:                irTypeFree(value_type);
+    #####: 1001:                return false;
+        -: 1002:            }
+        -: 1003:
+        9: 1004:            if (!irBuilderEmitStore(builder, slot.address, initializer.value)) {
+    #####: 1005:                irTypeFree(slot.type);
+    #####: 1006:                irTypeFree(initializer.type);
+    #####: 1007:                irTypeFree(value_type);
+    #####: 1008:                return false;
+        -: 1009:            }
+        -: 1010:
+        9: 1011:            irTypeFree(slot.type);
+        9: 1012:            irTypeFree(initializer.type);
+        -: 1013:        }
+       12: 1014:    } else if (node->data.var_decl.initializer != NULL && value_type->kind != IR_TYPE_STRING) {
+       10: 1015:        IRValue initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer);
+        -: 1016:
+       10: 1017:        if (!initializer.has_value) {
+    #####: 1018:            irTypeFree(value_type);
+    #####: 1019:            return false;
+        -: 1020:        }
+        -: 1021:
+       10: 1022:        if (!irBuilderEmitStore(
+        -: 1023:                builder,
+        -: 1024:                irOperandCreateLocal(irTypeClone(pointer_type), slot_id),
+        -: 1025:                initializer.value)) {
+    #####: 1026:            irTypeFree(initializer.type);
+    #####: 1027:            irTypeFree(value_type);
+    #####: 1028:            return false;
+        -: 1029:        }
+        -: 1030:
+       10: 1031:        irTypeFree(initializer.type);
+        -: 1032:    }
+        -: 1033:
+       15: 1034:    irTypeFree(value_type);
+       15: 1035:    return true;
+        -: 1036:}
+        -: 1037:
+       12: 1038:static bool irBuilderLowerAssign(IRBuilder *builder, const AstNode *node) {
+       12: 1039:    IRValue target = irBuilderLowerLValue(builder, node->data.assign.target);
+        -: 1040:    IRValue rhs;
+        -: 1041:
+       12: 1042:    if (!target.has_address || target.type == NULL) {
+    #####: 1043:        return false;
+        -: 1044:    }
+        -: 1045:
+       12: 1046:    if (node->data.assign.op == AST_ASSIGN_SET) {
+    #####: 1047:        rhs = irBuilderLowerRValue(builder, node->data.assign.value);
+    #####: 1048:        if (!rhs.has_value) {
+    #####: 1049:            irTypeFree(target.type);
+    #####: 1050:            irOperandFree(&target.address);
+    #####: 1051:            return false;
+        -: 1052:        }
+        -: 1053:
+    #####: 1054:        irTypeFree(target.type);
+    #####: 1055:        if (!irBuilderEmitStore(builder, target.address, rhs.value)) {
+    #####: 1056:            irTypeFree(rhs.type);
+    #####: 1057:            return false;
+        -: 1058:        }
+        -: 1059:
+    #####: 1060:        irTypeFree(rhs.type);
+    #####: 1061:        return true;
+        -: 1062:    }
+        -: 1063:
+        -: 1064:    {
+       12: 1065:        IRValue current = irBuilderEmitLoad(builder, target.address, target.type);
+       12: 1066:        IRValue value = irBuilderLowerRValue(builder, node->data.assign.value);
+        -: 1067:        IRValue computed;
+        -: 1068:        IRValue target_again;
+        -: 1069:
+       12: 1070:        if (!current.has_value || !value.has_value) {
+    #####: 1071:            irTypeFree(value.type);
+    #####: 1072:            return false;
+        -: 1073:        }
+        -: 1074:
+       12: 1075:        computed = irBuilderEmitBinary(
+        -: 1076:            builder,
+       12: 1077:            node->data.assign.op == AST_ASSIGN_ADD ? IR_INSTR_ADD : IR_INSTR_SUB,
+        -: 1078:            current.value,
+        -: 1079:            value.value,
+        -: 1080:            current.type
+        -: 1081:        );
+        -: 1082:
+       12: 1083:        if (!computed.has_value) {
+    #####: 1084:            irTypeFree(value.type);
+    #####: 1085:            return false;
+        -: 1086:        }
+        -: 1087:
+       12: 1088:        target_again = irBuilderLowerLValue(builder, node->data.assign.target);
+       12: 1089:        if (!target_again.has_address) {
+    #####: 1090:            irTypeFree(value.type);
+    #####: 1091:            irTypeFree(computed.type);
+    #####: 1092:            return false;
+        -: 1093:        }
+        -: 1094:
+       12: 1095:        if (!irBuilderEmitStore(builder, target_again.address, computed.value)) {
+    #####: 1096:            irTypeFree(target_again.type);
+    #####: 1097:            irTypeFree(value.type);
+    #####: 1098:            irTypeFree(computed.type);
+    #####: 1099:            return false;
+        -: 1100:        }
+        -: 1101:
+       12: 1102:        irTypeFree(target_again.type);
+       12: 1103:        irTypeFree(value.type);
+       12: 1104:        irTypeFree(computed.type);
+       12: 1105:        return true;
+        -: 1106:    }
+        -: 1107:}
+        -: 1108:
+       39: 1109:static bool irBuilderLowerReturn(IRBuilder *builder, const AstNode *node) {
+       39: 1110:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_RET);
+        -: 1111:
+       39: 1112:    if (instruction == NULL) {
+    #####: 1113:        return false;
+        -: 1114:    }
+        -: 1115:
+       39: 1116:    if (node->data.return_stmt.value != NULL) {
+       28: 1117:        IRValue value = irBuilderLowerRValue(builder, node->data.return_stmt.value);
+       28: 1118:        if (!value.has_value) {
+    #####: 1119:            irInstructionFree(instruction);
+    #####: 1120:            return false;
+        -: 1121:        }
+        -: 1122:
+       28: 1123:        instruction->data.ret.has_value = true;
+       28: 1124:        instruction->data.ret.value = value.value;
+       28: 1125:        irTypeFree(value.type);
+        -: 1126:    }
+        -: 1127:
+       39: 1128:    return irBuilderAppendInstruction(builder, instruction);
+        -: 1129:}
+        -: 1130:
+        3: 1131:static bool irBuilderEmitDefaultReturn(IRBuilder *builder) {
+        3: 1132:    IRInstruction *instruction = irInstructionCreate(IR_INSTR_RET);
+        -: 1133:
+        3: 1134:    if (instruction == NULL) {
+    #####: 1135:        return false;
+        -: 1136:    }
+        -: 1137:
+        3: 1138:    if (builder->current_function->return_type != NULL && builder->current_function->return_type->kind != IR_TYPE_VOID) {
+        3: 1139:        instruction->data.ret.has_value = true;
+        3: 1140:        switch (builder->current_function->return_type->kind) {
+        3: 1141:            case IR_TYPE_INT:
+        -: 1142:            case IR_TYPE_CHAR:
+        3: 1143:                instruction->data.ret.value = irOperandCreateLiteral(irTypeCreate(builder->current_function->return_type->kind), irLiteralCreateInt(0));
+        3: 1144:                break;
+    #####: 1145:            case IR_TYPE_BOOL:
+    #####: 1146:                instruction->data.ret.value = irOperandCreateLiteral(irTypeCreate(IR_TYPE_BOOL), irLiteralCreateBool(false));
+    #####: 1147:                break;
+    #####: 1148:            case IR_TYPE_FLOAT:
+    #####: 1149:                instruction->data.ret.value = irOperandCreateLiteral(irTypeCreate(IR_TYPE_FLOAT), irLiteralCreateFloat(0.0));
+    #####: 1150:                break;
+    #####: 1151:            default:
+    #####: 1152:                instruction->data.ret.value = irOperandCreateLiteral(irTypeClone(builder->current_function->return_type), NULL);
+    #####: 1153:                break;
+        -: 1154:        }
+        -: 1155:    }
+        -: 1156:
+        3: 1157:    return irBuilderAppendInstruction(builder, instruction);
+        -: 1158:}
+        -: 1159:
+        -: 1160:static bool irBuilderLowerStatement(IRBuilder *builder, const AstNode *node);
+        -: 1161:
+        4: 1162:static bool irBuilderLowerLooseNode(IRBuilder *builder, const AstNode *node) {
+        -: 1163:    IRValue value;
+        -: 1164:
+        4: 1165:    if (node == NULL) {
+    #####: 1166:        return true;
+        -: 1167:    }
+        -: 1168:
+        4: 1169:    switch (node->type) {
+        4: 1170:        case AST_VAR_DECL:
+        -: 1171:        case AST_ASSIGN:
+        -: 1172:        case AST_IF:
+        -: 1173:        case AST_RETURN:
+        -: 1174:        case AST_WHILE:
+        -: 1175:        case AST_FOR:
+        4: 1176:            return irBuilderLowerStatement(builder, node);
+    #####: 1177:        default:
+    #####: 1178:            value = irBuilderLowerRValue(builder, node);
+    #####: 1179:            if (value.has_value) {
+    #####: 1180:                irOperandFree(&value.value);
+    #####: 1181:                irTypeFree(value.type);
+        -: 1182:            }
+    #####: 1183:            return true;
+        -: 1184:    }
+        -: 1185:}
+        -: 1186:
+        4: 1187:static bool irBuilderLowerBlockNode(IRBuilder *builder, const AstNode *block) {
+        -: 1188:    size_t i;
+        -: 1189:
+        4: 1190:    if (block == NULL) {
+    #####: 1191:        return true;
+        -: 1192:    }
+        -: 1193:
+        8: 1194:    for (i = 0; i < block->data.block.count; i++) {
+        4: 1195:        if (!irBuilderLowerStatement(builder, block->data.block.items[i])) {
+    #####: 1196:            return false;
+        -: 1197:        }
+        -: 1198:    }
+        -: 1199:
+        4: 1200:    return true;
+        -: 1201:}
+        -: 1202:
+       86: 1203:static bool irBuilderLowerStatement(IRBuilder *builder, const AstNode *node) {
+       86: 1204:    if (node == NULL) {
+    #####: 1205:        return true;
+        -: 1206:    }
+        -: 1207:
+       86: 1208:    switch (node->type) {
+       15: 1209:        case AST_VAR_DECL:
+       15: 1210:            return irBuilderLowerVarDecl(builder, node);
+       12: 1211:        case AST_ASSIGN:
+       12: 1212:            return irBuilderLowerAssign(builder, node);
+        6: 1213:        case AST_IF: {
+        -: 1214:            IRBasicBlock *then_block;
+        -: 1215:            IRBasicBlock *else_block;
+        -: 1216:            IRBasicBlock *end_block;
+        -: 1217:            IRValue condition;
+        -: 1218:            size_t i;
+        -: 1219:
+        6: 1220:            then_block = irFunctionCreateBlock(builder->current_function);
+        6: 1221:            else_block = irFunctionCreateBlock(builder->current_function);
+        6: 1222:            end_block = irFunctionCreateBlock(builder->current_function);
+        6: 1223:            if (then_block == NULL || else_block == NULL || end_block == NULL) {
+    #####: 1224:                return false;
+        -: 1225:            }
+        -: 1226:
+        6: 1227:            if (!irFunctionAppendBlock(builder->current_function, then_block)
+        6: 1228:                    || !irFunctionAppendBlock(builder->current_function, else_block)
+        6: 1229:                    || !irFunctionAppendBlock(builder->current_function, end_block)) {
+    #####: 1230:                return false;
+        -: 1231:            }
+        -: 1232:
+        6: 1233:            condition = irBuilderLowerRValue(builder, node->data.if_stmt.condition);
+        6: 1234:            if (!condition.has_value) {
+    #####: 1235:                return false;
+        -: 1236:            }
+        6: 1237:            irTypeFree(condition.type);
+        -: 1238:
+        6: 1239:            if (!irBuilderEmitCondBranch(builder, condition.value, then_block, else_block)) {
+    #####: 1240:                return false;
+        -: 1241:            }
+        -: 1242:
+        6: 1243:            builder->current_block = then_block;
+       12: 1244:            for (i = 0; i < node->data.if_stmt.then_branch->data.block.count; i++) {
+        6: 1245:                if (!irBuilderLowerStatement(builder, node->data.if_stmt.then_branch->data.block.items[i])) {
+    #####: 1246:                    return false;
+        -: 1247:                }
+        -: 1248:            }
+       6*: 1249:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, end_block)) {
+    #####: 1250:                return false;
+        -: 1251:            }
+        -: 1252:
+        6: 1253:            builder->current_block = else_block;
+        6: 1254:            if (node->data.if_stmt.else_branch != NULL) {
+        4: 1255:                for (i = 0; i < node->data.if_stmt.else_branch->data.block.count; i++) {
+        2: 1256:                    if (!irBuilderLowerStatement(builder, node->data.if_stmt.else_branch->data.block.items[i])) {
+    #####: 1257:                        return false;
+        -: 1258:                    }
+        -: 1259:                }
+        -: 1260:            }
+        6: 1261:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, end_block)) {
+    #####: 1262:                return false;
+        -: 1263:            }
+        -: 1264:
+        6: 1265:            builder->current_block = end_block;
+        6: 1266:            return true;
+        -: 1267:        }
+        2: 1268:        case AST_WHILE: {
+        2: 1269:            IRBasicBlock *cond_block = irFunctionCreateBlock(builder->current_function);
+        2: 1270:            IRBasicBlock *body_block = irFunctionCreateBlock(builder->current_function);
+        2: 1271:            IRBasicBlock *end_block = irFunctionCreateBlock(builder->current_function);
+        -: 1272:            IRValue condition;
+        -: 1273:
+        2: 1274:            if (cond_block == NULL || body_block == NULL || end_block == NULL) {
+    #####: 1275:                return false;
+        -: 1276:            }
+        -: 1277:
+        2: 1278:            if (!irFunctionAppendBlock(builder->current_function, cond_block)
+        2: 1279:                    || !irFunctionAppendBlock(builder->current_function, body_block)
+        2: 1280:                    || !irFunctionAppendBlock(builder->current_function, end_block)) {
+    #####: 1281:                return false;
+        -: 1282:            }
+        -: 1283:
+        2: 1284:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, cond_block)) {
+    #####: 1285:                return false;
+        -: 1286:            }
+        -: 1287:
+        2: 1288:            builder->current_block = cond_block;
+        2: 1289:            condition = irBuilderLowerRValue(builder, node->data.while_stmt.condition);
+        2: 1290:            if (!condition.has_value) {
+    #####: 1291:                return false;
+        -: 1292:            }
+        2: 1293:            irTypeFree(condition.type);
+        2: 1294:            if (!irBuilderEmitCondBranch(builder, condition.value, body_block, end_block)) {
+    #####: 1295:                return false;
+        -: 1296:            }
+        -: 1297:
+        2: 1298:            builder->current_block = body_block;
+        2: 1299:            if (!irBuilderLowerBlockNode(builder, node->data.while_stmt.body)) {
+    #####: 1300:                return false;
+        -: 1301:            }
+        2: 1302:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, cond_block)) {
+    #####: 1303:                return false;
+        -: 1304:            }
+        -: 1305:
+        2: 1306:            builder->current_block = end_block;
+        2: 1307:            return true;
+        -: 1308:        }
+        2: 1309:        case AST_FOR: {
+        2: 1310:            IRScope *saved_scope = builder->current_scope;
+        2: 1311:            IRScope *loop_scope = irScopeCreate(saved_scope);
+        -: 1312:            IRBasicBlock *cond_block;
+        -: 1313:            IRBasicBlock *body_block;
+        -: 1314:            IRBasicBlock *update_block;
+        -: 1315:            IRBasicBlock *end_block;
+        -: 1316:
+        2: 1317:            if (loop_scope == NULL) {
+    #####: 1318:                return false;
+        -: 1319:            }
+        -: 1320:
+        2: 1321:            builder->current_scope = loop_scope;
+        2: 1322:            if (!irBuilderLowerLooseNode(builder, node->data.for_stmt.init)) {
+    #####: 1323:                irScopeFree(loop_scope);
+    #####: 1324:                builder->current_scope = saved_scope;
+    #####: 1325:                return false;
+        -: 1326:            }
+        -: 1327:
+        2: 1328:            cond_block = irFunctionCreateBlock(builder->current_function);
+        2: 1329:            body_block = irFunctionCreateBlock(builder->current_function);
+        2: 1330:            update_block = irFunctionCreateBlock(builder->current_function);
+        2: 1331:            end_block = irFunctionCreateBlock(builder->current_function);
+        2: 1332:            if (cond_block == NULL || body_block == NULL || update_block == NULL || end_block == NULL) {
+    #####: 1333:                irScopeFree(loop_scope);
+    #####: 1334:                builder->current_scope = saved_scope;
+    #####: 1335:                return false;
+        -: 1336:            }
+        -: 1337:
+        2: 1338:            if (!irFunctionAppendBlock(builder->current_function, cond_block)
+        2: 1339:                    || !irFunctionAppendBlock(builder->current_function, body_block)
+        2: 1340:                    || !irFunctionAppendBlock(builder->current_function, update_block)
+        2: 1341:                    || !irFunctionAppendBlock(builder->current_function, end_block)) {
+    #####: 1342:                irScopeFree(loop_scope);
+    #####: 1343:                builder->current_scope = saved_scope;
+    #####: 1344:                return false;
+        -: 1345:            }
+        -: 1346:
+        2: 1347:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, cond_block)) {
+    #####: 1348:                irScopeFree(loop_scope);
+    #####: 1349:                builder->current_scope = saved_scope;
+    #####: 1350:                return false;
+        -: 1351:            }
+        -: 1352:
+        2: 1353:            builder->current_block = cond_block;
+        2: 1354:            if (node->data.for_stmt.condition != NULL) {
+        2: 1355:                IRValue condition = irBuilderLowerRValue(builder, node->data.for_stmt.condition);
+        2: 1356:                if (!condition.has_value) {
+    #####: 1357:                    irScopeFree(loop_scope);
+    #####: 1358:                    builder->current_scope = saved_scope;
+    #####: 1359:                    return false;
+        -: 1360:                }
+        2: 1361:                irTypeFree(condition.type);
+        2: 1362:                if (!irBuilderEmitCondBranch(builder, condition.value, body_block, end_block)) {
+    #####: 1363:                    irScopeFree(loop_scope);
+    #####: 1364:                    builder->current_scope = saved_scope;
+    #####: 1365:                    return false;
+        -: 1366:                }
+    #####: 1367:            } else if (!irBuilderEmitBranch(builder, body_block)) {
+    #####: 1368:                irScopeFree(loop_scope);
+    #####: 1369:                builder->current_scope = saved_scope;
+    #####: 1370:                return false;
+        -: 1371:            }
+        -: 1372:
+        2: 1373:            builder->current_block = body_block;
+        2: 1374:            if (!irBuilderLowerBlockNode(builder, node->data.for_stmt.body)) {
+    #####: 1375:                irScopeFree(loop_scope);
+    #####: 1376:                builder->current_scope = saved_scope;
+    #####: 1377:                return false;
+        -: 1378:            }
+        2: 1379:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, update_block)) {
+    #####: 1380:                irScopeFree(loop_scope);
+    #####: 1381:                builder->current_scope = saved_scope;
+    #####: 1382:                return false;
+        -: 1383:            }
+        -: 1384:
+        2: 1385:            builder->current_block = update_block;
+        2: 1386:            if (!irBuilderLowerLooseNode(builder, node->data.for_stmt.update)) {
+    #####: 1387:                irScopeFree(loop_scope);
+    #####: 1388:                builder->current_scope = saved_scope;
+    #####: 1389:                return false;
+        -: 1390:            }
+        2: 1391:            if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, cond_block)) {
+    #####: 1392:                irScopeFree(loop_scope);
+    #####: 1393:                builder->current_scope = saved_scope;
+    #####: 1394:                return false;
+        -: 1395:            }
+        -: 1396:
+        2: 1397:            builder->current_block = end_block;
+        2: 1398:            irScopeFree(loop_scope);
+        2: 1399:            builder->current_scope = saved_scope;
+        2: 1400:            return true;
+        -: 1401:        }
+       39: 1402:        case AST_RETURN:
+       39: 1403:            return irBuilderLowerReturn(builder, node);
+       10: 1404:        case AST_EXPR_STMT: {
+       10: 1405:            IRValue value = irBuilderLowerRValue(builder, node->data.expr_stmt.expression);
+       10: 1406:            if (value.has_value) {
+    #####: 1407:                irOperandFree(&value.value);
+    #####: 1408:                irTypeFree(value.type);
+        -: 1409:            }
+       10: 1410:            return true;
+        -: 1411:        }
+    #####: 1412:        default:
+    #####: 1413:            return true;
+        -: 1414:    }
+        -: 1415:}
+        -: 1416:
+       34: 1417:static bool irBuilderLowerFunctionBody(IRBuilder *builder, const AstNode *node, IRFunction *function) {
+        -: 1418:    size_t i;
+        -: 1419:    IRBasicBlock *entry_block;
+        -: 1420:
+       34: 1421:    builder->current_function = function;
+       34: 1422:    builder->current_scope = function->scope;
+       34: 1423:    entry_block = irFunctionCreateBlock(function);
+       34: 1424:    if (entry_block == NULL || !irFunctionAppendBlock(function, entry_block)) {
+    #####: 1425:        irBasicBlockFree(entry_block);
+    #####: 1426:        return false;
+        -: 1427:    }
+       34: 1428:    builder->current_block = entry_block;
+        -: 1429:
+       47: 1430:    for (i = 0; i < function->param_count; i++) {
+       13: 1431:        if (!irBuilderMaterializeParameter(builder, function, &function->params[i], i)) {
+    #####: 1432:            return false;
+        -: 1433:        }
+        -: 1434:    }
+        -: 1435:
+      104: 1436:    for (i = 0; i < node->data.func_decl.body->data.block.count; i++) {
+       70: 1437:        if (!irBuilderLowerStatement(builder, node->data.func_decl.body->data.block.items[i])) {
+    #####: 1438:            return false;
+        -: 1439:        }
+        -: 1440:    }
+        -: 1441:
+       34: 1442:    if (!irBuilderCurrentBlockHasTerminator(builder)) {
+        3: 1443:        return irBuilderEmitDefaultReturn(builder);
+        -: 1444:    }
+        -: 1445:
+       31: 1446:    return true;
+        -: 1447:}
+        -: 1448:
+       33: 1449:IRModule *irBuildModule(AstNode *program, const SemanticResult *semantic) {
+        -: 1450:    IRBuilder *builder;
+        -: 1451:    IRModule *module;
+        -: 1452:    size_t i;
+        -: 1453:    size_t function_index;
+        -: 1454:
+       33: 1455:    if (program == NULL || semantic == NULL || semantic->errors.count != 0) {
+    #####: 1456:        return NULL;
+        -: 1457:    }
+        -: 1458:
+       33: 1459:    builder = irBuilderCreate(program, semantic);
+       33: 1460:    if (builder == NULL) {
+    #####: 1461:        return NULL;
+        -: 1462:    }
+        -: 1463:
+       33: 1464:    if (!irBuilderDeclareBuiltinRuntimeFunctions(builder)) {
+    #####: 1465:        irBuilderFree(builder);
+    #####: 1466:        return NULL;
+        -: 1467:    }
+        -: 1468:
+       76: 1469:    for (i = 0; i < program->data.program.count; i++) {
+       43: 1470:        AstNode *node = program->data.program.items[i];
+        -: 1471:
+       43: 1472:        if (node->type == AST_VAR_DECL) {
+        9: 1473:            if (!irBuilderPredeclareGlobal(builder, node)) {
+    #####: 1474:                irBuilderFree(builder);
+    #####: 1475:                return NULL;
+        -: 1476:            }
+       34: 1477:        } else if (node->type == AST_FUNC_DECL) {
+       34: 1478:            if (!irBuilderPredeclareFunction(builder, node)) {
+    #####: 1479:                irBuilderFree(builder);
+    #####: 1480:                return NULL;
+        -: 1481:            }
+        -: 1482:        }
+        -: 1483:    }
+        -: 1484:
+       33: 1485:    if (!irBuilderCollectStringLiterals(builder, program)) {
+    #####: 1486:        irBuilderFree(builder);
+    #####: 1487:        return NULL;
+        -: 1488:    }
+        -: 1489:
+       33: 1490:    function_index = 0;
+       76: 1491:    for (i = 0; i < program->data.program.count; i++) {
+       43: 1492:        AstNode *node = program->data.program.items[i];
+        -: 1493:
+       43: 1494:        if (node->type != AST_FUNC_DECL) {
+        9: 1495:            continue;
+        -: 1496:        }
+        -: 1497:
+       34: 1498:        if (!irBuilderLowerFunctionBody(builder, node, builder->module->functions[function_index])) {
+    #####: 1499:            irBuilderFree(builder);
+    #####: 1500:            return NULL;
+        -: 1501:        }
+       34: 1502:        function_index++;
+        -: 1503:    }
+        -: 1504:
+       33: 1505:    module = builder->module;
+       33: 1506:    builder->module = NULL;
+       33: 1507:    irBuilderFree(builder);
+        -: 1508:
+       33: 1509:    return module;
+        -: 1510:}

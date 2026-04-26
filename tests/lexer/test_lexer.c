@@ -122,3 +122,40 @@ void test_lexer_struct_preserves_scan_state(void) {
 
     freeTokens(tokens);
 }
+
+void test_lexer_tokenizes_logical_and_equality_operators(void) {
+    Token *tokens = tokenizeString("flag = a == b && c != d || !done;");
+
+    EXPECT_TRUE(tokens != NULL);
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->type));
+    EXPECT_STR_EQ("ASSIGN", tokenTypeName(tokens->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->type));
+    EXPECT_STR_EQ("EQ_EQ", tokenTypeName(tokens->next->next->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->next->next->type));
+    EXPECT_STR_EQ("AND_AND", tokenTypeName(tokens->next->next->next->next->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("NOT_EQ", tokenTypeName(tokens->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("OR_OR", tokenTypeName(tokens->next->next->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("BANG", tokenTypeName(tokens->next->next->next->next->next->next->next->next->next->next->type));
+
+    freeTokens(tokens);
+}
+
+void test_lexer_tokenizes_break_and_continue_keywords_together(void) {
+    Token *tokens = tokenizeString("while(true){ break; continue; }");
+
+    EXPECT_TRUE(tokens != NULL);
+    EXPECT_STR_EQ("KW_WHILE", tokenTypeName(tokens->type));
+    EXPECT_STR_EQ("LPAREN", tokenTypeName(tokens->next->type));
+    EXPECT_STR_EQ("BOOL", tokenTypeName(tokens->next->next->type));
+    EXPECT_STR_EQ("RPAREN", tokenTypeName(tokens->next->next->next->type));
+    EXPECT_STR_EQ("LBRACE", tokenTypeName(tokens->next->next->next->next->type));
+    EXPECT_STR_EQ("KW_BREAK", tokenTypeName(tokens->next->next->next->next->next->type));
+    EXPECT_STR_EQ("SEMICOLON", tokenTypeName(tokens->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("KW_CONTINUE", tokenTypeName(tokens->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("SEMICOLON", tokenTypeName(tokens->next->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("RBRACE", tokenTypeName(tokens->next->next->next->next->next->next->next->next->next->type));
+
+    freeTokens(tokens);
+}

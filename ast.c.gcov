@@ -1,0 +1,353 @@
+        -:    0:Source:parser/ast.c
+        -:    1:#include "ast.h"
+        -:    2:
+        -:    3:#include <stdio.h>
+        -:    4:#include <stdlib.h>
+        -:    5:#include <string.h>
+        -:    6:
+       24:    7:AstNode *astNewNode(AstNodeType type) {
+       24:    8:    return astNewNodeAt(type, 0, 0);
+        -:    9:}
+        -:   10:
+      949:   11:AstNode *astNewNodeAt(AstNodeType type, int line, int column) {
+      949:   12:    AstNode *node = calloc(1, sizeof(AstNode));
+        -:   13:
+      949:   14:    if (node == NULL) {
+    #####:   15:        return NULL;
+        -:   16:    }
+        -:   17:
+      949:   18:    node->type = type;
+      949:   19:    node->line = line;
+      949:   20:    node->column = column;
+      949:   21:    return node;
+        -:   22:}
+        -:   23:
+      244:   24:void astAppendNode(AstNode ***items, size_t *count, AstNode *item) {
+      244:   25:    AstNode **nextItems = realloc(*items, (*count + 1) * sizeof(AstNode *));
+        -:   26:
+      244:   27:    if (nextItems == NULL) {
+    #####:   28:        return;
+        -:   29:    }
+        -:   30:
+      244:   31:    *items = nextItems;
+      244:   32:    (*items)[*count] = item;
+      244:   33:    (*count)++;
+        -:   34:}
+        -:   35:
+        7:   36:static const char *binaryOpName(AstBinaryOp op) {
+        7:   37:    switch (op) {
+        1:   38:        case AST_BINARY_ADD: return "+";
+    #####:   39:        case AST_BINARY_SUB: return "-";
+        1:   40:        case AST_BINARY_MUL: return "*";
+    #####:   41:        case AST_BINARY_DIV: return "/";
+        1:   42:        case AST_BINARY_GT: return ">";
+        3:   43:        case AST_BINARY_LT: return "<";
+    #####:   44:        case AST_BINARY_GTE: return ">=";
+        1:   45:        case AST_BINARY_LTE: return "<=";
+    #####:   46:        case AST_BINARY_EQ: return "==";
+    #####:   47:        case AST_BINARY_NEQ: return "!=";
+    #####:   48:        case AST_BINARY_AND: return "&&";
+    #####:   49:        case AST_BINARY_OR: return "||";
+        -:   50:    }
+        -:   51:
+    #####:   52:    return "?";
+        -:   53:}
+        -:   54:
+        9:   55:static const char *assignOpName(AstAssignOp op) {
+        9:   56:    switch (op) {
+        3:   57:        case AST_ASSIGN_SET: return "=";
+        6:   58:        case AST_ASSIGN_ADD: return "+=";
+    #####:   59:        case AST_ASSIGN_SUB: return "-=";
+        -:   60:    }
+        -:   61:
+    #####:   62:    return "=";
+        -:   63:}
+        -:   64:
+      841:   65:static void appendText(char **buffer, size_t *size, const char *text) {
+      841:   66:    size_t textLength = strlen(text);
+      841:   67:    char *nextBuffer = realloc(*buffer, *size + textLength);
+        -:   68:
+      841:   69:    if (nextBuffer == NULL) {
+    #####:   70:        free(*buffer);
+    #####:   71:        *buffer = NULL;
+    #####:   72:        return;
+        -:   73:    }
+        -:   74:
+      841:   75:    *buffer = nextBuffer;
+      841:   76:    memcpy(*buffer + *size - 1, text, textLength + 1);
+      841:   77:    *size += textLength;
+        -:   78:}
+        -:   79:
+      841:   80:static void appendFormat(char **buffer, size_t *size, const char *text) {
+      841:   81:    if (*buffer == NULL) {
+    #####:   82:        return;
+        -:   83:    }
+      841:   84:    appendText(buffer, size, text);
+        -:   85:}
+        -:   86:
+      139:   87:static void writeIndent(char **buffer, size_t *size, int depth, int isLast[]) {
+        -:   88:    int i;
+      534:   89:    for (i = 0; i < depth - 1; i++) {
+      395:   90:        appendFormat(buffer, size, isLast[i] ? "   " : "  |");
+        -:   91:    }
+      139:   92:    if (depth > 0) {
+      137:   93:        appendFormat(buffer, size, "  ├─");
+        -:   94:    }
+      139:   95:}
+        -:   96:
+        -:   97:static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int isLast[]);
+        -:   98:
+      209:   99:static void freeNodeList(AstNode **items, size_t count) {
+        -:  100:    size_t i;
+        -:  101:
+      444:  102:    for (i = 0; i < count; i++) {
+      235:  103:        astFree(items[i]);
+        -:  104:    }
+        -:  105:
+      209:  106:    free(items);
+      209:  107:}
+        -:  108:
+       21:  109:static void writeList(char **buffer, size_t *size, AstNode **items, size_t count, int depth, int isLast[]) {
+        -:  110:    size_t i;
+       64:  111:    for (i = 0; i < count; i++) {
+       43:  112:        isLast[depth] = (i == count - 1);
+       43:  113:        writeNode(buffer, size, items[i], depth + 1, isLast);
+        -:  114:    }
+       21:  115:}
+        -:  116:
+      139:  117:static void writeLabel(char **buffer, size_t *size, AstNode *node) {
+        -:  118:    char temp[64];
+      139:  119:    switch (node->type) {
+        2:  120:        case AST_PROGRAM: appendFormat(buffer, size, " (PROGRAM)\n"); break;
+       11:  121:        case AST_BLOCK: appendFormat(buffer, size, " (BLOCK)\n"); break;
+       11:  122:        case AST_VAR_DECL: appendFormat(buffer, size, " (VAR_DECL "); appendFormat(buffer, size, node->data.var_decl.name); appendFormat(buffer, size, ")\n"); break;
+        5:  123:        case AST_FUNC_DECL: appendFormat(buffer, size, " (FUNC_DECL "); appendFormat(buffer, size, node->data.func_decl.name); appendFormat(buffer, size, ")\n"); break;
+        4:  124:        case AST_PARAM: appendFormat(buffer, size, " (PARAM "); appendFormat(buffer, size, node->data.param.name); appendFormat(buffer, size, ")\n"); break;
+        2:  125:        case AST_IF: appendFormat(buffer, size, " (IF)\n"); break;
+        2:  126:        case AST_WHILE: appendFormat(buffer, size, " (WHILE)\n"); break;
+        2:  127:        case AST_FOR: appendFormat(buffer, size, " (FOR)\n"); break;
+        5:  128:        case AST_RETURN: appendFormat(buffer, size, " (RETURN)\n"); break;
+        1:  129:        case AST_BREAK: appendFormat(buffer, size, " (BREAK)\n"); break;
+        2:  130:        case AST_CONTINUE: appendFormat(buffer, size, " (CONTINUE)\n"); break;
+    #####:  131:        case AST_EXPR_STMT: appendFormat(buffer, size, " (EXPR_STMT)\n"); break;
+        9:  132:        case AST_ASSIGN: appendFormat(buffer, size, " ("); appendFormat(buffer, size, assignOpName(node->data.assign.op)); appendFormat(buffer, size, ")\n"); break;
+        7:  133:        case AST_BINARY: appendFormat(buffer, size, " ("); appendFormat(buffer, size, binaryOpName(node->data.binary.op)); appendFormat(buffer, size, ")\n"); break;
+        2:  134:        case AST_UNARY: appendFormat(buffer, size, " (UNARY)\n"); break;
+        3:  135:        case AST_CALL: appendFormat(buffer, size, " (CALL)\n"); break;
+    #####:  136:        case AST_ARRAY_ACCESS: appendFormat(buffer, size, " (ARRAY_ACCESS)\n"); break;
+    #####:  137:        case AST_ARRAY_LITERAL: appendFormat(buffer, size, " (ARRAY_LITERAL)\n"); break;
+       29:  138:        case AST_IDENTIFIER: appendFormat(buffer, size, " ("); appendFormat(buffer, size, node->data.identifier.name); appendFormat(buffer, size, ")\n"); break;
+       20:  139:        case AST_INT_LITERAL:
+       20:  140:            snprintf(temp, sizeof(temp), " (%ld)\n", node->data.int_literal.value);
+       20:  141:            appendFormat(buffer, size, temp);
+       20:  142:            break;
+    #####:  143:        case AST_FLOAT_LITERAL:
+    #####:  144:            snprintf(temp, sizeof(temp), " (%g)\n", node->data.float_literal.value);
+    #####:  145:            appendFormat(buffer, size, temp);
+    #####:  146:            break;
+    #####:  147:        case AST_STRING_LITERAL: appendFormat(buffer, size, " ("); appendFormat(buffer, size, node->data.string_literal.value); appendFormat(buffer, size, ")\n"); break;
+       2*:  148:        case AST_BOOL_LITERAL: appendFormat(buffer, size, node->data.bool_literal.value ? " (true)\n" : " (false)\n"); break;
+       20:  149:        case AST_TYPE_NAME: appendFormat(buffer, size, " (TYPE "); appendFormat(buffer, size, node->data.type_name.name); appendFormat(buffer, size, ")\n"); break;
+    #####:  150:        case AST_TYPE_ARRAY: appendFormat(buffer, size, " (TYPE_ARRAY)\n"); break;
+        -:  151:    }
+      139:  152:}
+        -:  153:
+      139:  154:static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int isLast[]) {
+      139:  155:    if (node == NULL || *buffer == NULL) {
+    #####:  156:        return;
+        -:  157:    }
+        -:  158:
+      139:  159:    writeIndent(buffer, size, depth, isLast);
+      139:  160:    writeLabel(buffer, size, node);
+        -:  161:
+      139:  162:    switch (node->type) {
+        2:  163:        case AST_PROGRAM:
+        2:  164:            writeList(buffer, size, node->data.program.items, node->data.program.count, depth, isLast);
+        2:  165:            break;
+       11:  166:        case AST_BLOCK:
+       11:  167:            writeList(buffer, size, node->data.block.items, node->data.block.count, depth, isLast);
+       11:  168:            break;
+       11:  169:        case AST_VAR_DECL:
+       11:  170:            if (node->data.var_decl.declared_type) writeNode(buffer, size, node->data.var_decl.declared_type, depth + 1, isLast);
+       11:  171:            if (node->data.var_decl.initializer) writeNode(buffer, size, node->data.var_decl.initializer, depth + 1, isLast);
+       11:  172:            break;
+        5:  173:        case AST_FUNC_DECL:
+        5:  174:            if (node->data.func_decl.return_type) writeNode(buffer, size, node->data.func_decl.return_type, depth + 1, isLast);
+        5:  175:            writeList(buffer, size, node->data.func_decl.params, node->data.func_decl.param_count, depth, isLast);
+        5:  176:            if (node->data.func_decl.body) writeNode(buffer, size, node->data.func_decl.body, depth + 1, isLast);
+        5:  177:            break;
+        4:  178:        case AST_PARAM:
+        4:  179:            if (node->data.param.declared_type) writeNode(buffer, size, node->data.param.declared_type, depth + 1, isLast);
+        4:  180:            break;
+        2:  181:        case AST_IF:
+        2:  182:            writeNode(buffer, size, node->data.if_stmt.condition, depth + 1, isLast);
+        2:  183:            writeNode(buffer, size, node->data.if_stmt.then_branch, depth + 1, isLast);
+       2*:  184:            if (node->data.if_stmt.else_branch) writeNode(buffer, size, node->data.if_stmt.else_branch, depth + 1, isLast);
+        2:  185:            break;
+        2:  186:        case AST_WHILE:
+        2:  187:            writeNode(buffer, size, node->data.while_stmt.condition, depth + 1, isLast);
+        2:  188:            writeNode(buffer, size, node->data.while_stmt.body, depth + 1, isLast);
+        2:  189:            break;
+        2:  190:        case AST_FOR:
+        2:  191:            if (node->data.for_stmt.init) writeNode(buffer, size, node->data.for_stmt.init, depth + 1, isLast);
+        2:  192:            if (node->data.for_stmt.condition) writeNode(buffer, size, node->data.for_stmt.condition, depth + 1, isLast);
+        2:  193:            if (node->data.for_stmt.update) writeNode(buffer, size, node->data.for_stmt.update, depth + 1, isLast);
+        2:  194:            if (node->data.for_stmt.body) writeNode(buffer, size, node->data.for_stmt.body, depth + 1, isLast);
+        2:  195:            break;
+        5:  196:        case AST_RETURN:
+        5:  197:            if (node->data.return_stmt.value) writeNode(buffer, size, node->data.return_stmt.value, depth + 1, isLast);
+        5:  198:            break;
+        3:  199:        case AST_BREAK:
+        -:  200:        case AST_CONTINUE:
+        3:  201:            break;
+    #####:  202:        case AST_EXPR_STMT:
+    #####:  203:            if (node->data.expr_stmt.expression) writeNode(buffer, size, node->data.expr_stmt.expression, depth + 1, isLast);
+    #####:  204:            break;
+        9:  205:        case AST_ASSIGN:
+        9:  206:            writeNode(buffer, size, node->data.assign.target, depth + 1, isLast);
+        9:  207:            writeNode(buffer, size, node->data.assign.value, depth + 1, isLast);
+        9:  208:            break;
+        7:  209:        case AST_BINARY:
+        7:  210:            writeNode(buffer, size, node->data.binary.left, depth + 1, isLast);
+        7:  211:            writeNode(buffer, size, node->data.binary.right, depth + 1, isLast);
+        7:  212:            break;
+        2:  213:        case AST_UNARY:
+        2:  214:            writeNode(buffer, size, node->data.unary.operand, depth + 1, isLast);
+        2:  215:            break;
+        3:  216:        case AST_CALL:
+        3:  217:            writeNode(buffer, size, node->data.call.callee, depth + 1, isLast);
+        3:  218:            writeList(buffer, size, node->data.call.args, node->data.call.arg_count, depth, isLast);
+        3:  219:            break;
+    #####:  220:        case AST_ARRAY_ACCESS:
+    #####:  221:            writeNode(buffer, size, node->data.array_access.base, depth + 1, isLast);
+    #####:  222:            writeList(buffer, size, node->data.array_access.indices, node->data.array_access.index_count, depth, isLast);
+    #####:  223:            break;
+    #####:  224:        case AST_ARRAY_LITERAL:
+    #####:  225:            writeList(buffer, size, node->data.array_literal.elements, node->data.array_literal.count, depth, isLast);
+    #####:  226:            break;
+    #####:  227:        case AST_TYPE_ARRAY:
+    #####:  228:            if (node->data.type_array.element_type) writeNode(buffer, size, node->data.type_array.element_type, depth + 1, isLast);
+    #####:  229:            if (node->data.type_array.size_expr) writeNode(buffer, size, node->data.type_array.size_expr, depth + 1, isLast);
+    #####:  230:            break;
+       71:  231:        default:
+       71:  232:            break;
+        -:  233:    }
+        -:  234:}
+        -:  235:
+        2:  236:char *astToString(AstNode *root) {
+        2:  237:    char *buffer = malloc(1);
+        2:  238:    size_t size = 1;
+        2:  239:    int isLast[128] = {0};
+        -:  240:
+        2:  241:    if (buffer == NULL) {
+    #####:  242:        return NULL;
+        -:  243:    }
+        -:  244:
+        2:  245:    buffer[0] = '\0';
+        2:  246:    writeNode(&buffer, &size, root, 0, isLast);
+        2:  247:    return buffer;
+        -:  248:}
+        -:  249:
+    #####:  250:void astPrintPretty(AstNode *root) {
+    #####:  251:    char *text = astToString(root);
+        -:  252:
+    #####:  253:    if (text != NULL) {
+    #####:  254:        fputs(text, stdout);
+    #####:  255:        free(text);
+        -:  256:    }
+    #####:  257:}
+        -:  258:
+      728:  259:void astFree(AstNode *root) {
+      728:  260:    if (root == NULL) {
+       19:  261:        return;
+        -:  262:    }
+        -:  263:
+      709:  264:    switch (root->type) {
+       60:  265:        case AST_PROGRAM:
+       60:  266:            freeNodeList(root->data.program.items, root->data.program.count);
+       60:  267:            break;
+       72:  268:        case AST_BLOCK:
+       72:  269:            freeNodeList(root->data.block.items, root->data.block.count);
+       72:  270:            break;
+       48:  271:        case AST_VAR_DECL:
+       48:  272:            free(root->data.var_decl.name);
+       48:  273:            astFree(root->data.var_decl.declared_type);
+       48:  274:            astFree(root->data.var_decl.initializer);
+       48:  275:            break;
+       55:  276:        case AST_FUNC_DECL:
+       55:  277:            free(root->data.func_decl.name);
+       55:  278:            freeNodeList(root->data.func_decl.params, root->data.func_decl.param_count);
+       55:  279:            astFree(root->data.func_decl.body);
+       55:  280:            astFree(root->data.func_decl.return_type);
+       55:  281:            break;
+       19:  282:        case AST_PARAM:
+       19:  283:            free(root->data.param.name);
+       19:  284:            astFree(root->data.param.declared_type);
+       19:  285:            break;
+        7:  286:        case AST_IF:
+        7:  287:            astFree(root->data.if_stmt.condition);
+        7:  288:            astFree(root->data.if_stmt.then_branch);
+        7:  289:            astFree(root->data.if_stmt.else_branch);
+        7:  290:            break;
+        4:  291:        case AST_WHILE:
+        4:  292:            astFree(root->data.while_stmt.condition);
+        4:  293:            astFree(root->data.while_stmt.body);
+        4:  294:            break;
+        5:  295:        case AST_FOR:
+        5:  296:            astFree(root->data.for_stmt.init);
+        5:  297:            astFree(root->data.for_stmt.condition);
+        5:  298:            astFree(root->data.for_stmt.update);
+        5:  299:            astFree(root->data.for_stmt.body);
+        5:  300:            break;
+       36:  301:        case AST_RETURN:
+       36:  302:            astFree(root->data.return_stmt.value);
+       36:  303:            break;
+        9:  304:        case AST_BREAK:
+        -:  305:        case AST_CONTINUE:
+        9:  306:            break;
+       15:  307:        case AST_EXPR_STMT:
+       15:  308:            astFree(root->data.expr_stmt.expression);
+       15:  309:            break;
+       20:  310:        case AST_ASSIGN:
+       20:  311:            astFree(root->data.assign.target);
+       20:  312:            astFree(root->data.assign.value);
+       20:  313:            break;
+       20:  314:        case AST_BINARY:
+       20:  315:            astFree(root->data.binary.left);
+       20:  316:            astFree(root->data.binary.right);
+       20:  317:            break;
+        3:  318:        case AST_UNARY:
+        3:  319:            astFree(root->data.unary.operand);
+        3:  320:            break;
+       14:  321:        case AST_CALL:
+       14:  322:            astFree(root->data.call.callee);
+       14:  323:            freeNodeList(root->data.call.args, root->data.call.arg_count);
+       14:  324:            break;
+        5:  325:        case AST_ARRAY_ACCESS:
+        5:  326:            astFree(root->data.array_access.base);
+        5:  327:            freeNodeList(root->data.array_access.indices, root->data.array_access.index_count);
+        5:  328:            break;
+        3:  329:        case AST_ARRAY_LITERAL:
+        3:  330:            freeNodeList(root->data.array_literal.elements, root->data.array_literal.count);
+        3:  331:            break;
+       85:  332:        case AST_IDENTIFIER:
+       85:  333:            free(root->data.identifier.name);
+       85:  334:            break;
+        5:  335:        case AST_STRING_LITERAL:
+        5:  336:            free(root->data.string_literal.value);
+        5:  337:            break;
+      122:  338:        case AST_TYPE_NAME:
+      122:  339:            free(root->data.type_name.name);
+      122:  340:            break;
+        3:  341:        case AST_TYPE_ARRAY:
+        3:  342:            astFree(root->data.type_array.element_type);
+        3:  343:            astFree(root->data.type_array.size_expr);
+        3:  344:            break;
+       99:  345:        case AST_INT_LITERAL:
+        -:  346:        case AST_FLOAT_LITERAL:
+        -:  347:        case AST_BOOL_LITERAL:
+       99:  348:            break;
+        -:  349:    }
+        -:  350:
+      709:  351:    free(root);
+        -:  352:}

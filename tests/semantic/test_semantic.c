@@ -445,3 +445,125 @@ void test_semantic_accepts_break_and_continue_inside_for(void) {
 
     semanticResultFree(&result);
 }
+
+void test_semantic_accepts_logical_and_with_bool_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = true && false; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_logical_and_with_non_bool_operand(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = true && 1; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "logical operators require bool operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_logical_or_with_bool_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = true || false; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_logical_or_with_non_bool_operand(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = false || 1; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "logical operators require bool operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_equality_with_compatible_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { same::bool = 1 == 1; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_equality_with_incompatible_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { same::bool = 1 == true; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "comparison requires compatible operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_inequality_with_compatible_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { diff::bool = 1 != 2; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_inequality_with_incompatible_operands(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { diff::bool = 1 != true; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "comparison requires compatible operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_unary_not_for_bool_operand(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = !false; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_unary_not_for_non_bool_operand(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { flag::bool = !1; }");
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "operator '!' requires bool operand") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_array_literal_with_incompatible_element_types(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { arr::Array<int> = {1, true}; }");
+
+    EXPECT_TRUE(result.errors.count == 2);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "array literal elements must have compatible types") != NULL
+            || strstr(result.errors.items[1].message, "array literal elements must have compatible types") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_nested_array_literal_with_matching_shapes(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { matrix::Array<Array<int>> = {{1, 2}, {3, 4}}; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}

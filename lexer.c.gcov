@@ -1,0 +1,347 @@
+        -:    0:Source:lexer/lexer.c
+        -:    1:#include "lexer.h"
+        -:    2:
+        -:    3:Token *head = NULL;
+        -:    4:
+     4473:    5:static void appendToken(Token **head, TokenType type, const char *value, int line, int column) {
+     4473:    6:    Token *token = malloc(sizeof(Token));
+        -:    7:
+     4473:    8:    token->type = type;
+     4473:    9:    token->value = malloc(strlen(value) + 1);
+     4473:   10:    strcpy(token->value, value);
+     4473:   11:    token->line = line;
+     4473:   12:    token->column = column;
+     4473:   13:    token->anterior = NULL;
+     4473:   14:    token->next = NULL;
+        -:   15:
+     4473:   16:    if (*head == NULL) {
+      245:   17:        *head = token;
+      245:   18:        return;
+        -:   19:    }
+        -:   20:
+        -:   21:    {
+     4228:   22:        Token *temp = *head;
+    77489:   23:        while (temp->next != NULL) {
+    73261:   24:            temp = temp->next;
+        -:   25:        }
+     4228:   26:        temp->next = token;
+     4228:   27:        token->anterior = temp;
+        -:   28:    }
+        -:   29:}
+        -:   30:
+     4228:   31:static void lexerAppendToken(Lexer *lexer, TokenType type, const char *value) {
+     4228:   32:    appendToken(&lexer->tokens, type, value, lexer->line, lexer->column);
+     4228:   33:}
+        -:   34:
+        -:   35:TokenDefinition types[NUM_TYPES] = {
+        -:   36:    {TOKEN_NUMBER, "^([0-9]*\\.[0-9]+|[0-9]+)"},
+        -:   37:    {TOKEN_BOOL, "^(true|false)\\b"},
+        -:   38:    {TOKEN_COMMENT, "//.*"},
+        -:   39:    {TOKEN_TYPE_ARRAY, "^(Array)\\b"},
+        -:   40:    {TOKEN_TYPE_INT, "^(int)\\b"},
+        -:   41:    {TOKEN_TYPE_FLOAT, "^(float)\\b"},
+        -:   42:    {TOKEN_TYPE_CHAR, "^(char)\\b"},
+        -:   43:    {TOKEN_TYPE_BOOL, "^(bool)\\b"},
+        -:   44:    {TOKEN_TYPE_VOID, "^(void)\\b"},
+        -:   45:    {TOKEN_KW_IF, "^(if)\\b"},
+        -:   46:    {TOKEN_KW_ELSE, "^(else)\\b"},
+        -:   47:    {TOKEN_KW_FOR, "^(for)\\b"},
+        -:   48:    {TOKEN_KW_WHILE, "^(while)\\b"},
+        -:   49:    {TOKEN_KW_FUNC, "^(func)\\b"},
+        -:   50:    {TOKEN_KW_RET, "^(ret)\\b"},
+        -:   51:    {TOKEN_KW_BREAK, "^(break)\\b"},
+        -:   52:    {TOKEN_KW_CONTINUE, "^(continue)\\b"},
+        -:   53:    {TOKEN_STRING, "^\"([^\"\\\\]|\\\\.)*\"|^'([^'\\\\]|\\\\.)*'"},
+        -:   54:    {TOKEN_EQ_EQ, "^(==)"},
+        -:   55:    {TOKEN_GT_EQ, "^(>=)"},
+        -:   56:    {TOKEN_LT_EQ, "^(<=)"},
+        -:   57:    {TOKEN_NOT_EQ, "^(!=)"},
+        -:   58:    {TOKEN_GT, "^(>)"},
+        -:   59:    {TOKEN_LT, "^(<)"},
+        -:   60:    {TOKEN_BANG, "^(!)"},
+        -:   61:    {TOKEN_PLUS_ASSIGN, "^(\\+=)"},
+        -:   62:    {TOKEN_MINUS_ASSIGN, "^(-=)"},
+        -:   63:    {TOKEN_ARROW, "^(->)"},
+        -:   64:    {TOKEN_ASSIGN, "^(=)"},
+        -:   65:    {TOKEN_DOUBLE_COLON, "^(::)"},
+        -:   66:    {TOKEN_IDENTIFIER, "^[_a-zA-Z][_a-zA-Z0-9]*"},
+        -:   67:    {TOKEN_OR_OR, "^(\\|\\|)"},
+        -:   68:    {TOKEN_AND_AND, "^(&&)"},
+        -:   69:    {TOKEN_PLUS, "^(\\+)"},
+        -:   70:    {TOKEN_MINUS, "^(-)"},
+        -:   71:    {TOKEN_STAR, "^(\\*)"},
+        -:   72:    {TOKEN_SLASH, "^(\\/)"},
+        -:   73:    {TOKEN_LPAREN, "^(\\()"},
+        -:   74:    {TOKEN_RPAREN, "^(\\))"},
+        -:   75:    {TOKEN_LBRACE, "^(\\{)"},
+        -:   76:    {TOKEN_RBRACE, "^(\\})"},
+        -:   77:    {TOKEN_LBRACKET, "^(\\[)"},
+        -:   78:    {TOKEN_RBRACKET, "^(\\])"},
+        -:   79:    {TOKEN_SEMICOLON, "^(;)"},
+        -:   80:    {TOKEN_COMMA, "^(,)"},
+        -:   81:    {TOKEN_WHITESPACE, "^[ \t\n]+"}
+        -:   82:};
+        -:   83:
+      219:   84:const char *tokenTypeName(TokenType type){
+      219:   85:    switch(type){
+       22:   86:        case TOKEN_NUMBER: return "NUMBER";
+        7:   87:        case TOKEN_BOOL: return "BOOL";
+    #####:   88:        case TOKEN_COMMENT: return "COMMENT";
+    #####:   89:        case TOKEN_TYPE_ARRAY: return "TYPE_ARRAY";
+       10:   90:        case TOKEN_TYPE_INT: return "TYPE_INT";
+    #####:   91:        case TOKEN_TYPE_FLOAT: return "TYPE_FLOAT";
+    #####:   92:        case TOKEN_TYPE_CHAR: return "TYPE_CHAR";
+        4:   93:        case TOKEN_TYPE_BOOL: return "TYPE_BOOL";
+        4:   94:        case TOKEN_TYPE_VOID: return "TYPE_VOID";
+    #####:   95:        case TOKEN_KW_IF: return "KW_IF";
+    #####:   96:        case TOKEN_KW_ELSE: return "KW_ELSE";
+        6:   97:        case TOKEN_KW_FOR: return "KW_FOR";
+        1:   98:        case TOKEN_KW_WHILE: return "KW_WHILE";
+        4:   99:        case TOKEN_KW_FUNC: return "KW_FUNC";
+        2:  100:        case TOKEN_KW_RET: return "KW_RET";
+        1:  101:        case TOKEN_KW_BREAK: return "KW_BREAK";
+        1:  102:        case TOKEN_KW_CONTINUE: return "KW_CONTINUE";
+    #####:  103:        case TOKEN_STRING: return "STRING";
+        1:  104:        case TOKEN_EQ_EQ: return "EQ_EQ";
+    #####:  105:        case TOKEN_GT_EQ: return "GT_EQ";
+    #####:  106:        case TOKEN_LT_EQ: return "LT_EQ";
+        1:  107:        case TOKEN_NOT_EQ: return "NOT_EQ";
+    #####:  108:        case TOKEN_GT: return "GT";
+        4:  109:        case TOKEN_LT: return "LT";
+        1:  110:        case TOKEN_BANG: return "BANG";
+        6:  111:        case TOKEN_PLUS_ASSIGN: return "PLUS_ASSIGN";
+    #####:  112:        case TOKEN_MINUS_ASSIGN: return "MINUS_ASSIGN";
+        4:  113:        case TOKEN_ARROW: return "ARROW";
+       15:  114:        case TOKEN_ASSIGN: return "ASSIGN";
+       14:  115:        case TOKEN_DOUBLE_COLON: return "DOUBLE_COLON";
+       37:  116:        case TOKEN_IDENTIFIER: return "IDENTIFIER";
+        1:  117:        case TOKEN_OR_OR: return "OR_OR";
+        1:  118:        case TOKEN_AND_AND: return "AND_AND";
+    #####:  119:        case TOKEN_PLUS: return "PLUS";
+    #####:  120:        case TOKEN_MINUS: return "MINUS";
+    #####:  121:        case TOKEN_STAR: return "STAR";
+    #####:  122:        case TOKEN_SLASH: return "SLASH";
+       13:  123:        case TOKEN_LPAREN: return "LPAREN";
+       13:  124:        case TOKEN_RPAREN: return "RPAREN";
+       11:  125:        case TOKEN_LBRACE: return "LBRACE";
+        9:  126:        case TOKEN_RBRACE: return "RBRACE";
+        2:  127:        case TOKEN_LBRACKET: return "LBRACKET";
+        2:  128:        case TOKEN_RBRACKET: return "RBRACKET";
+       22:  129:        case TOKEN_SEMICOLON: return "SEMICOLON";
+    #####:  130:        case TOKEN_COMMA: return "COMMA";
+    #####:  131:        case TOKEN_EOF: return "EOF";
+    #####:  132:        case TOKEN_WHITESPACE: return "WHITESPACE";
+        -:  133:    }
+        -:  134:
+    #####:  135:    return "UNKNOWN";
+        -:  136:}
+        -:  137:
+        -:  138:
+      245:  139:void lexerInit(Lexer *lexer, char *input) {
+      245:  140:    lexer->input = input;
+      245:  141:    lexer->cursor = input;
+      245:  142:    lexer->tokens = NULL;
+      245:  143:    lexer->line = 1;
+      245:  144:    lexer->column = 1;
+      245:  145:}
+        -:  146:
+      245:  147:Token *lexerTakeTokens(Lexer *lexer) {
+      245:  148:    Token *tokens = lexer->tokens;
+        -:  149:
+      245:  150:    lexer->tokens = NULL;
+      245:  151:    return tokens;
+        -:  152:}
+        -:  153:
+      245:  154:void lexerScan(Lexer *lexer) {
+        -:  155:    regex_t regex;
+        -:  156:    regmatch_t match;
+      245:  157:    bool matched = false;
+        -:  158:
+     6788:  159:    while(*lexer->cursor != '\0'){
+     6543:  160:        matched = false;
+   223718:  161:        for(int i = 0;i < NUM_TYPES;i++){
+   223718:  162:            if (regcomp(&regex, types[i].pattern, REG_EXTENDED) != 0) {
+        -:  163:                char errbuf[256];
+    #####:  164:                regerror(1, &regex, errbuf, sizeof(errbuf));
+    #####:  165:                fprintf(stderr, "Regex compilation failed for type %s: %s\n", tokenTypeName(types[i].type), errbuf);
+    #####:  166:                exit(1);
+        -:  167:            }
+   223718:  168:            if(regexec(&regex, lexer->cursor, 1, &match, 0) == 0){
+     6543:  169:                int length = match.rm_eo - match.rm_so;
+     6543:  170:                if(types[i].type != TOKEN_WHITESPACE && types[i].type != TOKEN_COMMENT){
+     4228:  171:                    char *value = malloc(length + 1);
+        -:  172:
+     4228:  173:                    strncpy(value, lexer->cursor, length);
+     4228:  174:                    value[length] = '\0';
+     4228:  175:                    lexerAppendToken(lexer, types[i].type, value);
+     4228:  176:                    free(value);
+        -:  177:                }
+        -:  178:
+    17464:  179:                for(int j = 0; j < length; j++){
+    10921:  180:                    if(lexer->cursor[j] == '\n'){
+      212:  181:                        lexer->line++;
+      212:  182:                        lexer->column = 1;
+        -:  183:                    }else{
+    10709:  184:                        lexer->column++;
+        -:  185:                    }
+        -:  186:                }
+        -:  187:
+     6543:  188:                lexer->cursor += length;
+     6543:  189:                matched = true;
+     6543:  190:                regfree(&regex);
+     6543:  191:                break;
+        -:  192:            }
+   217175:  193:            regfree(&regex);
+        -:  194:        }
+     6543:  195:        if (!matched) {
+    #####:  196:            fprintf(stderr, "Unrecognized token: %.10s\n", lexer->cursor);
+    #####:  197:            exit(1);
+        -:  198:        }
+        -:  199:    }
+        -:  200:
+      245:  201:    appendToken(&lexer->tokens, TOKEN_EOF, "", lexer->line, lexer->column);
+      245:  202:}
+        -:  203:
+      239:  204:Token *tokenizeString(const char *input){
+        -:  205:    Lexer lexer;
+      239:  206:    char *buffer = malloc(strlen(input) + 1);
+        -:  207:    Token *tokens;
+        -:  208:
+      239:  209:    strcpy(buffer, input);
+      239:  210:    lexerInit(&lexer, buffer);
+      239:  211:    lexerScan(&lexer);
+      239:  212:    tokens = lexerTakeTokens(&lexer);
+        -:  213:
+      239:  214:    free(buffer);
+      239:  215:    return tokens;
+        -:  216:}
+        -:  217:
+        2:  218:Token *tokenizeFile(const char *path) {
+        2:  219:    char *input = readFileToString(path);
+        -:  220:    Token *tokens;
+        -:  221:
+        2:  222:    if (input == NULL) {
+    #####:  223:        return NULL;
+        -:  224:    }
+        -:  225:
+        2:  226:    tokens = tokenizeString(input);
+        2:  227:    free(input);
+        2:  228:    return tokens;
+        -:  229:}
+        -:  230:
+       15:  231:char *readFileToString(const char *path){
+       15:  232:    FILE *file = fopen(path, "r");
+        -:  233:    long size;
+        -:  234:    char *buffer;
+        -:  235:
+       15:  236:    if(file == NULL){
+    #####:  237:        return NULL;
+        -:  238:    }
+        -:  239:
+       15:  240:    fseek(file, 0, SEEK_END);
+       15:  241:    size = ftell(file);
+       15:  242:    rewind(file);
+        -:  243:
+       15:  244:    buffer = malloc(size + 1);
+       15:  245:    if(buffer == NULL){
+    #####:  246:        fclose(file);
+    #####:  247:        return NULL;
+        -:  248:    }
+        -:  249:
+       15:  250:    if(fread(buffer, 1, size, file) != (size_t)size){
+    #####:  251:        fclose(file);
+    #####:  252:        free(buffer);
+    #####:  253:        return NULL;
+        -:  254:    }
+        -:  255:
+       15:  256:    buffer[size] = '\0';
+       15:  257:    fclose(file);
+       15:  258:    return buffer;
+        -:  259:}
+        -:  260:
+        2:  261:char *tokensToString(Token *head){
+        2:  262:    size_t size = 1;
+        2:  263:    char *buffer = malloc(size);
+        2:  264:    Token *current = head;
+        -:  265:
+        2:  266:    if(buffer == NULL){
+    #####:  267:        return NULL;
+        -:  268:    }
+        -:  269:
+        2:  270:    buffer[0] = '\0';
+        -:  271:
+       80:  272:    while(current != NULL){
+       78:  273:        if (current->type == TOKEN_EOF) {
+        2:  274:            current = current->next;
+        2:  275:            continue;
+        -:  276:        }
+        -:  277:
+       76:  278:        size_t lineLength = strlen(tokenTypeName(current->type)) + strlen(current->value) + 2;
+       76:  279:        char *nextBuffer = realloc(buffer, size + lineLength);
+        -:  280:
+       76:  281:        if(nextBuffer == NULL){
+    #####:  282:            free(buffer);
+    #####:  283:            return NULL;
+        -:  284:        }
+        -:  285:
+       76:  286:        buffer = nextBuffer;
+       76:  287:        snprintf(buffer + size - 1, lineLength + 1, "%s %s\n", tokenTypeName(current->type), current->value);
+       76:  288:        size += lineLength;
+       76:  289:        current = current->next;
+        -:  290:    }
+        -:  291:
+        2:  292:    return buffer;
+        -:  293:}
+        -:  294:
+        2:  295:char *tokenizeFileToString(const char *path){
+        2:  296:    char *input = readFileToString(path);
+        -:  297:    Token *tokens;
+        -:  298:    char *output;
+        -:  299:
+        2:  300:    if(input == NULL){
+    #####:  301:        return NULL;
+        -:  302:    }
+        -:  303:
+        2:  304:    tokens = tokenizeString(input);
+        2:  305:    free(input);
+        -:  306:
+        2:  307:    output = tokensToString(tokens);
+        2:  308:    freeTokens(tokens);
+        2:  309:    return output;
+        -:  310:}
+        -:  311:
+      149:  312:void freeTokens(Token *head){
+      149:  313:    Token *current = head;
+        -:  314:
+     3432:  315:    while(current != NULL){
+     3283:  316:        Token *next = current->next;
+     3283:  317:        free(current->value);
+     3283:  318:        free(current);
+     3283:  319:        current = next;
+        -:  320:    }
+      149:  321:}
+        -:  322:
+    #####:  323:void print(Token *head){
+    #####:  324:    Token *temp = head;
+    #####:  325:    while(temp != NULL){
+    #####:  326:        printf("%s\n", tokenTypeName(temp->type));
+    #####:  327:        printf("%s\n", temp->value);
+    #####:  328:        printf("%d\n", temp->line);
+    #####:  329:        printf("%d\n", temp->column);
+    #####:  330:        printf("\n");
+    #####:  331:        temp = temp->next;
+        -:  332:    }
+    #####:  333:}
+        -:  334:
+    #####:  335:void printInv(Token *head){
+    #####:  336:    Token *temp = head;
+    #####:  337:    while(temp->next != NULL){
+    #####:  338:        temp = temp->next;
+        -:  339:    }
+    #####:  340:    while(temp != NULL){
+    #####:  341:        printf("%s\n", tokenTypeName(temp->type));
+    #####:  342:        printf("%s\n", temp->value);
+    #####:  343:        printf("\n");
+    #####:  344:        temp = temp->anterior;
+        -:  345:    }
+    #####:  346:}

@@ -1,0 +1,92 @@
+        -:    0:Source:ir/ir_instr.c
+        -:    1:#include "ir.h"
+        -:    2:
+        -:    3:#include <stdlib.h>
+        -:    4:
+       91:    5:static void irInstructionFreePayload(IRInstruction *instruction) {
+        -:    6:    size_t i;
+        -:    7:
+       91:    8:    switch (instruction->kind) {
+    #####:    9:        case IR_INSTR_CONST:
+    #####:   10:            irOperandFree(&instruction->data.const_instr.value);
+    #####:   11:            break;
+    #####:   12:        case IR_INSTR_GLOBAL_ADDR:
+    #####:   13:            break;
+       10:   14:        case IR_INSTR_ALLOCA:
+       10:   15:            irTypeFree(instruction->data.alloca.allocated_type);
+       10:   16:            break;
+       19:   17:        case IR_INSTR_LOAD:
+       19:   18:            irOperandFree(&instruction->data.load.address);
+       19:   19:            break;
+       17:   20:        case IR_INSTR_STORE:
+       17:   21:            irOperandFree(&instruction->data.store.address);
+       17:   22:            irOperandFree(&instruction->data.store.value);
+       17:   23:            break;
+        5:   24:        case IR_INSTR_GEP:
+        5:   25:            irOperandFree(&instruction->data.gep.base);
+       15:   26:            for (i = 0; i < instruction->data.gep.index_count; i++) {
+       10:   27:                irOperandFree(&instruction->data.gep.indices[i]);
+        -:   28:            }
+        5:   29:            free(instruction->data.gep.indices);
+        5:   30:            break;
+       11:   31:        case IR_INSTR_ADD:
+        -:   32:        case IR_INSTR_SUB:
+        -:   33:        case IR_INSTR_MUL:
+        -:   34:        case IR_INSTR_DIV:
+        -:   35:        case IR_INSTR_CMP_EQ:
+        -:   36:        case IR_INSTR_CMP_NE:
+        -:   37:        case IR_INSTR_CMP_LT:
+        -:   38:        case IR_INSTR_CMP_LE:
+        -:   39:        case IR_INSTR_CMP_GT:
+        -:   40:        case IR_INSTR_CMP_GE:
+       11:   41:            irOperandFree(&instruction->data.binary.left);
+       11:   42:            irOperandFree(&instruction->data.binary.right);
+       11:   43:            break;
+    #####:   44:        case IR_INSTR_NEG:
+        -:   45:        case IR_INSTR_NOT:
+    #####:   46:            irOperandFree(&instruction->data.unary.operand);
+    #####:   47:            break;
+        6:   48:        case IR_INSTR_BR:
+        6:   49:            break;
+        4:   50:        case IR_INSTR_COND_BR:
+        4:   51:            irOperandFree(&instruction->data.cond_br.condition);
+        4:   52:            break;
+       15:   53:        case IR_INSTR_RET:
+       15:   54:            if (instruction->data.ret.has_value) {
+       11:   55:                irOperandFree(&instruction->data.ret.value);
+        -:   56:            }
+       15:   57:            break;
+        4:   58:        case IR_INSTR_CALL:
+        4:   59:            free(instruction->data.call.callee);
+        9:   60:            for (i = 0; i < instruction->data.call.arg_count; i++) {
+        5:   61:                irOperandFree(&instruction->data.call.args[i]);
+        -:   62:            }
+        4:   63:            free(instruction->data.call.args);
+        4:   64:            break;
+    #####:   65:        case IR_INSTR_CAST:
+    #####:   66:            irOperandFree(&instruction->data.cast.value);
+    #####:   67:            irTypeFree(instruction->data.cast.target_type);
+    #####:   68:            break;
+        -:   69:    }
+       91:   70:}
+        -:   71:
+       91:   72:IRInstruction *irInstructionCreate(IRInstructionKind kind) {
+       91:   73:    IRInstruction *instruction = calloc(1, sizeof(IRInstruction));
+        -:   74:
+       91:   75:    if (instruction == NULL) {
+    #####:   76:        return NULL;
+        -:   77:    }
+        -:   78:
+       91:   79:    instruction->kind = kind;
+       91:   80:    return instruction;
+        -:   81:}
+        -:   82:
+       91:   83:void irInstructionFree(IRInstruction *instruction) {
+       91:   84:    if (instruction == NULL) {
+    #####:   85:        return;
+        -:   86:    }
+        -:   87:
+       91:   88:    irInstructionFreePayload(instruction);
+       91:   89:    irTypeFree(instruction->result_type);
+       91:   90:    free(instruction);
+        -:   91:}

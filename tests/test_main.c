@@ -2,8 +2,31 @@
 
 void test_semantic_accepts_builtin_print_functions(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
+void test_lexer_tokenizes_logical_and_equality_operators(void);
+void test_lexer_tokenizes_break_and_continue_keywords_together(void);
+void test_semantic_accepts_logical_and_with_bool_operands(void);
+void test_semantic_rejects_logical_and_with_non_bool_operand(void);
+void test_semantic_accepts_logical_or_with_bool_operands(void);
+void test_semantic_rejects_logical_or_with_non_bool_operand(void);
+void test_semantic_accepts_equality_with_compatible_operands(void);
+void test_semantic_rejects_equality_with_incompatible_operands(void);
+void test_semantic_accepts_inequality_with_compatible_operands(void);
+void test_semantic_rejects_inequality_with_incompatible_operands(void);
+void test_semantic_accepts_unary_not_for_bool_operand(void);
+void test_semantic_rejects_unary_not_for_non_bool_operand(void);
+void test_semantic_rejects_array_literal_with_incompatible_element_types(void);
+void test_semantic_accepts_nested_array_literal_with_matching_shapes(void);
 void test_ir_builder_predeclares_builtin_runtime_functions(void);
 void test_ir_printer_emits_runtime_function_declarations(void);
+void test_ir_printer_emits_float_values_as_double(void);
+void test_ir_printer_emits_bool_values_as_i1(void);
+void test_ir_printer_escapes_special_characters_in_string_literals(void);
+void test_ir_printer_emits_sub_mul_and_div_operations(void);
+void test_ir_printer_emits_default_return_for_empty_function(void);
+void test_ir_printer_writes_module_to_file(void);
+void test_integration_emits_ir_for_globals_function_calls_and_control_flow(void);
+void test_integration_emits_ir_for_single_dimension_array_access(void);
+void test_integration_emits_ir_for_runtime_print_calls(void);
 
 int test_failures = 0;
 int tests_run = 0;
@@ -19,6 +42,8 @@ int main(void) {
     RUN_TEST(test_get_tokens_preserves_position_across_calls, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_struct_tracks_position_and_tokens, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_struct_preserves_scan_state, "tests/lexer/test_lexer.c");
+    RUN_TEST(test_lexer_tokenizes_logical_and_equality_operators, "tests/lexer/test_lexer.c");
+    RUN_TEST(test_lexer_tokenizes_break_and_continue_keywords_together, "tests/lexer/test_lexer.c");
     RUN_TEST(test_parser_parses_assignment_without_symbol_lookup, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_declaration_syntax_without_semantics, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_call_syntax_without_function_type, "tests/parser/test_parser.c");
@@ -78,9 +103,24 @@ int main(void) {
     RUN_TEST(test_semantic_rejects_identifier_global_initializer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_break_and_continue_inside_while, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_break_and_continue_inside_for, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_logical_and_with_bool_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_logical_and_with_non_bool_operand, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_logical_or_with_bool_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_logical_or_with_non_bool_operand, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_equality_with_compatible_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_equality_with_incompatible_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_inequality_with_compatible_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_inequality_with_incompatible_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_unary_not_for_bool_operand, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_unary_not_for_non_bool_operand, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_array_literal_with_incompatible_element_types, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_nested_array_literal_with_matching_shapes, "tests/semantic/test_semantic.c");
     RUN_TEST(test_tokenize_file_appends_single_eof_for_multiline_input, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_input_program_ast, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_parses_loop_control_and_unary_ast, "tests/integration/test_integration.c");
+    RUN_TEST(test_integration_emits_ir_for_globals_function_calls_and_control_flow, "tests/integration/test_integration.c");
+    RUN_TEST(test_integration_emits_ir_for_single_dimension_array_access, "tests/integration/test_integration.c");
+    RUN_TEST(test_integration_emits_ir_for_runtime_print_calls, "tests/integration/test_integration.c");
     RUN_TEST(test_ir_builder_creates_module_for_empty_program, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_builder_predeclares_global_and_function_symbols, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_private_string_global, "tests/ir/test_ir.c");
@@ -93,6 +133,12 @@ int main(void) {
     RUN_TEST(test_ir_printer_emits_runtime_function_declarations, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_loop_comparisons_and_branches, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_reads_and_writes_global_variables, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_float_values_as_double, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_bool_values_as_i1, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_escapes_special_characters_in_string_literals, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_sub_mul_and_div_operations, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_default_return_for_empty_function, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_writes_module_to_file, "tests/ir/test_ir.c");
 
     printf("\n");
     printf("Tests run: %d\n", tests_run);

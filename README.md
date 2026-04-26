@@ -6,13 +6,13 @@ PocScript is a study project focused on implementing the core building blocks of
 
 The compiler is intentionally split into small, explicit stages:
 
-- `lexer/`: turns source text into a linked list of tokens with `type`, `value`, `line`, and `column`
-- `parser/`: consumes tokens and builds an AST for declarations, statements, expressions, calls, control flow, and arrays
-- `semantic/`: validates scopes, declarations, types, function calls, returns, loop control, builtin runtime functions, and array rules
-- `ir/`: lowers the validated AST to an internal IR and prints LLVM IR to `IR.ll`
+- `src/lexer/`: turns source text into a linked list of tokens with `type`, `value`, `line`, and `column`
+- `src/parser/`: consumes tokens and builds an AST for declarations, statements, expressions, calls, control flow, and arrays
+- `src/semantic/`: validates scopes, declarations, types, function calls, returns, loop control, builtin runtime functions, and array rules
+- `src/ir/`: lowers the validated AST to an internal IR and prints LLVM IR to `build/ir/IR.ll`
 - `runtime/`: provides `_start` and builtin runtime functions linked into the final executable without libc
 - `tests/`: unit and integration tests for lexer, parser, semantic analysis, IR building, and IR printing
-- `main.c`: debug-oriented compiler entry point that reads `input.ps`, runs the full pipeline, and emits `IR.ll`
+- `src/main.c`: debug-oriented compiler entry point that reads `input.ps`, runs the full pipeline, and emits `build/ir/IR.ll`
 
 ## Current Architecture
 
@@ -22,13 +22,13 @@ The current pipeline is:
 2. `parserParseProgram(...)` builds the AST.
 3. `semanticAnalyze(...)` validates the AST in two passes.
 4. `irBuildModule(...)` lowers the validated AST to the internal IR.
-5. `irPrintModuleToFile(...)` prints LLVM IR to `IR.ll`.
-6. `make assembly` compiles `IR.ll`, assembles the runtime, and links everything into `output`.
+5. `irPrintModuleToFile(...)` prints LLVM IR to `build/ir/IR.ll`.
+6. `make assembly` compiles `build/ir/IR.ll`, assembles the runtime, and links everything into `build/bin/output`.
 
 In practice, there are two main artifacts:
 
-- `compiler`: useful for inspecting parsing, semantic validation, and IR generation
-- `output`: the final executable built from generated LLVM IR plus the runtime layer
+- `build/bin/compiler`: useful for inspecting parsing, semantic validation, and IR generation
+- `build/bin/output`: the final executable built from generated LLVM IR plus the runtime layer
 
 ## Design Decisions
 
@@ -96,39 +96,43 @@ In other words, the project tries to build as much as possible from scratch, but
 
 ```text
 .
-|-- main.c
-|-- constants.h
+|-- build/
+|-- include/
+|   |-- ast.h
+|   |-- constants.h
+|   |-- errors.h
+|   |-- ir.h
+|   |-- lexer.h
+|   |-- parser.h
+|   |-- scope.h
+|   |-- semantic.h
+|   |-- token.h
+|   `-- types.h
 |-- input.ps
 |-- makefile
-|-- lexer/
-|   |-- lexer.c
-|   |-- lexer.h
-|   |-- token.h
-|   `-- README.md
-|-- parser/
-|   |-- parser.c
-|   |-- parser.h
-|   |-- ast.c
-|   |-- ast.h
-|   `-- README.md
-|-- semantic/
-|   |-- semantic.c
-|   |-- semantic.h
-|   |-- errors.c
-|   |-- errors.h
-|   |-- scope.c
-|   |-- scope.h
-|   |-- types.c
-|   `-- types.h
-|-- ir/
-|   |-- ir_core.c
-|   |-- ir_instr.c
-|   |-- ir_module.c
-|   |-- ir_scope.c
-|   |-- ir_builder.c
-|   |-- ir_printer.c
-|   |-- ir.h
-|   `-- README.md
+|-- src/
+|   |-- main.c
+|   |-- lexer/
+|   |   |-- lexer.c
+|   |   `-- README.md
+|   |-- parser/
+|   |   |-- parser.c
+|   |   |-- ast.c
+|   |   `-- README.md
+|   |-- semantic/
+|   |   |-- semantic.c
+|   |   |-- errors.c
+|   |   |-- scope.c
+|   |   |-- types.c
+|   |   `-- README.md
+|   `-- ir/
+|       |-- ir_core.c
+|       |-- ir_instr.c
+|       |-- ir_module.c
+|       |-- ir_scope.c
+|       |-- ir_builder.c
+|       |-- ir_printer.c
+|       `-- README.md
 |-- runtime/
 |   |-- io.asm
 |   |-- start.asm
@@ -244,15 +248,15 @@ The project is intentionally incomplete, but the currently documented language s
 make
 ```
 
-This generates the `compiler` executable.
+This generates `build/bin/compiler`.
 
 ### Run with the default input file
 
 ```bash
-./compiler
+./build/bin/compiler
 ```
 
-The program reads `input.ps`, parses it, runs semantic validation, and writes `IR.ll` when the program is valid. When semantic errors exist, they are printed with line and column information and IR generation is skipped.
+The program reads `input.ps`, parses it, runs semantic validation, and writes `build/ir/IR.ll` when the program is valid. When semantic errors exist, they are printed with line and column information and IR generation is skipped.
 
 ### Build the final executable
 
@@ -262,16 +266,16 @@ make assembly
 
 This performs the full backend build:
 
-1. runs `./compiler` to generate `IR.ll`
-2. compiles `IR.ll` into `IR.o` with `clang -c`
-3. assembles `runtime/io.asm` into `runtime/io.o`
-4. assembles `runtime/start.asm` into `runtime/start.o`
-5. links `IR.o`, `runtime/io.o`, and `runtime/start.o` into `output` with `ld`
+1. runs `./build/bin/compiler` to generate `build/ir/IR.ll`
+2. compiles `build/ir/IR.ll` into `build/obj/IR.o` with `clang -c`
+3. assembles `runtime/io.asm` into `build/obj/runtime/io.o`
+4. assembles `runtime/start.asm` into `build/obj/runtime/start.o`
+5. links `build/obj/IR.o`, `build/obj/runtime/io.o`, and `build/obj/runtime/start.o` into `build/bin/output` with `ld`
 
 ### Run the final executable
 
 ```bash
-./output
+./build/bin/output
 ```
 
 The final program starts at `_start`, calls the generated `main`, uses the runtime functions linked from `runtime/`, and exits through Linux syscalls without libc.
@@ -282,7 +286,7 @@ The final program starts at `_start`, calls the generated `main`, uses the runti
 make test
 ```
 
-This builds and runs `tests_runner`.
+This builds and runs `build/bin/tests_runner`.
 
 ### Clean artifacts
 
@@ -292,10 +296,10 @@ make clean
 
 ## Internal Documentation
 
-- `lexer/README.md`: lexer overview, token categories, and tokenization flow
-- `parser/README.md`: parser organization and AST structure
-- `semantic/README.md`: semantic analysis flow, data structures, and validation rules
-- `ir/README.md`: IR model, lowering strategy, LLVM printer behavior, and backend limits
+- `src/lexer/README.md`: lexer overview, token categories, and tokenization flow
+- `src/parser/README.md`: parser organization and AST structure
+- `src/semantic/README.md`: semantic analysis flow, data structures, and validation rules
+- `src/ir/README.md`: IR model, lowering strategy, LLVM printer behavior, and backend limits
 - `runtime/README.md`: runtime entry point, exported symbols, and link flow
 - `tests/README.md`: test suite structure and the role of each group
 

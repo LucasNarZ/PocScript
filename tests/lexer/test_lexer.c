@@ -1,5 +1,5 @@
 #include "../helpers/test_helpers.h"
-#include "../../lexer/lexer.h"
+#include "lexer.h"
 
 void test_lexer_tokenizes_double_colon_and_types(void) {
     Token *tokens = tokenizeString("x::int = 10;");

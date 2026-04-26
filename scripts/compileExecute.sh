@@ -1,4 +1,4 @@
 make clean
 make 
 make assembly
-./output
+./build/bin/output

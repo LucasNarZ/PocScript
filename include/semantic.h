@@ -4,7 +4,7 @@
 #include "errors.h"
 #include "scope.h"
 #include "types.h"
-#include "../parser/ast.h"
+#include "ast.h"
 
 typedef struct {
     Scope *global_scope;

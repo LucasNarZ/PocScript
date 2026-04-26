@@ -1,6 +1,6 @@
 #include "../helpers/test_helpers.h"
 #include "../helpers/test_support.h"
-#include "../../lexer/lexer.h"
+#include "lexer.h"
 
 void test_tokenize_file_appends_single_eof_for_multiline_input(void) {
     Token *tokens = tokenizeFile("tests/fixtures/lexer/basic_program.ps");

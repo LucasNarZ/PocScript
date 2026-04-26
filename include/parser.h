@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../lexer/token.h"
+#include "token.h"
 #include "ast.h"
 
 typedef struct {

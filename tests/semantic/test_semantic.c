@@ -1,6 +1,6 @@
 #include "../helpers/test_helpers.h"
 #include "../helpers/test_support.h"
-#include "../../semantic/semantic.h"
+#include "semantic.h"
 
 static AstNode *makeProgramWithSingleNode(AstNode *node) {
     AstNode *program = astNewNode(AST_PROGRAM);

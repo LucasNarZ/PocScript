@@ -1,7 +1,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include "../constants.h"
+#include "constants.h"
 
 typedef enum {
     TOKEN_NUMBER,

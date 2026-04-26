@@ -1,6 +1,6 @@
 # IR
 
-The `ir/` directory contains PocScript's lowering stage from validated AST nodes to an internal intermediate representation and, from there, to textual LLVM IR.
+The `src/ir/` directory contains PocScript's lowering stage from validated AST nodes to an internal intermediate representation and, from there, to textual LLVM IR.
 
 ## Files
 
@@ -19,8 +19,8 @@ The backend flow is currently:
 1. The parser builds the AST.
 2. The semantic analyzer validates the AST and produces `SemanticResult`.
 3. `irBuildModule(...)` lowers the validated tree into an `IRModule`.
-4. `irPrintModuleToFile(...)` writes the LLVM IR text to `IR.ll`.
-5. `clang` compiles `IR.ll` and `ld` links it with the runtime objects.
+4. `irPrintModuleToFile(...)` writes the LLVM IR text to `build/ir/IR.ll`.
+5. `clang` compiles `build/ir/IR.ll` and `ld` links it with the runtime objects.
 
 `irBuildModule(...)` refuses to run when semantic analysis reported errors. The IR layer assumes the input program is already semantically valid.
 

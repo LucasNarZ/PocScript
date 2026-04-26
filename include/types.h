@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../parser/ast.h"
+#include "ast.h"
 
 typedef enum {
     SEM_TYPE_INT,

@@ -1,8 +1,8 @@
-#include "./ir/ir.h"
-#include "./lexer/lexer.h"
-#include "./parser/ast.h"
-#include "./parser/parser.h"
-#include "./semantic/semantic.h"
+#include "ast.h"
+#include "ir.h"
+#include "lexer.h"
+#include "parser.h"
+#include "semantic.h"
 #include <stdio.h>
 
 int main() {
@@ -22,8 +22,6 @@ int main() {
   root = parserParseProgram(&parser);
   semantic = semanticAnalyze(root);
 
-  astPrintPretty(root);
-
   if (semantic.errors.count > 0) {
     printf("\n");
     for (i = 0; i < semantic.errors.count; i++) {
@@ -39,8 +37,8 @@ int main() {
     }
   } else {
     module = irBuildModule(root, &semantic);
-    if (module == NULL || !irPrintModuleToFile(module, "IR.ll")) {
-      remove("IR.ll");
+    if (module == NULL || !irPrintModuleToFile(module, "build/ir/IR.ll")) {
+      remove("build/ir/IR.ll");
       fprintf(stderr, "IR generation failed\n");
       irModuleFree(module);
       semanticResultFree(&semantic);

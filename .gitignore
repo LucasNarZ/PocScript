@@ -1,7 +1,5 @@
 .vscode
-*.o
-compiler
+build/
 output.txt
 *.ps
-output*
 test

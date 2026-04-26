@@ -1,6 +1,6 @@
 # Runtime
 
-The `runtime/` directory contains the assembly code linked into the final executable generated from `IR.ll`.
+The `runtime/` directory contains the assembly code linked into the final executable generated from `build/ir/IR.ll`.
 
 ## Files
 
@@ -14,7 +14,7 @@ The language currently exposes these runtime functions to user code:
 - `printString(string) -> void`
 - `printInt(int) -> void`
 
-These names are registered as builtins in semantic analysis, mirrored into the IR global symbol table, emitted as external LLVM declarations, and resolved by `ld` against `runtime/io.o`.
+These names are registered as builtins in semantic analysis, mirrored into the IR global symbol table, emitted as external LLVM declarations, and resolved by `ld` against `build/obj/runtime/io.o`.
 
 ## `io.asm`
 
@@ -39,9 +39,9 @@ This keeps process startup separate from runtime helper functions and allows the
 
 The `makefile` assembles and links this directory through these stages:
 
-1. `nasm -f elf64 runtime/io.asm -o runtime/io.o`
-2. `nasm -f elf64 runtime/start.asm -o runtime/start.o`
-3. `clang -c IR.ll -o IR.o`
-4. `ld -o output runtime/start.o runtime/io.o IR.o`
+1. `nasm -f elf64 runtime/io.asm -o build/obj/runtime/io.o`
+2. `nasm -f elf64 runtime/start.asm -o build/obj/runtime/start.o`
+3. `clang -c build/ir/IR.ll -o build/obj/IR.o`
+4. `ld -o build/bin/output build/obj/runtime/start.o build/obj/runtime/io.o build/obj/IR.o`
 
 Use `make assembly` to build the final executable.

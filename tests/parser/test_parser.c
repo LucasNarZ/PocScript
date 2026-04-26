@@ -2,8 +2,8 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "../../lexer/lexer.h"
-#include "../../parser/parser.h"
+#include "lexer.h"
+#include "parser.h"
 
 static Token *makeToken(TokenType type, char *value) {
     Token *token = malloc(sizeof(Token));

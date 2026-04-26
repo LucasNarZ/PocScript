@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../parser/ast.h"
-#include "../semantic/semantic.h"
+#include "ast.h"
+#include "semantic.h"
 
 typedef struct IRType IRType;
 typedef struct IRLiteral IRLiteral;

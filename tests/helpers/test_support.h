@@ -1,11 +1,11 @@
 #ifndef TEST_SUPPORT_H
 #define TEST_SUPPORT_H
 
-#include "../../lexer/lexer.h"
-#include "../../parser/ast.h"
-#include "../../parser/parser.h"
-#include "../../semantic/semantic.h"
-#include "../../ir/ir.h"
+#include "lexer.h"
+#include "ast.h"
+#include "parser.h"
+#include "semantic.h"
+#include "ir.h"
 
 AstNode *parseRootFromString(const char *input);
 char *nodeTreeToString(AstNode *root);

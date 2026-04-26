@@ -184,6 +184,17 @@ void test_semantic_reports_wrong_argument_type(void) {
     astFree(root);
 }
 
+void test_semantic_accepts_sized_array_argument_for_matching_parameter(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func first(values::Array<int>[3]) -> int { ret values[0]; } "
+        "func main() -> int { data::Array<int>[3] = {1, 2, 3}; ret first(data); }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_reports_non_integer_array_index(void) {
     AstNode *root = parseRootFromString("func main() -> void { arr::Array<int> = {1, 2}; arr[true]; }");
     SemanticResult result = semanticAnalyze(root);

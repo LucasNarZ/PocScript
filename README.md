@@ -156,20 +156,20 @@ The current codebase supports:
 - integer, float, string, and bool literals
 - array literals, including nested array literals
 - assignments `=`, `+=`, and `-=`
-- binary expressions including arithmetic, comparison, and logical operators at the parser/semantic level
-- unary operators `!` and `-` at the parser/semantic level
+- binary expressions including arithmetic, comparison, and logical operators across the active pipeline
+- unary operators `!` and `-` across the active pipeline
 - blocks
 - `if`, `else`, `while`, `for`, `break`, and `continue`
 - function declarations with explicit return types and `ret`
 - function calls
 - builtin runtime calls to `printString` and `printInt`
-- array access syntax with one or more indices in the AST and semantic phases
+- array access syntax with one or more indices across the active pipeline
 - LLVM IR emission for globals, functions, control flow, array access, string storage, and external runtime declarations
 - final executable generation with `_start` and a libc-free runtime linked by `ld`
 
 ## Feature Status
 
-The table below distinguishes between features that are currently supported across the full implemented pipeline and features that are already accepted in the frontend but are not yet fully covered by backend code generation.
+The table below distinguishes between features that are currently supported across the full implemented pipeline.
 
 | Feature | Status | Notes |
 | --- | --- | --- |
@@ -190,22 +190,20 @@ The table below distinguishes between features that are currently supported acro
 | Compound assignments `+=` and `-=` | `fully-supported` | Lowered through load/compute/store |
 | Single-index array access | `fully-supported` | Lowered with `getelementptr` in current backend |
 | Array literals | `fully-supported` | Current backend supports element-by-element initialization |
-| Nested array literals | `frontend-only` | Frontend accepts them, but backend coverage is not yet fully defined end to end |
-| Multi-index array access | `frontend-only` | Parser and semantic analyzer accept it, backend currently lowers one index |
+| Nested array literals | `fully-supported` | Lowered recursively with element-by-element initialization |
+| Multi-index array access | `fully-supported` | Lowered through multi-step `getelementptr` index lists |
 | Binary arithmetic `+`, `-`, `*`, `/` | `fully-supported` | Lowered in current backend |
 | Comparisons `>`, `<`, `<=` | `fully-supported` | Lowered in current backend |
-| Comparisons `>=`, `==`, `!=` | `frontend-only` | Present in parser/semantic space, not fully lowered in active backend path |
-| Logical operators `&&`, `||` | `frontend-only` | Accepted in the frontend, not fully implemented in current backend lowering |
-| Unary `!` and unary `-` | `frontend-only` | Accepted by parser and semantic analysis, not fully implemented in current backend lowering |
-| `break` and `continue` | `frontend-only` | Accepted and semantically validated, but not yet lowered in the current backend path |
+| Comparisons `>=`, `==`, `!=` | `fully-supported` | Lowered and emitted as LLVM comparisons in the active backend path |
+| Logical operators `&&`, `||` | `fully-supported` | Lowered and emitted as boolean LLVM operations |
+| Unary `!` and unary `-` | `fully-supported` | Lowered and emitted in the active backend path |
+| `break` and `continue` | `fully-supported` | Lowered through explicit loop target branches |
 
 `fully-supported` means the feature is implemented coherently across the currently active pipeline: parser, semantic analysis, IR generation, LLVM IR emission, and executable generation.
 
-`frontend-only` means the feature is already part of the language surface in the parser and usually also in semantic analysis, but it is not yet fully supported end to end by the backend.
-
 ## Current Language And Backend Limitations
 
-The project is intentionally incomplete. Some features are accepted earlier in the pipeline than they are currently supported in code generation.
+The project is intentionally incomplete, but the currently documented language surface is supported across the active pipeline.
 
 ### Language limitations
 
@@ -225,15 +223,10 @@ The project is intentionally incomplete. Some features are accepted earlier in t
 
 ### Backend limitations
 
-- the internal IR enum contains more instruction variants than the current lowering path actually emits
-- the current backend lowers arithmetic and only part of the comparison space in the active path
 - locals are always lowered through stack slots rather than promoted values
 - there are no SSA phi nodes
-- array access lowering in `ir/` currently handles one index in the active backend path, even though the parser and semantic analyzer accept multiple indices
 - the backend depends on semantic analysis to reject unsupported or inconsistent programs before IR generation
 - code generation is focused on readability and correctness, not optimization quality
-
-That last point is important: parser support or semantic support for a construct does not automatically mean the LLVM backend is equally complete for every variant of that construct.
 
 ## Build And Run
 

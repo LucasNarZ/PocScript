@@ -60,6 +60,8 @@ typedef enum {
     IR_INSTR_SUB,
     IR_INSTR_MUL,
     IR_INSTR_DIV,
+    IR_INSTR_AND,
+    IR_INSTR_OR,
     IR_INSTR_NEG,
     IR_INSTR_CMP_EQ,
     IR_INSTR_CMP_NE,
@@ -285,6 +287,9 @@ struct IRBuilder {
     IRFunction *current_function;
     IRBasicBlock *current_block;
     IRScope *current_scope;
+    IRLoopTarget *loop_targets;
+    size_t loop_target_count;
+    size_t loop_target_capacity;
 };
 
 IRType *irTypeCreate(IRTypeKind kind);

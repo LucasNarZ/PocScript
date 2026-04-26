@@ -216,15 +216,28 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
         case IR_INSTR_SUB:
         case IR_INSTR_MUL:
         case IR_INSTR_DIV:
+        case IR_INSTR_AND:
+        case IR_INSTR_OR:
+        case IR_INSTR_CMP_EQ:
+        case IR_INSTR_CMP_NE:
         case IR_INSTR_CMP_LT:
         case IR_INSTR_CMP_LE:
         case IR_INSTR_CMP_GT:
-            if (instruction->kind == IR_INSTR_CMP_GT || instruction->kind == IR_INSTR_CMP_LT || instruction->kind == IR_INSTR_CMP_LE) {
+        case IR_INSTR_CMP_GE:
+            if (instruction->kind == IR_INSTR_CMP_EQ
+                    || instruction->kind == IR_INSTR_CMP_NE
+                    || instruction->kind == IR_INSTR_CMP_GT
+                    || instruction->kind == IR_INSTR_CMP_LT
+                    || instruction->kind == IR_INSTR_CMP_LE
+                    || instruction->kind == IR_INSTR_CMP_GE) {
                 fprintf(out, "  %%t%u = ", instruction->result_id);
                 fputs(
+                    instruction->kind == IR_INSTR_CMP_EQ ? "icmp eq " :
+                    instruction->kind == IR_INSTR_CMP_NE ? "icmp ne " :
                     instruction->kind == IR_INSTR_CMP_GT ? "icmp sgt " :
                     instruction->kind == IR_INSTR_CMP_LT ? "icmp slt " :
-                    "icmp sle ",
+                    instruction->kind == IR_INSTR_CMP_LE ? "icmp sle " :
+                    "icmp sge ",
                     out
                 );
                 irPrintType(out, instruction->data.binary.left.type);
@@ -232,7 +245,9 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
                 fprintf(out, "  %%t%u = %s ", instruction->result_id,
                     instruction->kind == IR_INSTR_ADD ? "add" :
                     instruction->kind == IR_INSTR_SUB ? "sub" :
-                    instruction->kind == IR_INSTR_MUL ? "mul" : "sdiv");
+                    instruction->kind == IR_INSTR_MUL ? "mul" :
+                    instruction->kind == IR_INSTR_DIV ? "sdiv" :
+                    instruction->kind == IR_INSTR_AND ? "and" : "or");
                 irPrintType(out, instruction->result_type);
             }
             fputc(' ', out);
@@ -240,6 +255,20 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
             fputs(", ", out);
             irPrintOperand(out, module, &instruction->data.binary.right);
             fputc('\n', out);
+            break;
+        case IR_INSTR_NEG:
+            fprintf(out, "  %%t%u = sub ", instruction->result_id);
+            irPrintType(out, instruction->result_type);
+            fputs(" 0, ", out);
+            irPrintOperand(out, module, &instruction->data.unary.operand);
+            fputc('\n', out);
+            break;
+        case IR_INSTR_NOT:
+            fprintf(out, "  %%t%u = xor ", instruction->result_id);
+            irPrintType(out, instruction->result_type);
+            fputc(' ', out);
+            irPrintOperand(out, module, &instruction->data.unary.operand);
+            fputs(", 1\n", out);
             break;
         case IR_INSTR_GEP:
             fprintf(out, "  %%t%u = getelementptr inbounds ", instruction->result_id);

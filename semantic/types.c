@@ -12,8 +12,11 @@ SemanticType *semanticTypeNewPrimitive(SemanticTypeKind kind) {
 
     type->kind = kind;
     type->element_type = NULL;
+    type->array_size = 0;
+    type->has_array_size = false;
     return type;
 }
+
 SemanticType *semanticTypeClone(const SemanticType *type) {
     SemanticType *copy;
 
@@ -25,6 +28,9 @@ SemanticType *semanticTypeClone(const SemanticType *type) {
     if (copy == NULL) {
         return NULL;
     }
+
+    copy->array_size = type->array_size;
+    copy->has_array_size = type->has_array_size;
 
     if (type->element_type != NULL) {
         copy->element_type = semanticTypeClone(type->element_type);
@@ -53,6 +59,14 @@ bool semanticTypeEquals(const SemanticType *left, const SemanticType *right) {
 
     if (left->kind != SEM_TYPE_ARRAY) {
         return true;
+    }
+
+    if (left->has_array_size != right->has_array_size) {
+        return false;
+    }
+
+    if (left->has_array_size && left->array_size != right->array_size) {
+        return false;
     }
 
     return semanticTypeEquals(left->element_type, right->element_type);
@@ -87,6 +101,7 @@ const char *semanticTypeName(const SemanticType *type) {
 
 SemanticType *semanticTypeFromAst(AstNode *typeNode) {
     SemanticType *type;
+    AstNode *elementTypeNode;
 
     if (typeNode == NULL) {
         return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
@@ -98,7 +113,20 @@ SemanticType *semanticTypeFromAst(AstNode *typeNode) {
             return NULL;
         }
 
-        type->element_type = semanticTypeFromAst(typeNode->data.type_array.element_type);
+        if (typeNode->data.type_array.size_expr != NULL && typeNode->data.type_array.size_expr->type == AST_INT_LITERAL) {
+            type->array_size = (size_t) typeNode->data.type_array.size_expr->data.int_literal.value;
+            type->has_array_size = true;
+        }
+
+        elementTypeNode = typeNode->data.type_array.element_type;
+        if (typeNode->data.type_array.size_expr != NULL
+                && elementTypeNode != NULL
+                && elementTypeNode->type == AST_TYPE_ARRAY
+                && elementTypeNode->data.type_array.size_expr == NULL) {
+            elementTypeNode = elementTypeNode->data.type_array.element_type;
+        }
+
+        type->element_type = semanticTypeFromAst(elementTypeNode);
         return type;
     }
 

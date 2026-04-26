@@ -123,7 +123,7 @@ Current operand kinds are:
 
 Instructions optionally produce a result id and store instruction-specific payload in a tagged union.
 
-The enum contains more variants than the printer currently emits. The active backend path today uses a smaller subset, described below.
+The enum contains more variants than the current lowering path emits, but the printer now covers the instruction kinds used by the active backend path described below.
 
 ### `IRScope`, `IRSymbolTable`, and `IRSymbol`
 
@@ -220,7 +220,7 @@ Local declarations lower to:
 2. symbol registration in the current scope
 3. optional initialization with `store`
 
-Array literals are lowered element-by-element with `getelementptr` followed by `store` for each slot.
+Array literals, including nested array literals, are lowered element-by-element with `getelementptr` followed by `store` for each slot.
 
 ### Binary expressions
 
@@ -230,13 +230,21 @@ The builder currently emits IR for:
 - `-` -> `sub`
 - `*` -> `mul`
 - `/` -> `sdiv`
+- `&&` -> `and`
+- `||` -> `or`
 - `>` -> `icmp sgt`
 - `<` -> `icmp slt`
 - `<=` -> `icmp sle`
+- `>=` -> `icmp sge`
+- `==` -> `icmp eq`
+- `!=` -> `icmp ne`
+
+It also lowers unary operators:
+
+- unary `-` -> `sub 0, value`
+- unary `!` -> `xor value, 1`
 
 Comparison results use `bool` / `i1`.
-
-Although the instruction enum includes more comparison and unary variants, they are not currently lowered or printed in the active path.
 
 ### Function calls
 
@@ -255,8 +263,8 @@ Array element access lowers through `getelementptr inbounds`.
 Current implementation details:
 
 - the base expression must lower to an addressable array value
-- only one index is lowered in the current backend path
-- the generated index list is `[0, index]`, matching LLVM access into an aggregate stored behind a pointer
+- one or more indices are lowered in the active backend path
+- the generated index list starts with `0` and then appends every source index, matching LLVM access into an aggregate stored behind a pointer
 
 The resulting address is then loaded when the access is used as an rvalue.
 
@@ -284,6 +292,11 @@ Current patterns are:
 - `if`: `then`, `else`, and `end` blocks
 - `while`: `cond`, `body`, and `end` blocks
 - `for`: optional init in a fresh scope, then `cond`, `body`, `update`, and `end` blocks
+
+Loop lowering also maintains explicit loop targets so:
+
+- `break` branches to the current loop end block
+- `continue` branches to the current `while` condition block or current `for` update block
 
 A block that does not already end in `ret`, `br`, or conditional `br` receives an explicit jump to the next block.
 

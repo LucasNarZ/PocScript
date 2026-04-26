@@ -32,6 +32,8 @@ static void irInstructionFreePayload(IRInstruction *instruction) {
         case IR_INSTR_SUB:
         case IR_INSTR_MUL:
         case IR_INSTR_DIV:
+        case IR_INSTR_AND:
+        case IR_INSTR_OR:
         case IR_INSTR_CMP_EQ:
         case IR_INSTR_CMP_NE:
         case IR_INSTR_CMP_LT:

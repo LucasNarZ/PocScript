@@ -300,6 +300,26 @@ static bool semanticTypeIsNumeric(const SemanticType *type) {
     return type != NULL && (type->kind == SEM_TYPE_INT || type->kind == SEM_TYPE_FLOAT);
 }
 
+static bool semanticTypeIsCompatible(const SemanticType *expected, const SemanticType *actual) {
+    if (expected == NULL || actual == NULL) {
+        return false;
+    }
+
+    if (semanticTypeEquals(expected, actual)) {
+        return true;
+    }
+
+    if (expected->kind != SEM_TYPE_ARRAY || actual->kind != SEM_TYPE_ARRAY) {
+        return false;
+    }
+
+    if (expected->has_array_size && actual->has_array_size && expected->array_size != actual->array_size) {
+        return false;
+    }
+
+    return semanticTypeIsCompatible(expected->element_type, actual->element_type);
+}
+
 static bool semanticTypeIsBool(const SemanticType *type) {
     return type != NULL && type->kind == SEM_TYPE_BOOL;
 }
@@ -414,7 +434,7 @@ static SemanticType *checkAssign(AstNode *node, Scope *scope, SemanticResult *re
         Symbol *targetSymbol = scopeLookup(scope, node->data.assign.target->data.identifier.name);
 
         if (targetSymbol != NULL && targetSymbol->kind == SYMBOL_VARIABLE) {
-            if (valueType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(targetSymbol->type, valueType)) {
+            if (valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(targetSymbol->type, valueType)) {
                 appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "assignment types are incompatible");
             }
             semanticTypeFree(valueType);
@@ -593,7 +613,7 @@ static SemanticType *checkCall(AstNode *node, Scope *scope, SemanticResult *resu
 
     for (i = 0; i < node->data.call.arg_count; i++) {
         SemanticType *argType = checkExpression(node->data.call.args[i], scope, result);
-        if (argType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(callee->params[i], argType)) {
+        if (argType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(callee->params[i], argType)) {
             appendWrongArgumentTypeError(node->data.call.args[i], result, callee->name, i + 1, callee->params[i], argType);
         }
         semanticTypeFree(argType);
@@ -647,7 +667,7 @@ static void validateVariableDeclaration(AstNode *node, Scope *scope, SemanticRes
             appendInvalidGlobalInitializerError(node, result, node->data.var_decl.name);
         } else {
             SemanticType *initializerType = checkExpression(node->data.var_decl.initializer, scope, result);
-            if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(declaredType, initializerType)) {
+            if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(declaredType, initializerType)) {
                 appendInitializerTypeError(node, result, node->data.var_decl.name, declaredType, initializerType);
             }
             semanticTypeFree(initializerType);

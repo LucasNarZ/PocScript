@@ -3,6 +3,28 @@
 
 #include <unistd.h>
 
+static size_t countUnconditionalBranchesToBlock(const IRFunction *function, unsigned int target_block_id) {
+    size_t block_index;
+    size_t instruction_index;
+    size_t count = 0;
+
+    if (function == NULL) {
+        return 0;
+    }
+
+    for (block_index = 0; block_index < function->block_count; block_index++) {
+        IRBasicBlock *block = function->blocks[block_index];
+        for (instruction_index = 0; instruction_index < block->instruction_count; instruction_index++) {
+            IRInstruction *instruction = block->instructions[instruction_index];
+            if (instruction->kind == IR_INSTR_BR && instruction->data.br.target_block_id == target_block_id) {
+                count++;
+            }
+        }
+    }
+
+    return count;
+}
+
 void test_ir_builder_creates_module_for_empty_program(void) {
     IRModule *module = buildIrModuleFromString("");
 
@@ -99,6 +121,21 @@ void test_ir_printer_emits_function_call(void) {
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
         EXPECT_TRUE(strstr(llvm, "call i32 @add") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func first(values::Array<int>[3]) -> int { ret values[1]; } "
+        "func main() -> int { data::Array<int>[3] = {1, 2, 3}; ret first(data); }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "define i32 @first([3 x i32] %p1)") != NULL);
+        EXPECT_TRUE(strstr(llvm, "call i32 @first([3 x i32]") != NULL);
+        EXPECT_TRUE(strstr(llvm, "[0 x i32]") == NULL);
         free(llvm);
     }
 }
@@ -248,4 +285,120 @@ void test_ir_printer_writes_module_to_file(void) {
     free(written);
     irModuleFree(module);
     unlink(pathTemplate);
+}
+
+void test_ir_printer_emits_missing_comparison_variants(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main(a::int, b::int) -> bool { if (a >= b) { ret a == b; } ret a != b; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "icmp sge") != NULL);
+        EXPECT_TRUE(strstr(llvm, "icmp eq") != NULL);
+        EXPECT_TRUE(strstr(llvm, "icmp ne") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_unary_negation_and_not(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main(flag::bool, value::int) -> int { if (!flag) { ret -value; } ret value; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "xor i1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "sub i32 0,") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_logical_and_or(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main(a::bool, b::bool, c::bool) -> bool { if (a && b) { ret a || c; } ret false; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "and i1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "or i1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "ret i1") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_multi_index_array_access(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { grid::int[2][3] = {{1, 2, 3}, {4, 5, 6}}; ret grid[1][2]; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "getelementptr") != NULL);
+        EXPECT_TRUE(strstr(llvm, "[3 x [2 x i32]]") != NULL);
+        EXPECT_TRUE(strstr(llvm, ", i32 1, i32 2") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_initializes_nested_array_literals_element_by_element(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { grid::int[2][2] = {{1, 2}, {3, 4}}; ret grid[1][0]; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "alloca [2 x [2 x i32]]") != NULL);
+        EXPECT_TRUE(strstr(llvm, "store i32 1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "store i32 4") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_break_and_continue_in_while(void) {
+    IRModule *module = buildIrModuleFromString(
+        "func main() -> int { i::int = 0; while (i < 5) { i += 1; if (i == 2) { continue; } if (i == 4) { break; } } ret i; }"
+    );
+
+    EXPECT_TRUE(module != NULL);
+    if (module != NULL) {
+        IRFunction *main_function = module->functions[0];
+        unsigned int cond_block_id = main_function->blocks[1]->id;
+        unsigned int end_block_id = main_function->blocks[3]->id;
+
+        EXPECT_TRUE(countUnconditionalBranchesToBlock(main_function, cond_block_id) >= 2);
+        EXPECT_TRUE(countUnconditionalBranchesToBlock(main_function, end_block_id) >= 1);
+        irModuleFree(module);
+    }
+}
+
+void test_ir_printer_emits_break_and_continue_in_for(void) {
+    IRModule *module = buildIrModuleFromString(
+        "func main() -> int { total::int = 0; for (i::int = 0; i < 5; i += 1) { if (i == 1) { continue; } if (i == 4) { break; } total += i; } ret total; }"
+    );
+
+    EXPECT_TRUE(module != NULL);
+    if (module != NULL) {
+        IRFunction *main_function = module->functions[0];
+        unsigned int update_block_id = main_function->blocks[3]->id;
+        unsigned int end_block_id = main_function->blocks[4]->id;
+
+        EXPECT_TRUE(countUnconditionalBranchesToBlock(main_function, update_block_id) >= 2);
+        EXPECT_TRUE(countUnconditionalBranchesToBlock(main_function, end_block_id) >= 1);
+        irModuleFree(module);
+    }
+}
+
+void test_ir_printer_inferrs_unsized_array_length_from_literal(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { arr::Array<int> = {1, 2, 4}; ret 0; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "alloca [3 x i32]") != NULL);
+        EXPECT_TRUE(strstr(llvm, "alloca [0 x i32]") == NULL);
+        free(llvm);
+    }
 }

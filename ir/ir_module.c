@@ -306,6 +306,7 @@ void irBuilderFree(IRBuilder *builder) {
         return;
     }
 
+    free(builder->loop_targets);
     irModuleFree(builder->module);
     free(builder);
 }

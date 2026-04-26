@@ -2,6 +2,7 @@
 
 void test_semantic_accepts_builtin_print_functions(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
+void test_semantic_accepts_sized_array_argument_for_matching_parameter(void);
 void test_lexer_tokenizes_logical_and_equality_operators(void);
 void test_lexer_tokenizes_break_and_continue_keywords_together(void);
 void test_semantic_accepts_logical_and_with_bool_operands(void);
@@ -24,6 +25,15 @@ void test_ir_printer_escapes_special_characters_in_string_literals(void);
 void test_ir_printer_emits_sub_mul_and_div_operations(void);
 void test_ir_printer_emits_default_return_for_empty_function(void);
 void test_ir_printer_writes_module_to_file(void);
+void test_ir_printer_emits_missing_comparison_variants(void);
+void test_ir_printer_emits_unary_negation_and_not(void);
+void test_ir_printer_emits_logical_and_or(void);
+void test_ir_printer_emits_multi_index_array_access(void);
+void test_ir_printer_initializes_nested_array_literals_element_by_element(void);
+void test_ir_printer_emits_break_and_continue_in_while(void);
+void test_ir_printer_emits_break_and_continue_in_for(void);
+void test_ir_printer_inferrs_unsized_array_length_from_literal(void);
+void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void);
 void test_integration_emits_ir_for_globals_function_calls_and_control_flow(void);
 void test_integration_emits_ir_for_single_dimension_array_access(void);
 void test_integration_emits_ir_for_runtime_print_calls(void);
@@ -83,6 +93,7 @@ int main(void) {
     RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_count, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_type, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_sized_array_argument_for_matching_parameter, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_non_integer_array_index, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_indexing_non_array_value, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accumulates_multiple_errors, "tests/semantic/test_semantic.c");
@@ -129,6 +140,7 @@ int main(void) {
     RUN_TEST(test_ir_printer_emits_conditional_branches_and_labels, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_gep_for_array_access, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_function_call, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_preserves_sized_array_parameter_types_in_calls, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_builder_predeclares_builtin_runtime_functions, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_runtime_function_declarations, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_loop_comparisons_and_branches, "tests/ir/test_ir.c");
@@ -139,6 +151,14 @@ int main(void) {
     RUN_TEST(test_ir_printer_emits_sub_mul_and_div_operations, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_default_return_for_empty_function, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_writes_module_to_file, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_missing_comparison_variants, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_unary_negation_and_not, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_logical_and_or, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_multi_index_array_access, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_initializes_nested_array_literals_element_by_element, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_break_and_continue_in_while, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_break_and_continue_in_for, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_inferrs_unsized_array_length_from_literal, "tests/ir/test_ir.c");
 
     printf("\n");
     printf("Tests run: %d\n", tests_run);

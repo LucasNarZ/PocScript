@@ -2,6 +2,7 @@
 #define SEMANTIC_TYPES_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "../parser/ast.h"
 
@@ -19,6 +20,8 @@ typedef enum {
 typedef struct SemanticType {
     SemanticTypeKind kind;
     struct SemanticType *element_type;
+    size_t array_size;
+    bool has_array_size;
 } SemanticType;
 
 SemanticType *semanticTypeNewPrimitive(SemanticTypeKind kind);

@@ -47,13 +47,22 @@ static char *irBuilderUnquoteString(const char *value) {
 
 static IRType *irBuilderTypeFromAst(const AstNode *type_node) {
     IRType *element_type;
+    const AstNode *element_type_node;
 
     if (type_node == NULL) {
         return NULL;
     }
 
     if (type_node->type == AST_TYPE_ARRAY) {
-        element_type = irBuilderTypeFromAst(type_node->data.type_array.element_type);
+        element_type_node = type_node->data.type_array.element_type;
+        if (type_node->data.type_array.size_expr != NULL
+                && element_type_node != NULL
+                && element_type_node->type == AST_TYPE_ARRAY
+                && element_type_node->data.type_array.size_expr == NULL) {
+            element_type_node = element_type_node->data.type_array.element_type;
+        }
+
+        element_type = irBuilderTypeFromAst(element_type_node);
         if (type_node->data.type_array.size_expr != NULL && type_node->data.type_array.size_expr->type == AST_INT_LITERAL) {
             return irTypeCreateSizedArray(element_type, (size_t) type_node->data.type_array.size_expr->data.int_literal.value);
         }
@@ -112,6 +121,133 @@ static IRLiteral *irBuilderLiteralFromAst(const AstNode *node) {
         default:
             return NULL;
     }
+}
+
+static IRLiteral *irBuilderCloneLiteral(const IRLiteral *literal) {
+    if (literal == NULL) {
+        return NULL;
+    }
+
+    switch (literal->kind) {
+        case IR_LITERAL_INT:
+            return irLiteralCreateInt(literal->data.int_value);
+        case IR_LITERAL_FLOAT:
+            return irLiteralCreateFloat(literal->data.float_value);
+        case IR_LITERAL_STRING:
+            return irLiteralCreateString(literal->data.string_value);
+        case IR_LITERAL_BOOL:
+            return irLiteralCreateBool(literal->data.bool_value);
+    }
+
+    return NULL;
+}
+
+static IROperand irBuilderCloneOperand(const IROperand *operand) {
+    if (operand == NULL) {
+        return (IROperand) {0};
+    }
+
+    switch (operand->kind) {
+        case IR_OPERAND_LOCAL:
+            return irOperandCreateLocal(irTypeClone(operand->type), operand->data.local_id);
+        case IR_OPERAND_PARAM:
+            return irOperandCreateParam(irTypeClone(operand->type), operand->data.param_id);
+        case IR_OPERAND_GLOBAL:
+            return irOperandCreateGlobal(irTypeClone(operand->type), operand->data.global_id);
+        case IR_OPERAND_LITERAL:
+            return irOperandCreateLiteral(irTypeClone(operand->type), irBuilderCloneLiteral(operand->data.literal));
+        case IR_OPERAND_BLOCK:
+            return irOperandCreateBlock(operand->data.block_id);
+    }
+
+    return (IROperand) {0};
+}
+
+static void irBuilderFreeOperandArray(IROperand *operands, size_t count) {
+    size_t i;
+
+    if (operands == NULL) {
+        return;
+    }
+
+    for (i = 0; i < count; i++) {
+        irOperandFree(&operands[i]);
+    }
+
+    free(operands);
+}
+
+static size_t irBuilderArrayDepth(const IRType *type) {
+    size_t depth = 0;
+    const IRType *current = type;
+
+    while (current != NULL && current->kind == IR_TYPE_ARRAY) {
+        depth++;
+        current = current->element_type;
+    }
+
+    return depth;
+}
+
+static IRType *irBuilderInferArrayTypeFromLiteral(const IRType *declared_type, const AstNode *literal) {
+    IRType *element_type;
+
+    if (declared_type == NULL) {
+        return NULL;
+    }
+
+    if (declared_type->kind != IR_TYPE_ARRAY || literal == NULL || literal->type != AST_ARRAY_LITERAL) {
+        return irTypeClone(declared_type);
+    }
+
+    if (declared_type->element_type != NULL
+            && declared_type->element_type->kind == IR_TYPE_ARRAY
+            && literal->data.array_literal.count > 0
+            && literal->data.array_literal.elements[0]->type == AST_ARRAY_LITERAL) {
+        element_type = irBuilderInferArrayTypeFromLiteral(declared_type->element_type, literal->data.array_literal.elements[0]);
+    } else {
+        element_type = irTypeClone(declared_type->element_type);
+    }
+
+    if (element_type == NULL) {
+        return NULL;
+    }
+
+    return irTypeCreateSizedArray(element_type, literal->data.array_literal.count);
+}
+
+static bool irBuilderPushLoopTarget(IRBuilder *builder, IRBasicBlock *break_target, IRBasicBlock *continue_target) {
+    IRLoopTarget *resized;
+
+    if (builder->loop_target_count == builder->loop_target_capacity) {
+        size_t new_capacity = builder->loop_target_capacity == 0 ? 4 : builder->loop_target_capacity * 2;
+        resized = realloc(builder->loop_targets, new_capacity * sizeof(IRLoopTarget));
+        if (resized == NULL) {
+            return false;
+        }
+
+        builder->loop_targets = resized;
+        builder->loop_target_capacity = new_capacity;
+    }
+
+    builder->loop_targets[builder->loop_target_count].break_target = break_target;
+    builder->loop_targets[builder->loop_target_count].continue_target = continue_target;
+    builder->loop_target_count++;
+    return true;
+}
+
+static void irBuilderPopLoopTarget(IRBuilder *builder) {
+    if (builder->loop_target_count > 0) {
+        builder->loop_target_count--;
+    }
+}
+
+static IRLoopTarget *irBuilderCurrentLoopTarget(IRBuilder *builder) {
+    if (builder->loop_target_count == 0) {
+        return NULL;
+    }
+
+    return &builder->loop_targets[builder->loop_target_count - 1];
 }
 
 static unsigned int irBuilderNextGlobalId(IRBuilder *builder) {
@@ -576,6 +712,35 @@ static IRValue irBuilderEmitBinary(IRBuilder *builder, IRInstructionKind kind, I
     return result;
 }
 
+static IRValue irBuilderEmitUnary(IRBuilder *builder, IRInstructionKind kind, IROperand operand, IRType *type) {
+    IRValue result = irValueEmpty();
+    IRInstruction *instruction = irInstructionCreate(kind);
+    unsigned int result_id;
+
+    if (instruction == NULL || type == NULL) {
+        irInstructionFree(instruction);
+        irOperandFree(&operand);
+        irTypeFree(type);
+        return result;
+    }
+
+    result_id = irBuilderReserveResult(builder);
+    instruction->has_result = true;
+    instruction->result_id = result_id;
+    instruction->result_type = irTypeClone(type);
+    instruction->data.unary.operand = operand;
+
+    if (!irBuilderAppendInstruction(builder, instruction)) {
+        irTypeFree(type);
+        return result;
+    }
+
+    result.type = type;
+    result.value = irOperandCreateLocal(irTypeClone(type), result_id);
+    result.has_value = true;
+    return result;
+}
+
 static IRValue irBuilderEmitGep(IRBuilder *builder, IROperand base, IROperand *indices, size_t index_count, IRType *result_type) {
     IRValue result = irValueEmpty();
     IRInstruction *instruction = irInstructionCreate(IR_INSTR_GEP);
@@ -606,6 +771,80 @@ static IRValue irBuilderEmitGep(IRBuilder *builder, IROperand base, IROperand *i
     result.address = irOperandCreateLocal(irTypeClone(instruction->result_type), result_id);
     result.has_address = true;
     return result;
+}
+
+static bool irBuilderEmitStore(IRBuilder *builder, IROperand address, IROperand value);
+
+static bool irBuilderStoreArrayLiteralElements(
+        IRBuilder *builder,
+        const IROperand *base_address,
+        const IRType *array_type,
+        const AstNode *literal,
+        long *path,
+        size_t depth) {
+    size_t i;
+
+    if (base_address == NULL || array_type == NULL || literal == NULL || literal->type != AST_ARRAY_LITERAL) {
+        return false;
+    }
+
+    for (i = 0; i < literal->data.array_literal.count; i++) {
+        AstNode *element = literal->data.array_literal.elements[i];
+        path[depth] = (long) i;
+
+        if (element->type == AST_ARRAY_LITERAL) {
+            if (array_type->element_type == NULL || array_type->element_type->kind != IR_TYPE_ARRAY) {
+                return false;
+            }
+
+            if (!irBuilderStoreArrayLiteralElements(builder, base_address, array_type->element_type, element, path, depth + 1)) {
+                return false;
+            }
+
+            continue;
+        }
+
+        {
+            IROperand *indices = calloc(depth + 2, sizeof(IROperand));
+            IRValue slot;
+            IRValue initializer;
+            size_t j;
+
+            if (indices == NULL) {
+                return false;
+            }
+
+            indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+            for (j = 0; j <= depth; j++) {
+                indices[j + 1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(path[j]));
+            }
+
+            slot = irBuilderEmitGep(
+                builder,
+                irBuilderCloneOperand(base_address),
+                indices,
+                depth + 2,
+                irTypeClone(array_type->element_type)
+            );
+            initializer = irBuilderLowerRValue(builder, element);
+            if (!slot.has_address || !initializer.has_value) {
+                irTypeFree(slot.type);
+                irTypeFree(initializer.type);
+                return false;
+            }
+
+            if (!irBuilderEmitStore(builder, slot.address, initializer.value)) {
+                irTypeFree(slot.type);
+                irTypeFree(initializer.type);
+                return false;
+            }
+
+            irTypeFree(slot.type);
+            irTypeFree(initializer.type);
+        }
+    }
+
+    return true;
 }
 
 static bool irBuilderEmitBranch(IRBuilder *builder, IRBasicBlock *target) {
@@ -687,10 +926,11 @@ static IRValue irBuilderLowerIdentifier(IRBuilder *builder, const AstNode *node)
 
 static IRValue irBuilderLowerArrayAccess(IRBuilder *builder, const AstNode *node) {
     IRValue base = irBuilderLowerLValue(builder, node->data.array_access.base);
-    IRValue index_value;
     IROperand *indices;
+    IRType *current_type;
+    size_t i;
 
-    if (!base.has_address || base.type == NULL || base.type->kind != IR_TYPE_ARRAY || node->data.array_access.index_count != 1) {
+    if (!base.has_address || base.type == NULL || base.type->kind != IR_TYPE_ARRAY || node->data.array_access.index_count == 0) {
         irTypeFree(base.type);
         if (base.has_address) {
             irOperandFree(&base.address);
@@ -698,27 +938,46 @@ static IRValue irBuilderLowerArrayAccess(IRBuilder *builder, const AstNode *node
         return irValueEmpty();
     }
 
-    index_value = irBuilderLowerRValue(builder, node->data.array_access.indices[0]);
-    if (!index_value.has_value) {
-        irTypeFree(base.type);
-        irOperandFree(&base.address);
-        return irValueEmpty();
-    }
-
-    indices = calloc(2, sizeof(IROperand));
+    indices = calloc(node->data.array_access.index_count + 1, sizeof(IROperand));
     if (indices == NULL) {
         irTypeFree(base.type);
         irOperandFree(&base.address);
-        irOperandFree(&index_value.value);
-        irTypeFree(index_value.type);
         return irValueEmpty();
     }
 
+    current_type = irTypeClone(base.type);
     indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
-    indices[1] = index_value.value;
-    irTypeFree(index_value.type);
 
-    return irBuilderEmitGep(builder, base.address, indices, 2, irTypeClone(base.type->element_type));
+    for (i = 0; i < node->data.array_access.index_count; i++) {
+        IRValue index_value;
+        IRType *next_type;
+
+        if (current_type == NULL || current_type->kind != IR_TYPE_ARRAY || current_type->element_type == NULL) {
+            irTypeFree(base.type);
+            irTypeFree(current_type);
+            irOperandFree(&base.address);
+            irBuilderFreeOperandArray(indices, i + 1);
+            return irValueEmpty();
+        }
+
+        index_value = irBuilderLowerRValue(builder, node->data.array_access.indices[i]);
+        if (!index_value.has_value) {
+            irTypeFree(base.type);
+            irTypeFree(current_type);
+            irOperandFree(&base.address);
+            irBuilderFreeOperandArray(indices, i + 1);
+            return irValueEmpty();
+        }
+
+        indices[i + 1] = index_value.value;
+        irTypeFree(index_value.type);
+        next_type = irTypeClone(current_type->element_type);
+        irTypeFree(current_type);
+        current_type = next_type;
+    }
+
+    irTypeFree(base.type);
+    return irBuilderEmitGep(builder, base.address, indices, node->data.array_access.index_count + 1, current_type);
 }
 
 static IRValue irBuilderLowerLValue(IRBuilder *builder, const AstNode *node) {
@@ -810,6 +1069,28 @@ static IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node) {
                 return irValueEmpty();
             }
             return irBuilderEmitLoad(builder, result.address, result.type);
+        case AST_UNARY: {
+            IRValue operand = irBuilderLowerRValue(builder, node->data.unary.operand);
+            if (!operand.has_value) {
+                return irValueEmpty();
+            }
+
+            if (node->data.unary.op == AST_UNARY_NOT) {
+                IRValue unary_result = irBuilderEmitUnary(builder, IR_INSTR_NOT, operand.value, irTypeCreate(IR_TYPE_BOOL));
+                irTypeFree(operand.type);
+                return unary_result;
+            }
+
+            if (node->data.unary.op == AST_UNARY_NEGATE) {
+                IRValue unary_result = irBuilderEmitUnary(builder, IR_INSTR_NEG, operand.value, irTypeClone(operand.type));
+                irTypeFree(operand.type);
+                return unary_result;
+            }
+
+            irOperandFree(&operand.value);
+            irTypeFree(operand.type);
+            return irValueEmpty();
+        }
         case AST_CALL: {
             IRSymbol *callee;
             IROperand *args = NULL;
@@ -901,6 +1182,16 @@ static IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node) {
                     binary_result = irBuilderEmitBinary(builder, IR_INSTR_DIV, left.value, right.value, left.type);
                     irTypeFree(right.type);
                     return binary_result;
+                case AST_BINARY_AND:
+                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_AND, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+                    irTypeFree(left.type);
+                    irTypeFree(right.type);
+                    return binary_result;
+                case AST_BINARY_OR:
+                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_OR, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+                    irTypeFree(left.type);
+                    irTypeFree(right.type);
+                    return binary_result;
                 case AST_BINARY_GT:
                     binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_GT, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
                     irTypeFree(left.type);
@@ -913,6 +1204,21 @@ static IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node) {
                     return binary_result;
                 case AST_BINARY_LTE:
                     binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_LE, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+                    irTypeFree(left.type);
+                    irTypeFree(right.type);
+                    return binary_result;
+                case AST_BINARY_GTE:
+                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_GE, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+                    irTypeFree(left.type);
+                    irTypeFree(right.type);
+                    return binary_result;
+                case AST_BINARY_EQ:
+                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_EQ, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
+                    irTypeFree(left.type);
+                    irTypeFree(right.type);
+                    return binary_result;
+                case AST_BINARY_NEQ:
+                    binary_result = irBuilderEmitBinary(builder, IR_INSTR_CMP_NE, left.value, right.value, irTypeCreate(IR_TYPE_BOOL));
                     irTypeFree(left.type);
                     irTypeFree(right.type);
                     return binary_result;
@@ -937,6 +1243,21 @@ static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
 
     if (value_type == NULL) {
         return false;
+    }
+
+    if (node->data.var_decl.initializer != NULL
+            && value_type->kind == IR_TYPE_ARRAY
+            && !value_type->has_array_size
+            && node->data.var_decl.initializer->type == AST_ARRAY_LITERAL) {
+        IRType *inferred_type = irBuilderInferArrayTypeFromLiteral(value_type, node->data.var_decl.initializer);
+
+        if (inferred_type == NULL) {
+            irTypeFree(value_type);
+            return false;
+        }
+
+        irTypeFree(value_type);
+        value_type = inferred_type;
     }
 
     pointer_type = irTypeCreatePointer(irTypeClone(value_type));
@@ -974,43 +1295,25 @@ static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
     }
 
     if (node->data.var_decl.initializer != NULL && value_type->kind == IR_TYPE_ARRAY && node->data.var_decl.initializer->type == AST_ARRAY_LITERAL) {
-        size_t i;
+        size_t array_depth = irBuilderArrayDepth(value_type);
+        long *path = calloc(array_depth, sizeof(long));
+        IROperand base_address = irOperandCreateLocal(irTypeClone(pointer_type), slot_id);
 
-        for (i = 0; i < node->data.var_decl.initializer->data.array_literal.count; i++) {
-            IROperand *indices = calloc(2, sizeof(IROperand));
-            IRValue slot;
-            IRValue initializer;
-
-            if (indices == NULL) {
-                irTypeFree(value_type);
-                return false;
-            }
-
-            indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
-            indices[1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt((long) i));
-            slot = irBuilderEmitGep(
-                builder,
-                irOperandCreateLocal(irTypeClone(pointer_type), slot_id),
-                indices,
-                2,
-                irTypeClone(value_type->element_type)
-            );
-            initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer->data.array_literal.elements[i]);
-            if (!slot.has_address || !initializer.has_value) {
-                irTypeFree(value_type);
-                return false;
-            }
-
-            if (!irBuilderEmitStore(builder, slot.address, initializer.value)) {
-                irTypeFree(slot.type);
-                irTypeFree(initializer.type);
-                irTypeFree(value_type);
-                return false;
-            }
-
-            irTypeFree(slot.type);
-            irTypeFree(initializer.type);
+        if (path == NULL) {
+            irOperandFree(&base_address);
+            irTypeFree(value_type);
+            return false;
         }
+
+        if (!irBuilderStoreArrayLiteralElements(builder, &base_address, value_type, node->data.var_decl.initializer, path, 0)) {
+            free(path);
+            irOperandFree(&base_address);
+            irTypeFree(value_type);
+            return false;
+        }
+
+        free(path);
+        irOperandFree(&base_address);
     } else if (node->data.var_decl.initializer != NULL && value_type->kind != IR_TYPE_STRING) {
         IRValue initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer);
 
@@ -1295,10 +1598,15 @@ static bool irBuilderLowerStatement(IRBuilder *builder, const AstNode *node) {
                 return false;
             }
 
-            builder->current_block = body_block;
-            if (!irBuilderLowerBlockNode(builder, node->data.while_stmt.body)) {
+            if (!irBuilderPushLoopTarget(builder, end_block, cond_block)) {
                 return false;
             }
+            builder->current_block = body_block;
+            if (!irBuilderLowerBlockNode(builder, node->data.while_stmt.body)) {
+                irBuilderPopLoopTarget(builder);
+                return false;
+            }
+            irBuilderPopLoopTarget(builder);
             if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, cond_block)) {
                 return false;
             }
@@ -1370,12 +1678,19 @@ static bool irBuilderLowerStatement(IRBuilder *builder, const AstNode *node) {
                 return false;
             }
 
-            builder->current_block = body_block;
-            if (!irBuilderLowerBlockNode(builder, node->data.for_stmt.body)) {
+            if (!irBuilderPushLoopTarget(builder, end_block, update_block)) {
                 irScopeFree(loop_scope);
                 builder->current_scope = saved_scope;
                 return false;
             }
+            builder->current_block = body_block;
+            if (!irBuilderLowerBlockNode(builder, node->data.for_stmt.body)) {
+                irBuilderPopLoopTarget(builder);
+                irScopeFree(loop_scope);
+                builder->current_scope = saved_scope;
+                return false;
+            }
+            irBuilderPopLoopTarget(builder);
             if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, update_block)) {
                 irScopeFree(loop_scope);
                 builder->current_scope = saved_scope;
@@ -1398,6 +1713,22 @@ static bool irBuilderLowerStatement(IRBuilder *builder, const AstNode *node) {
             irScopeFree(loop_scope);
             builder->current_scope = saved_scope;
             return true;
+        }
+        case AST_BREAK: {
+            IRLoopTarget *loop_target = irBuilderCurrentLoopTarget(builder);
+            if (loop_target == NULL) {
+                return false;
+            }
+
+            return irBuilderEmitBranch(builder, loop_target->break_target);
+        }
+        case AST_CONTINUE: {
+            IRLoopTarget *loop_target = irBuilderCurrentLoopTarget(builder);
+            if (loop_target == NULL) {
+                return false;
+            }
+
+            return irBuilderEmitBranch(builder, loop_target->continue_target);
         }
         case AST_RETURN:
             return irBuilderLowerReturn(builder, node);

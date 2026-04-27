@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "ast.h"
 #include "semantic.h"
@@ -334,6 +335,7 @@ IRModule *irModuleCreate(void);
 bool irModuleAppendGlobal(IRModule *module, IRGlobal *global);
 bool irModuleAppendFunction(IRModule *module, IRFunction *function);
 IRModule *irBuildModule(AstNode *program, const SemanticResult *semantic);
+void irDumpModule(FILE *out, const IRModule *module);
 bool irPrintModuleToFile(const IRModule *module, const char *path);
 char *irPrintModuleToString(const IRModule *module);
 void irModuleFree(IRModule *module);

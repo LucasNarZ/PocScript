@@ -331,6 +331,218 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
     }
 }
 
+static const char *irInstructionKindName(IRInstructionKind kind) {
+    switch (kind) {
+        case IR_INSTR_CONST: return "const";
+        case IR_INSTR_GLOBAL_ADDR: return "global_addr";
+        case IR_INSTR_ALLOCA: return "alloca";
+        case IR_INSTR_LOAD: return "load";
+        case IR_INSTR_STORE: return "store";
+        case IR_INSTR_GEP: return "gep";
+        case IR_INSTR_ADD: return "add";
+        case IR_INSTR_SUB: return "sub";
+        case IR_INSTR_MUL: return "mul";
+        case IR_INSTR_DIV: return "div";
+        case IR_INSTR_AND: return "and";
+        case IR_INSTR_OR: return "or";
+        case IR_INSTR_NEG: return "neg";
+        case IR_INSTR_CMP_EQ: return "cmp_eq";
+        case IR_INSTR_CMP_NE: return "cmp_ne";
+        case IR_INSTR_CMP_LT: return "cmp_lt";
+        case IR_INSTR_CMP_LE: return "cmp_le";
+        case IR_INSTR_CMP_GT: return "cmp_gt";
+        case IR_INSTR_CMP_GE: return "cmp_ge";
+        case IR_INSTR_NOT: return "not";
+        case IR_INSTR_BR: return "br";
+        case IR_INSTR_COND_BR: return "cond_br";
+        case IR_INSTR_RET: return "ret";
+        case IR_INSTR_CALL: return "call";
+        case IR_INSTR_CAST: return "cast";
+    }
+
+    return "unknown";
+}
+
+static void irDumpOperand(FILE *out, const IRModule *module, const IROperand *operand) {
+    if (operand == NULL) {
+        fputs("<null>", out);
+        return;
+    }
+
+    switch (operand->kind) {
+        case IR_OPERAND_LOCAL:
+            fprintf(out, "local(%%t%u)", operand->data.local_id);
+            break;
+        case IR_OPERAND_PARAM:
+            fprintf(out, "param(%%p%u)", operand->data.param_id);
+            break;
+        case IR_OPERAND_GLOBAL: {
+            IRGlobal *global = module != NULL ? irPrinterFindGlobalById(module, operand->data.global_id) : NULL;
+            fprintf(out, "global(@%s)", global != NULL ? global->name : "g");
+            break;
+        }
+        case IR_OPERAND_LITERAL:
+            fputs("literal(", out);
+            irPrintOperand(out, module, operand);
+            fputc(')', out);
+            break;
+        case IR_OPERAND_BLOCK:
+            fprintf(out, "block(bb%u)", operand->data.block_id);
+            break;
+    }
+
+    if (operand->type != NULL) {
+        fputs(": ", out);
+        irPrintType(out, operand->type);
+    }
+}
+
+static void irDumpInstruction(FILE *out, const IRModule *module, const IRInstruction *instruction) {
+    fprintf(out, "      - %s", irInstructionKindName(instruction->kind));
+
+    if (instruction->has_result) {
+        fprintf(out, " -> %%t%u", instruction->result_id);
+        if (instruction->result_type != NULL) {
+            fputs(": ", out);
+            irPrintType(out, instruction->result_type);
+        }
+    }
+
+    switch (instruction->kind) {
+        case IR_INSTR_ALLOCA:
+            fputs(" allocated=", out);
+            irPrintType(out, instruction->data.alloca.allocated_type);
+            break;
+        case IR_INSTR_LOAD:
+            fputs(" address=", out);
+            irDumpOperand(out, module, &instruction->data.load.address);
+            break;
+        case IR_INSTR_STORE:
+            fputs(" value=", out);
+            irDumpOperand(out, module, &instruction->data.store.value);
+            fputs(" address=", out);
+            irDumpOperand(out, module, &instruction->data.store.address);
+            break;
+        case IR_INSTR_GEP: {
+            size_t i;
+            fputs(" base=", out);
+            irDumpOperand(out, module, &instruction->data.gep.base);
+            fputs(" indices=[", out);
+            for (i = 0; i < instruction->data.gep.index_count; i++) {
+                if (i > 0) {
+                    fputs(", ", out);
+                }
+                irDumpOperand(out, module, &instruction->data.gep.indices[i]);
+            }
+            fputc(']', out);
+            break;
+        }
+        case IR_INSTR_ADD:
+        case IR_INSTR_SUB:
+        case IR_INSTR_MUL:
+        case IR_INSTR_DIV:
+        case IR_INSTR_AND:
+        case IR_INSTR_OR:
+        case IR_INSTR_CMP_EQ:
+        case IR_INSTR_CMP_NE:
+        case IR_INSTR_CMP_LT:
+        case IR_INSTR_CMP_LE:
+        case IR_INSTR_CMP_GT:
+        case IR_INSTR_CMP_GE:
+            fputs(" left=", out);
+            irDumpOperand(out, module, &instruction->data.binary.left);
+            fputs(" right=", out);
+            irDumpOperand(out, module, &instruction->data.binary.right);
+            break;
+        case IR_INSTR_NEG:
+        case IR_INSTR_NOT:
+            fputs(" operand=", out);
+            irDumpOperand(out, module, &instruction->data.unary.operand);
+            break;
+        case IR_INSTR_BR:
+            fprintf(out, " target=bb%u", instruction->data.br.target_block_id);
+            break;
+        case IR_INSTR_COND_BR:
+            fputs(" condition=", out);
+            irDumpOperand(out, module, &instruction->data.cond_br.condition);
+            fprintf(out, " then=bb%u else=bb%u", instruction->data.cond_br.then_block_id, instruction->data.cond_br.else_block_id);
+            break;
+        case IR_INSTR_RET:
+            if (instruction->data.ret.has_value) {
+                fputs(" value=", out);
+                irDumpOperand(out, module, &instruction->data.ret.value);
+            }
+            break;
+        case IR_INSTR_CALL: {
+            size_t i;
+            fprintf(out, " callee=%s args=[", instruction->data.call.callee);
+            for (i = 0; i < instruction->data.call.arg_count; i++) {
+                if (i > 0) {
+                    fputs(", ", out);
+                }
+                irDumpOperand(out, module, &instruction->data.call.args[i]);
+            }
+            fputc(']', out);
+            break;
+        }
+        case IR_INSTR_CAST:
+            fputs(" value=", out);
+            irDumpOperand(out, module, &instruction->data.cast.value);
+            fputs(" target=", out);
+            irPrintType(out, instruction->data.cast.target_type);
+            break;
+        case IR_INSTR_CONST:
+            fputs(" value=", out);
+            irDumpOperand(out, module, &instruction->data.const_instr.value);
+            break;
+        case IR_INSTR_GLOBAL_ADDR:
+            fprintf(out, " global_id=%u", instruction->data.global_addr.global_id);
+            break;
+    }
+
+    fputc('\n', out);
+}
+
+void irDumpModule(FILE *out, const IRModule *module) {
+    size_t i;
+
+    if (out == NULL || module == NULL) {
+        return;
+    }
+
+    fprintf(out, "IRModule\n");
+    fprintf(out, "  globals (%zu)\n", module->global_count);
+    for (i = 0; i < module->global_count; i++) {
+        IRGlobal *global = module->global_items[i];
+        fprintf(out, "    - @%s [id=%u] type=", global->name, global->id);
+        irPrintType(out, global->type);
+        if (global->is_constant) {
+            fputs(" constant", out);
+        }
+        fputc('\n', out);
+    }
+
+    fprintf(out, "  functions (%zu)\n", module->function_count);
+    for (i = 0; i < module->function_count; i++) {
+        IRFunction *function = module->functions[i];
+        size_t block_index;
+
+        fprintf(out, "    - %s returns ", function->name);
+        irPrintType(out, function->return_type);
+        fprintf(out, " blocks=%zu\n", function->block_count);
+
+        for (block_index = 0; block_index < function->block_count; block_index++) {
+            IRBasicBlock *block = function->blocks[block_index];
+            size_t instr_index;
+
+            fprintf(out, "      block bb%u (%zu instructions)\n", block->id, block->instruction_count);
+            for (instr_index = 0; instr_index < block->instruction_count; instr_index++) {
+                irDumpInstruction(out, module, block->instructions[instr_index]);
+            }
+        }
+    }
+}
+
 static void irPrintFunction(FILE *out, const IRModule *module, const IRFunction *function) {
     size_t i;
     size_t j;

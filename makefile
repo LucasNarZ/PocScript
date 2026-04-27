@@ -5,8 +5,8 @@ IR_OBJ = $(OBJDIR)/IR.o
 RUNTIME_IO_OBJ = $(OBJDIR)/runtime/io.o
 RUNTIME_START_OBJ = $(OBJDIR)/runtime/start.o
 
-SRC = src/main.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder.c src/ir/ir_printer.c
-TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c tests/semantic/test_semantic.c tests/ir/test_ir.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder.c src/ir/ir_printer.c
+SRC = src/main.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
+TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c tests/semantic/test_semantic.c tests/ir/test_ir.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
 
 OBJ = $(addprefix $(OBJDIR)/,$(SRC:.c=.o))
 TEST_OBJ = $(addprefix $(OBJDIR)/,$(TEST_SRC:.c=.o))

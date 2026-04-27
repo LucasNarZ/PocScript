@@ -4,13 +4,13 @@ The `src/ir/` directory contains PocScript's lowering stage from validated AST n
 
 ## Files
 
-- `ir.h`: shared IR data model, public constructors, symbol/scope API, builder API, and printer API
-- `ir_core.c`: creation and destruction of types, literals, operands, and generic IR values
-- `ir_instr.c`: instruction allocation and cleanup
-- `ir_module.c`: module, function, global, and basic block storage
-- `ir_scope.c`: IR symbol table and nested scope chain
-- `ir_builder.c`: lowering from AST + semantic result into the IR module
-- `ir_printer.c`: conversion from the internal IR module to LLVM IR text
+- `include/ir.h`: shared IR data model, public constructors, symbol/scope API, builder API, and printer API
+- `src/ir/ir_core.c`: creation and destruction of types, literals, operands, and generic IR values
+- `src/ir/ir_instr.c`: instruction allocation and cleanup
+- `src/ir/ir_module.c`: module, function, global, and basic block storage
+- `src/ir/ir_scope.c`: IR symbol table and nested scope chain
+- `src/ir/ir_builder.c`: lowering from AST + semantic result into the IR module
+- `src/ir/ir_printer.c`: conversion from the internal IR module to LLVM IR text
 
 ## Role In The Compiler
 
@@ -42,7 +42,7 @@ The representation is not fully SSA in the classical sense. Temporary instructio
 
 ### `IRModule`
 
-Defined in `ir.h`.
+Defined in `include/ir.h`.
 
 It owns:
 

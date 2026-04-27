@@ -1,6 +1,6 @@
 # PocScript Grammar
 
-This document describes the grammar currently accepted by the parser in `parser/parser.c`.
+This document describes the grammar currently accepted by the parser in `src/parser/parser.c`.
 It documents the language as it exists in the implementation today, not as it ideally should be.
 
 ## Overview
@@ -9,7 +9,7 @@ It documents the language as it exists in the implementation today, not as it id
 - `if`, `while`, `for`, and `func` always require a block with `{}`.
 - Regular statements end with `;`.
 - Declarations use `::`.
-- `ret` always requires an expression.
+- `ret` may appear either as `ret;` or `ret <expr>;`.
 - `break` and `continue` are parsed as simple statements and require `;`.
 - The parser supports array literals, indexed access, function calls, and types with `Array<...>` and `[]` suffixes.
 - Function declarations require an explicit return type after `->`.
@@ -50,7 +50,7 @@ return-type     = "void" | type ;
 
 parameter       = identifier "::" type ;
 
-return-statement = "ret" logical-expression ;
+return-statement = "ret" [ logical-expression ] ;
 
 loop-control-statement = "break" | "continue" ;
 
@@ -136,7 +136,7 @@ Assignment operators are parsed outside the expression precedence chain, as part
 
 ## Lexical Rules
 
-Based on `lexer/lexer.c`:
+Based on `src/lexer/lexer.c`:
 
 - `identifier`: `[_a-zA-Z][_a-zA-Z0-9]*`
 - `number`: integers or decimal floats such as `10` and `1.5`
@@ -199,7 +199,7 @@ arr[0](x);
 
 ## Implementation Notes
 
-- There is no unary `-` operator. `-x` is not recognized as a unary expression.
+- Unary `-` is accepted and parsed as a unary expression.
 - The parser accepts `Array` without a generic parameter, for example `x::Array;`.
 - Types can receive repeated `[]` suffixes, with an optional size per dimension, for example `int[][10]`.
 - The size inside type `[]` uses the same `logical-expression` rule.
@@ -222,6 +222,6 @@ arr[0](x);
 
 The rules above were derived mainly from:
 
-- `parser/parser.c`
+- `src/parser/parser.c`
 - `tests/parser/test_parser.c`
-- `lexer/lexer.c`
+- `src/lexer/lexer.c`

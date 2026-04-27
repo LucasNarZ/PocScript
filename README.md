@@ -47,7 +47,7 @@ This separation keeps failure modes easier to understand and avoids mixing synta
 
 ### AST first, semantics second
 
-The parser builds a full AST without trying to resolve identifiers or types on the fly. That makes the parser simpler and keeps semantic rules centralized in `semantic/`.
+The parser builds a full AST without trying to resolve identifiers or types on the fly. That makes the parser simpler and keeps semantic rules centralized in `src/semantic/`.
 
 ### Two-pass semantic analysis
 
@@ -305,8 +305,8 @@ make clean
 
 ## Architecture Notes
 
-- the parser remains purely syntactic; all semantic rules live in `semantic/`
+- the parser remains purely syntactic; all semantic rules live in `src/semantic/`
 - builtin runtime functions are treated as global functions during semantic analysis and IR generation
-- AST textual serialization in `parser/ast.c` is part of the practical contract because integration tests depend on it
+- AST textual serialization in `src/parser/ast.c` is part of the practical contract because integration tests depend on it
 - the compiler favors simple explicit data structures over compact or heavily abstracted implementations
 - the project prioritizes readability and phase separation over performance and feature completeness

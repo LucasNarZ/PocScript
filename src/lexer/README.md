@@ -1,12 +1,12 @@
 # Lexer
 
-The `lexer/` directory contains PocScript's lexical analyzer. It transforms the input text into a linked list of tokens consumed by the parser.
+The `src/lexer/` directory contains PocScript's lexical analyzer. It transforms the input text into a linked list of tokens consumed by the parser.
 
 ## Files
 
-- `token.h`: defines `TokenType`, the `Token` struct, and `TokenDefinition`
-- `lexer.h`: public lexer interface
-- `lexer.c`: implementation of tokenization, file reading, token serialization, and memory cleanup
+- `include/token.h`: defines `TokenType`, the `Token` struct, and `TokenDefinition`
+- `include/lexer.h`: public lexer interface
+- `src/lexer/lexer.c`: implementation of tokenization, file reading, token serialization, and memory cleanup
 
 ## General Behavior
 
@@ -68,6 +68,8 @@ These two types help the scanner advance correctly, but they do not appear in th
 - `TOKEN_KW_WHILE`: `while`
 - `TOKEN_KW_FUNC`: `func`
 - `TOKEN_KW_RET`: `ret`
+- `TOKEN_KW_BREAK`: `break`
+- `TOKEN_KW_CONTINUE`: `continue`
 
 ### Operators
 

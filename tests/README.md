@@ -1,6 +1,6 @@
 # Tests
 
-The `tests/` directory contains the automated validation for PocScript's current frontend. The general idea of the suite is to ensure that the lexer, parser, and semantic analyzer produce consistent structures and predictable diagnostics.
+The `tests/` directory contains the automated validation for PocScript's current frontend and backend. The general idea of the suite is to ensure that the lexer, parser, semantic analyzer, and IR generation produce consistent structures and predictable diagnostics.
 
 ## Organization
 
@@ -9,7 +9,8 @@ The `tests/` directory contains the automated validation for PocScript's current
 - `lexer/`: unit tests for the lexical analyzer
 - `parser/`: unit tests for the parser and syntax errors
 - `semantic/`: unit tests for scope, symbol resolution, type checking, function calls, function returns, and array validation
-- `integration/`: full-flow tests, from input to serialized AST
+- `ir/`: unit tests for IR construction and LLVM IR printing
+- `integration/`: full-flow tests from tokenization through AST and selected IR emission checks
 - `fixtures/`: `.ps` files and expected outputs used by the tests
 
 ## What Each Group Validates
@@ -52,6 +53,17 @@ Validates the combined flow:
 - complete tokenization with a single `EOF`
 - parsing the whole program
 - comparing the serialized AST against an expected file
+- selected end-to-end IR expectations for globals, arrays, control flow, and runtime calls
+
+### `tests/ir/`
+
+Checks whether the IR layer:
+
+- predeclares globals, functions, and builtin runtime symbols
+- lowers expressions, control flow, array access, and array literals
+- preserves sized array information where required
+- prints valid LLVM IR fragments for the active backend path
+- writes LLVM IR to files when requested
 
 ## Helpers
 
@@ -69,14 +81,15 @@ The main helpers are:
 make test
 ```
 
-This target builds `tests_runner` and executes the full suite.
+This target builds `build/bin/tests_runner` and executes the full suite.
 
 ## General Idea
 
-The suite is designed to protect the current frontend contract. It mainly verifies:
+The suite is designed to protect the current frontend and backend contracts. It mainly verifies:
 
 - token format
 - AST structure
 - basic quality of parsing errors
 - semantic diagnostics and recovery
+- IR construction and LLVM IR printing behavior
 - stability of fixture outputs

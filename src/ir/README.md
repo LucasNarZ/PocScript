@@ -9,7 +9,10 @@ The `src/ir/` directory contains PocScript's lowering stage from validated AST n
 - `src/ir/ir_instr.c`: instruction allocation and cleanup
 - `src/ir/ir_module.c`: module, function, global, and basic block storage
 - `src/ir/ir_scope.c`: IR symbol table and nested scope chain
-- `src/ir/ir_builder.c`: lowering from AST + semantic result into the IR module
+- `src/ir/ir_builder_utils.c`: shared builder helpers for types, operands, loop targets, and IR instruction emission
+- `src/ir/ir_builder_module.c`: builder orchestration, global/function predeclaration, builtin setup, and whole-module lowering flow
+- `src/ir/ir_builder_expr.c`: lowering from AST expressions into IR values and addresses
+- `src/ir/ir_builder_stmt.c`: lowering from AST statements and blocks into IR control flow and stores
 - `src/ir/ir_printer.c`: conversion from the internal IR module to LLVM IR text
 
 ## Role In The Compiler

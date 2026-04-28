@@ -9,8 +9,12 @@ static void collectSymbols(AstNode *node, Scope *scope, SemanticResult *result);
 typedef struct {
     const char *function_name;
     SemanticType *return_type;
-    bool found_compatible_return;
 } FunctionContext;
+
+typedef enum {
+    FLOW_CONTINUES,
+    FLOW_RETURNS
+} FlowState;
 
 typedef struct {
     SemanticResult *result;
@@ -18,8 +22,9 @@ typedef struct {
     int loop_depth;
 } SemanticContext;
 
-static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx);
+static FlowState validateNode(AstNode *node, Scope *scope, SemanticContext *ctx);
 static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContext *ctx);
+static SemanticType *checkArrayAccess(AstNode *node, Scope *scope, SemanticContext *ctx);
 
 static void appendCategorizedError(AstNode *node, SemanticResult *result, SemanticErrorKind kind, const char *message) {
     int line = 0;
@@ -300,6 +305,10 @@ static void appendEmptyReturnError(AstNode *node, SemanticResult *result, const 
     appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
 }
 
+static void appendUnreachableCodeError(AstNode *node, SemanticResult *result) {
+    appendCategorizedError(node, result, SEMANTIC_ERROR_DEVELOPER, "unreachable code");
+}
+
 static bool semanticTypeIsNumeric(const SemanticType *type) {
     return type != NULL && (type->kind == SEM_TYPE_INT || type->kind == SEM_TYPE_FLOAT);
 }
@@ -431,24 +440,39 @@ static SemanticType *checkIdentifier(AstNode *node, Scope *scope, SemanticResult
     return semanticTypeClone(symbol->type);
 }
 
-static SemanticType *checkAssign(AstNode *node, Scope *scope, SemanticContext *ctx) {
-    SemanticType *valueType = checkExpression(node->data.assign.value, scope, ctx);
-
-    if (node->data.assign.target->type == AST_IDENTIFIER) {
-        Symbol *targetSymbol = scopeLookup(scope, node->data.assign.target->data.identifier.name);
-
-        if (targetSymbol != NULL && targetSymbol->kind == SYMBOL_VARIABLE) {
-            if (valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(targetSymbol->type, valueType)) {
-                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "assignment types are incompatible");
-            }
-            semanticTypeFree(valueType);
-            return semanticTypeClone(targetSymbol->type);
-        }
-
-        return valueType;
+static SemanticType *checkAssignmentTarget(AstNode *node, Scope *scope, SemanticContext *ctx) {
+    if (node == NULL) {
+        return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
     }
 
-    return valueType;
+    switch (node->type) {
+        case AST_IDENTIFIER: {
+            Symbol *targetSymbol = scopeLookup(scope, node->data.identifier.name);
+
+            if (targetSymbol != NULL && targetSymbol->kind == SYMBOL_VARIABLE) {
+                return semanticTypeClone(targetSymbol->type);
+            }
+
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        }
+        case AST_ARRAY_ACCESS:
+            return checkArrayAccess(node, scope, ctx);
+        default:
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+    }
+}
+
+static SemanticType *checkAssign(AstNode *node, Scope *scope, SemanticContext *ctx) {
+    SemanticType *targetType = checkAssignmentTarget(node->data.assign.target, scope, ctx);
+    SemanticType *valueType = checkExpression(node->data.assign.value, scope, ctx);
+
+    if (targetType->kind != SEM_TYPE_ERROR && valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(targetType, valueType)) {
+        appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "assignment types are incompatible");
+    }
+
+    semanticTypeFree(valueType);
+    return targetType;
+
 }
 
 static SemanticType *checkBinary(AstNode *node, Scope *scope, SemanticContext *ctx) {
@@ -682,25 +706,36 @@ static void validateVariableDeclaration(AstNode *node, Scope *scope, SemanticCon
     declareVariableInScope(node->data.var_decl.name, node->data.var_decl.declared_type, scope);
 }
 
-static void validateBlock(AstNode *node, Scope *scope, SemanticContext *ctx) {
+static FlowState validateBlock(AstNode *node, Scope *scope, SemanticContext *ctx) {
     Scope *blockScope = scopeCreate(scope);
+    FlowState flow = FLOW_CONTINUES;
     size_t i;
 
     if (blockScope == NULL) {
-        return;
+        return FLOW_CONTINUES;
     }
 
     for (i = 0; i < node->data.block.count; i++) {
-        validateNode(node->data.block.items[i], blockScope, ctx);
+        AstNode *item = node->data.block.items[i];
+
+        if (flow == FLOW_RETURNS) {
+            appendUnreachableCodeError(item, ctx->result);
+            validateNode(item, blockScope, ctx);
+            continue;
+        }
+
+        flow = validateNode(item, blockScope, ctx);
     }
 
     scopeFree(blockScope);
+    return flow;
 }
 
 static void validateFunction(AstNode *node, Scope *scope, SemanticContext *ctx) {
     Scope *functionScope = scopeCreate(scope);
     FunctionContext context;
     FunctionContext *previousContext = ctx->current_function;
+    FlowState flow;
     size_t i;
 
     if (functionScope == NULL) {
@@ -709,7 +744,6 @@ static void validateFunction(AstNode *node, Scope *scope, SemanticContext *ctx) 
 
     context.function_name = node->data.func_decl.name;
     context.return_type = semanticTypeFromAst(node->data.func_decl.return_type);
-    context.found_compatible_return = false;
     ctx->current_function = &context;
 
     for (i = 0; i < node->data.func_decl.param_count; i++) {
@@ -717,8 +751,8 @@ static void validateFunction(AstNode *node, Scope *scope, SemanticContext *ctx) 
         declareVariableInScope(param->data.param.name, param->data.param.declared_type, functionScope);
     }
 
-    validateNode(node->data.func_decl.body, functionScope, ctx);
-    if (context.return_type != NULL && context.return_type->kind != SEM_TYPE_VOID && !context.found_compatible_return) {
+    flow = validateNode(node->data.func_decl.body, functionScope, ctx);
+    if (context.return_type != NULL && context.return_type->kind != SEM_TYPE_VOID && flow != FLOW_RETURNS) {
         appendMissingReturnError(node, ctx->result, node->data.func_decl.name, context.return_type);
     }
     semanticTypeFree(context.return_type);
@@ -726,11 +760,11 @@ static void validateFunction(AstNode *node, Scope *scope, SemanticContext *ctx) 
     scopeFree(functionScope);
 }
 
-static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
+static FlowState validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
     size_t i;
 
     if (node == NULL) {
-        return;
+        return FLOW_CONTINUES;
     }
 
     switch (node->type) {
@@ -745,28 +779,37 @@ static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
 
                 validateNode(item, scope, ctx);
             }
-            return;
+            return FLOW_CONTINUES;
         case AST_BLOCK:
-            validateBlock(node, scope, ctx);
-            return;
+            return validateBlock(node, scope, ctx);
         case AST_VAR_DECL:
             validateVariableDeclaration(node, scope, ctx, false);
-            return;
+            return FLOW_CONTINUES;
         case AST_EXPR_STMT:
         case AST_ASSIGN: {
             SemanticType *exprType = checkExpression(node->type == AST_EXPR_STMT ? node->data.expr_stmt.expression : node, scope, ctx);
             semanticTypeFree(exprType);
-            return;
+            return FLOW_CONTINUES;
         }
         case AST_IF: {
+            FlowState thenFlow;
+            FlowState elseFlow;
             SemanticType *conditionType = checkExpression(node->data.if_stmt.condition, scope, ctx);
             if (conditionType->kind != SEM_TYPE_ERROR && !semanticTypeIsBool(conditionType)) {
                 appendConditionTypeError(node->data.if_stmt.condition, ctx->result);
             }
             semanticTypeFree(conditionType);
-            validateNode(node->data.if_stmt.then_branch, scope, ctx);
-            validateNode(node->data.if_stmt.else_branch, scope, ctx);
-            return;
+            thenFlow = validateNode(node->data.if_stmt.then_branch, scope, ctx);
+            if (node->data.if_stmt.else_branch == NULL) {
+                return FLOW_CONTINUES;
+            }
+
+            elseFlow = validateNode(node->data.if_stmt.else_branch, scope, ctx);
+            if (thenFlow == FLOW_RETURNS && elseFlow == FLOW_RETURNS) {
+                return FLOW_RETURNS;
+            }
+
+            return FLOW_CONTINUES;
         }
         case AST_WHILE: {
             SemanticType *conditionType = checkExpression(node->data.while_stmt.condition, scope, ctx);
@@ -777,12 +820,12 @@ static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
             ctx->loop_depth++;
             validateNode(node->data.while_stmt.body, scope, ctx);
             ctx->loop_depth--;
-            return;
+            return FLOW_CONTINUES;
         }
         case AST_FOR: {
             Scope *forScope = scopeCreate(scope);
             if (forScope == NULL) {
-                return;
+                return FLOW_CONTINUES;
             }
 
             if (node->data.for_stmt.init != NULL) {
@@ -803,23 +846,22 @@ static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
             validateNode(node->data.for_stmt.body, forScope, ctx);
             ctx->loop_depth--;
             scopeFree(forScope);
-            return;
+            return FLOW_CONTINUES;
         }
         case AST_FUNC_DECL:
             validateFunction(node, scope, ctx);
-            return;
+            return FLOW_CONTINUES;
         case AST_RETURN:
             if (ctx->current_function == NULL || ctx->current_function->return_type == NULL) {
                 appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "return statement outside function");
-                return;
+                return FLOW_RETURNS;
             }
 
             if (node->data.return_stmt.value == NULL) {
                 if (ctx->current_function->return_type->kind != SEM_TYPE_VOID) {
                     appendEmptyReturnError(node, ctx->result, ctx->current_function->function_name, ctx->current_function->return_type);
-                    ctx->current_function->found_compatible_return = true;
                 }
-                return;
+                return FLOW_RETURNS;
             }
 
             if (node->data.return_stmt.value != NULL) {
@@ -827,8 +869,6 @@ static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
 
                 if (ctx->current_function->return_type->kind == SEM_TYPE_VOID) {
                     appendVoidReturnValueError(node, ctx->result, ctx->current_function->function_name);
-                } else {
-                    ctx->current_function->found_compatible_return = true;
                 }
 
                 if (ctx->current_function->return_type->kind != SEM_TYPE_VOID && returnType->kind != SEM_TYPE_ERROR && !semanticTypeEquals(ctx->current_function->return_type, returnType)) {
@@ -837,19 +877,19 @@ static void validateNode(AstNode *node, Scope *scope, SemanticContext *ctx) {
 
                 semanticTypeFree(returnType);
             }
-            return;
+            return FLOW_RETURNS;
         case AST_BREAK:
             if (ctx->loop_depth == 0) {
-                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "break statement outside loop");
+                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_DEVELOPER, "break statement outside loop");
             }
-            return;
+            return FLOW_CONTINUES;
         case AST_CONTINUE:
             if (ctx->loop_depth == 0) {
-                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "continue statement outside loop");
+                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_DEVELOPER, "continue statement outside loop");
             }
-            return;
+            return FLOW_CONTINUES;
         default:
-            return;
+            return FLOW_CONTINUES;
     }
 }
 

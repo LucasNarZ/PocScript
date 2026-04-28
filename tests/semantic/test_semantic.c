@@ -219,6 +219,30 @@ void test_semantic_reports_indexing_non_array_value(void) {
     astFree(root);
 }
 
+void test_semantic_rejects_incompatible_assignment_through_array_access(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::Array<int>[2] = {1, 2}; arr[0] = true; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "assignment types are incompatible") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_assignment_through_nested_array_access(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { matrix::Array<Array<int>[2]>[2] = {{1, 2}, {3, 4}}; matrix[0][1] = 9; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accumulates_multiple_errors(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void {\n"
@@ -265,6 +289,20 @@ void test_semantic_rejects_non_void_function_without_return(void) {
     if (result.errors.count > 0) {
         EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
         EXPECT_TRUE(strstr(result.errors.items[0].message, "function 'soma' with return type int must return a value") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_non_void_function_with_if_missing_else_return(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func foo(flag::bool) -> int { if (flag) { ret 1; } }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "function 'foo' with return type int must return a value") != NULL);
     }
 
     semanticResultFree(&result);
@@ -324,6 +362,16 @@ void test_semantic_accepts_matching_function_return_type(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_if_else_when_both_branches_return(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func foo(flag::bool) -> int { if (flag) { ret 1; } else { ret 2; } }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accepts_empty_return_inside_void_function(void) {
     SemanticResult result = analyzeRootFromString("func foo() -> void { ret; }");
 
@@ -363,6 +411,20 @@ void test_semantic_reports_empty_return_outside_function(void) {
     astFree(program);
 }
 
+void test_semantic_reports_unreachable_code_after_returning_if_else(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func foo(flag::bool) -> int { if (flag) { ret 1; } else { ret 2; } ret 3; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DEVELOPER);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "unreachable code") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accepts_unary_minus_for_numeric_operand(void) {
     AstNode *root = parseRootFromString("func main() -> void { x::int = -1; }");
     SemanticResult result = semanticAnalyze(root);
@@ -379,7 +441,7 @@ void test_semantic_reports_break_outside_loop(void) {
 
     EXPECT_TRUE(result.errors.count == 1);
     if (result.errors.count > 0) {
-        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DEVELOPER);
         EXPECT_TRUE(strstr(result.errors.items[0].message, "break statement outside loop") != NULL);
     }
 
@@ -393,7 +455,7 @@ void test_semantic_reports_continue_outside_loop(void) {
 
     EXPECT_TRUE(result.errors.count == 1);
     if (result.errors.count > 0) {
-        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DEVELOPER);
         EXPECT_TRUE(strstr(result.errors.items[0].message, "continue statement outside loop") != NULL);
     }
 

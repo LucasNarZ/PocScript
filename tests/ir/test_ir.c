@@ -241,15 +241,10 @@ void test_ir_printer_emits_sub_mul_and_div_operations(void) {
     }
 }
 
-void test_ir_printer_emits_default_return_for_empty_function(void) {
+void test_ir_printer_rejects_non_void_function_without_return_on_all_paths(void) {
     char *llvm = emitLlvmIrFromString("func zero(flag::bool) -> int { if (flag) { ret 1; } }");
 
-    EXPECT_TRUE(llvm != NULL);
-    if (llvm != NULL) {
-        EXPECT_TRUE(strstr(llvm, "define i32 @zero(i1 %p1)") != NULL);
-        EXPECT_TRUE(strstr(llvm, "ret i32 0") != NULL);
-        free(llvm);
-    }
+    EXPECT_TRUE(llvm == NULL);
 }
 
 void test_ir_printer_writes_module_to_file(void) {

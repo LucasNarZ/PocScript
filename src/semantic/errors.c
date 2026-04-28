@@ -23,6 +23,8 @@ const char *semanticErrorKindName(SemanticErrorKind kind) {
             return "NameError";
         case SEMANTIC_ERROR_DECLARATION:
             return "DeclarationError";
+        case SEMANTIC_ERROR_DEVELOPER:
+            return "DeveloperError";
     }
 
     return "SemanticError";

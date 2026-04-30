@@ -18,6 +18,7 @@ typedef enum {
     TOKEN_KW_FOR,
     TOKEN_KW_WHILE,
     TOKEN_KW_FUNC,
+    TOKEN_KW_EXTERN,
     TOKEN_KW_RET,
     TOKEN_KW_BREAK,
     TOKEN_KW_CONTINUE,

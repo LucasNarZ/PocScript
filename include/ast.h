@@ -110,6 +110,7 @@ typedef struct {
     size_t param_count;
     AstNode *body;
     AstNode *return_type;
+    bool is_extern;
 } AstFuncDeclData;
 
 typedef struct {

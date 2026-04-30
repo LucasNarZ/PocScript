@@ -141,7 +141,11 @@ void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void) {
 }
 
 void test_ir_builder_predeclares_builtin_runtime_functions(void) {
-    IRModule *module = buildIrModuleFromString("func main() -> void { printInt(1); ret; }");
+    IRModule *module = buildIrModuleFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "extern func printString(value::string) -> void;\n"
+        "func main() -> void { printInt(1); ret; }"
+    );
 
     EXPECT_TRUE(module != NULL);
     if (module != NULL) {
@@ -152,7 +156,11 @@ void test_ir_builder_predeclares_builtin_runtime_functions(void) {
 }
 
 void test_ir_printer_emits_runtime_function_declarations(void) {
-    char *llvm = emitLlvmIrFromString("func main() -> void { printString(\"hi\"); printInt(1); ret; }");
+    char *llvm = emitLlvmIrFromString(
+        "extern func printString(value::string) -> void;\n"
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printString(\"hi\"); printInt(1); ret; }"
+    );
 
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
@@ -160,6 +168,53 @@ void test_ir_printer_emits_runtime_function_declarations(void) {
         EXPECT_TRUE(strstr(llvm, "declare void @printInt(i32)") != NULL);
         EXPECT_TRUE(strstr(llvm, "call void @printString") != NULL);
         EXPECT_TRUE(strstr(llvm, "call void @printInt") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_builder_registers_extern_function_symbols(void) {
+    IRModule *module = buildIrModuleFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printInt(1); ret; }"
+    );
+
+    EXPECT_TRUE(module != NULL);
+    if (module != NULL) {
+        EXPECT_TRUE(irScopeLookup(module->global_scope, "printInt") != NULL);
+        EXPECT_TRUE(irScopeLookup(module->global_scope, "main") != NULL);
+        EXPECT_TRUE(module->function_count == 1);
+        irModuleFree(module);
+    }
+}
+
+void test_ir_printer_emits_extern_function_declarations(void) {
+    char *llvm = emitLlvmIrFromString(
+        "extern func printString(value::string) -> void;\n"
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printString(\"hi\"); printInt(1); ret; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "declare void @printString(i8*)") != NULL);
+        EXPECT_TRUE(strstr(llvm, "declare void @printInt(i32)") != NULL);
+        EXPECT_TRUE(strstr(llvm, "define void @main()") != NULL);
+        EXPECT_TRUE(strstr(llvm, "call void @printString") != NULL);
+        EXPECT_TRUE(strstr(llvm, "call void @printInt") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_does_not_define_extern_function_body(void) {
+    char *llvm = emitLlvmIrFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printInt(1); ret; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "declare void @printInt(i32)") != NULL);
+        EXPECT_TRUE(strstr(llvm, "define void @printInt") == NULL);
         free(llvm);
     }
 }
@@ -218,7 +273,10 @@ void test_ir_printer_emits_bool_values_as_i1(void) {
 }
 
 void test_ir_printer_escapes_special_characters_in_string_literals(void) {
-    char *llvm = emitLlvmIrFromString("func main() -> void { printString(\"line\\nquote\\\"tab\\t\\\\\"); ret; }");
+    char *llvm = emitLlvmIrFromString(
+        "extern func printString(value::string) -> void;\n"
+        "func main() -> void { printString(\"line\\nquote\\\"tab\\t\\\\\"); ret; }"
+    );
 
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
@@ -248,7 +306,10 @@ void test_ir_printer_rejects_non_void_function_without_return_on_all_paths(void)
 }
 
 void test_ir_printer_writes_module_to_file(void) {
-    IRModule *module = buildIrModuleFromString("func main() -> void { printInt(1); ret; }");
+    IRModule *module = buildIrModuleFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printInt(1); ret; }"
+    );
     char pathTemplate[] = "/tmp/pocscript-ir-XXXXXX.ll";
     int fd = mkstemps(pathTemplate, 3);
     char *written;

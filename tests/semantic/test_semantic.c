@@ -133,6 +133,8 @@ void test_semantic_reports_call_to_undeclared_function(void) {
 
 void test_semantic_accepts_builtin_print_functions(void) {
     SemanticResult result = analyzeRootFromString(
+        "extern func printString(value::string) -> void;\n"
+        "extern func printInt(value::int) -> void;\n"
         "func main() -> void {\n"
         "    printString(\"hi\");\n"
         "    printInt(42);\n"
@@ -147,6 +149,7 @@ void test_semantic_accepts_builtin_print_functions(void) {
 
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void) {
     SemanticResult result = analyzeRootFromString(
+        "extern func printInt(value::int) -> void;\n"
         "func printInt(value::int) -> void { ret; }\n"
         "func main() -> void { ret; }"
     );
@@ -155,6 +158,69 @@ void test_semantic_rejects_redeclaration_of_builtin_print_function(void) {
     if (result.errors.count > 0) {
         EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DECLARATION);
         EXPECT_TRUE(strstr(result.errors.items[0].message, "duplicate declaration of 'printInt'") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_extern_function_declarations(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func printString(value::string) -> void;\n"
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void {\n"
+        "    printString(\"hi\");\n"
+        "    printInt(42);\n"
+        "    ret;\n"
+        "}"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_duplicate_extern_function_declaration(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DECLARATION);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "duplicate declaration of 'printInt'") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_conflict_between_extern_and_defined_function(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "func printInt(value::int) -> void { ret; }\n"
+        "func main() -> void { ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_DECLARATION);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "duplicate declaration of 'printInt'") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_validates_extern_function_argument_types(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> void { printInt(true); ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "argument 1 of function 'printInt' expects int but got bool") != NULL);
     }
 
     semanticResultFree(&result);

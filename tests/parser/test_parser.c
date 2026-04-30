@@ -287,6 +287,27 @@ void test_parser_rejects_return_break_and_continue_at_file_scope(void) {
     assertParseError("continue;", "expected top-level declaration");
 }
 
+void test_parser_parses_extern_function_declaration(void) {
+    assertParsesWithAstSubstring(
+        "extern func printInt(value::int) -> void; func main() -> void { ret; }",
+        "extern"
+    );
+}
+
+void test_parser_rejects_extern_function_inside_block(void) {
+    assertParseError(
+        "func main() -> void { extern func printInt(value::int) -> void; ret; }",
+        "unexpected token in expression"
+    );
+}
+
+void test_parser_requires_func_after_extern(void) {
+    assertParseError(
+        "extern printInt(value::int) -> void;",
+        "expected 'func' after extern"
+    );
+}
+
 void test_parser_parses_assignment_without_symbol_lookup(void) {
     Token *tokens = tokenizeString("func main() -> void { x = y; }");
     AstNode *root;

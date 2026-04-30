@@ -2,9 +2,17 @@
 
 void test_semantic_accepts_builtin_print_functions(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
+void test_semantic_accepts_extern_function_declarations(void);
+void test_semantic_rejects_duplicate_extern_function_declaration(void);
+void test_semantic_rejects_conflict_between_extern_and_defined_function(void);
+void test_semantic_validates_extern_function_argument_types(void);
 void test_semantic_accepts_sized_array_argument_for_matching_parameter(void);
 void test_lexer_tokenizes_logical_and_equality_operators(void);
 void test_lexer_tokenizes_break_and_continue_keywords_together(void);
+void test_lexer_tokenizes_extern_function_declaration(void);
+void test_parser_parses_extern_function_declaration(void);
+void test_parser_rejects_extern_function_inside_block(void);
+void test_parser_requires_func_after_extern(void);
 void test_semantic_accepts_logical_and_with_bool_operands(void);
 void test_semantic_rejects_logical_and_with_non_bool_operand(void);
 void test_semantic_accepts_logical_or_with_bool_operands(void);
@@ -19,6 +27,9 @@ void test_semantic_rejects_array_literal_with_incompatible_element_types(void);
 void test_semantic_accepts_nested_array_literal_with_matching_shapes(void);
 void test_ir_builder_predeclares_builtin_runtime_functions(void);
 void test_ir_printer_emits_runtime_function_declarations(void);
+void test_ir_builder_registers_extern_function_symbols(void);
+void test_ir_printer_emits_extern_function_declarations(void);
+void test_ir_printer_does_not_define_extern_function_body(void);
 void test_ir_printer_emits_float_values_as_double(void);
 void test_ir_printer_emits_bool_values_as_i1(void);
 void test_ir_printer_escapes_special_characters_in_string_literals(void);
@@ -54,6 +65,7 @@ int main(void) {
     RUN_TEST(test_lexer_struct_preserves_scan_state, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_tokenizes_logical_and_equality_operators, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_tokenizes_break_and_continue_keywords_together, "tests/lexer/test_lexer.c");
+    RUN_TEST(test_lexer_tokenizes_extern_function_declaration, "tests/lexer/test_lexer.c");
     RUN_TEST(test_parser_parses_assignment_without_symbol_lookup, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_declaration_syntax_without_semantics, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_call_syntax_without_function_type, "tests/parser/test_parser.c");
@@ -79,6 +91,9 @@ int main(void) {
     RUN_TEST(test_parser_rejects_while_at_file_scope, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_rejects_for_at_file_scope, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_rejects_return_break_and_continue_at_file_scope, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_parses_extern_function_declaration, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_extern_function_inside_block, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_requires_func_after_extern, "tests/parser/test_parser.c");
     RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");
@@ -91,6 +106,10 @@ int main(void) {
     RUN_TEST(test_semantic_reports_call_to_undeclared_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_builtin_print_functions, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_extern_function_declarations, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_duplicate_extern_function_declaration, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_conflict_between_extern_and_defined_function, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_validates_extern_function_argument_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_count, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_wrong_argument_type, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_sized_array_argument_for_matching_parameter, "tests/semantic/test_semantic.c");
@@ -148,6 +167,9 @@ int main(void) {
     RUN_TEST(test_ir_printer_preserves_sized_array_parameter_types_in_calls, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_builder_predeclares_builtin_runtime_functions, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_runtime_function_declarations, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_builder_registers_extern_function_symbols, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_extern_function_declarations, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_does_not_define_extern_function_body, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_loop_comparisons_and_branches, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_reads_and_writes_global_variables, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_float_values_as_double, "tests/ir/test_ir.c");

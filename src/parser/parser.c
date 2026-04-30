@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 static AstNode *parseBlock(Parser *parser);
+static AstNode *parseExternFunction(Parser *parser);
 static AstNode *parseTopLevel(Parser *parser);
 static AstNode *parseStatement(Parser *parser);
 static AstNode *parseReturn(Parser *parser);
@@ -235,6 +236,7 @@ static AstNode *parseFunction(Parser *parser) {
     }
 
     node->data.func_decl.name = copyTokenValue(parser->current);
+    node->data.func_decl.is_extern = false;
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after function name");
 
@@ -253,6 +255,38 @@ static AstNode *parseFunction(Parser *parser) {
     parserExpect(parser, TOKEN_ARROW, "expected '->' after function parameters");
     node->data.func_decl.return_type = parseType(parser);
     node->data.func_decl.body = parseBlock(parser);
+    return node;
+}
+
+static AstNode *parseExternFunction(Parser *parser) {
+    AstNode *node = astNewNodeFromCurrent(parser, AST_FUNC_DECL);
+
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_KW_FUNC, "expected 'func' after extern");
+    if (!parserIs(parser, TOKEN_IDENTIFIER)) {
+        parserSyntaxError(parser->current, "expected function name after func");
+    }
+
+    node->data.func_decl.name = copyTokenValue(parser->current);
+    node->data.func_decl.is_extern = true;
+    parserAdvance(parser);
+    parserExpect(parser, TOKEN_LPAREN, "expected '(' after function name");
+
+    if (!parserIs(parser, TOKEN_RPAREN)) {
+        AstNode *param = parseParameter(parser);
+        astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+
+        while (parserIs(parser, TOKEN_COMMA)) {
+            parserAdvance(parser);
+            param = parseParameter(parser);
+            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+        }
+    }
+
+    parserExpect(parser, TOKEN_RPAREN, "expected ')' after function parameters");
+    parserExpect(parser, TOKEN_ARROW, "expected '->' after function parameters");
+    node->data.func_decl.return_type = parseType(parser);
+    parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after extern function declaration");
     return node;
 }
 
@@ -281,6 +315,10 @@ static AstNode *parseTopLevel(Parser *parser) {
 
     if (parserIs(parser, TOKEN_KW_FUNC)) {
         return parseFunction(parser);
+    }
+
+    if (parserIs(parser, TOKEN_KW_EXTERN)) {
+        return parseExternFunction(parser);
     }
 
     if (!isDeclarationStart(parser)) {

@@ -159,3 +159,22 @@ void test_lexer_tokenizes_break_and_continue_keywords_together(void) {
 
     freeTokens(tokens);
 }
+
+void test_lexer_tokenizes_extern_function_declaration(void) {
+    Token *tokens = tokenizeString("extern func printInt(value::int) -> void;");
+
+    EXPECT_TRUE(tokens != NULL);
+    EXPECT_STR_EQ("KW_EXTERN", tokenTypeName(tokens->type));
+    EXPECT_STR_EQ("KW_FUNC", tokenTypeName(tokens->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->type));
+    EXPECT_STR_EQ("LPAREN", tokenTypeName(tokens->next->next->next->type));
+    EXPECT_STR_EQ("IDENTIFIER", tokenTypeName(tokens->next->next->next->next->type));
+    EXPECT_STR_EQ("DOUBLE_COLON", tokenTypeName(tokens->next->next->next->next->next->type));
+    EXPECT_STR_EQ("TYPE_INT", tokenTypeName(tokens->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("RPAREN", tokenTypeName(tokens->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("ARROW", tokenTypeName(tokens->next->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("TYPE_VOID", tokenTypeName(tokens->next->next->next->next->next->next->next->next->next->type));
+    EXPECT_STR_EQ("SEMICOLON", tokenTypeName(tokens->next->next->next->next->next->next->next->next->next->next->type));
+
+    freeTokens(tokens);
+}

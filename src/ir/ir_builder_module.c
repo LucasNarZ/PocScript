@@ -140,12 +140,51 @@ static bool irBuilderPopulateFunctionParams(IRFunction *function, const AstNode 
     return true;
 }
 
+static IRType **irBuilderCreateFunctionParamTypes(const AstNode *node) {
+    IRType **param_types = NULL;
+    size_t i;
+
+    if (node->data.func_decl.param_count > 0) {
+        param_types = calloc(node->data.func_decl.param_count, sizeof(IRType *));
+        if (param_types == NULL) {
+            return NULL;
+        }
+    }
+
+    for (i = 0; i < node->data.func_decl.param_count; i++) {
+        param_types[i] = irBuilderTypeFromAst(node->data.func_decl.params[i]->data.param.declared_type);
+        if (param_types[i] == NULL) {
+            size_t j;
+            for (j = 0; j < i; j++) {
+                irTypeFree(param_types[j]);
+            }
+            free(param_types);
+            return NULL;
+        }
+    }
+
+    return param_types;
+}
+
+static void irBuilderFreeFunctionParamTypes(IRType **param_types, size_t param_count) {
+    size_t i;
+
+    if (param_types == NULL) {
+        return;
+    }
+
+    for (i = 0; i < param_count; i++) {
+        irTypeFree(param_types[i]);
+    }
+
+    free(param_types);
+}
+
 static bool irBuilderPredeclareFunction(IRBuilder *builder, const AstNode *node) {
     IRType *return_type = irBuilderTypeFromAst(node->data.func_decl.return_type);
     IRFunction *function;
-    IRType **param_types = NULL;
+    IRType **param_types;
     IRSymbol *symbol;
-    size_t i;
 
     if (return_type == NULL) {
         return false;
@@ -161,23 +200,14 @@ static bool irBuilderPredeclareFunction(IRBuilder *builder, const AstNode *node)
         return false;
     }
 
-    if (function->param_count > 0) {
-        param_types = calloc(function->param_count, sizeof(IRType *));
-        if (param_types == NULL) {
-            irFunctionFree(function);
-            return false;
-        }
-    }
-
-    for (i = 0; i < function->param_count; i++) {
-        param_types[i] = irTypeClone(function->params[i].type);
+    param_types = irBuilderCreateFunctionParamTypes(node);
+    if (node->data.func_decl.param_count > 0 && param_types == NULL) {
+        irFunctionFree(function);
+        return false;
     }
 
     symbol = irSymbolCreateFunction(function->name, irTypeClone(function->return_type), param_types, function->param_count);
-    for (i = 0; i < function->param_count; i++) {
-        irTypeFree(param_types[i]);
-    }
-    free(param_types);
+    irBuilderFreeFunctionParamTypes(param_types, function->param_count);
 
     if (symbol == NULL) {
         irFunctionFree(function);
@@ -198,9 +228,23 @@ static bool irBuilderPredeclareFunction(IRBuilder *builder, const AstNode *node)
     return true;
 }
 
-static bool irBuilderDeclareBuiltinFunction(IRBuilder *builder, const char *name, IRType *return_type, IRType **param_types, size_t param_count) {
-    IRSymbol *symbol = irSymbolCreateFunction(name, return_type, param_types, param_count);
+static bool irBuilderPredeclareExternFunction(IRBuilder *builder, const AstNode *node) {
+    IRType *return_type = irBuilderTypeFromAst(node->data.func_decl.return_type);
+    IRType **param_types;
+    IRSymbol *symbol;
 
+    if (return_type == NULL) {
+        return false;
+    }
+
+    param_types = irBuilderCreateFunctionParamTypes(node);
+    if (node->data.func_decl.param_count > 0 && param_types == NULL) {
+        irTypeFree(return_type);
+        return false;
+    }
+
+    symbol = irSymbolCreateFunction(node->data.func_decl.name, return_type, param_types, node->data.func_decl.param_count);
+    irBuilderFreeFunctionParamTypes(param_types, node->data.func_decl.param_count);
     if (symbol == NULL) {
         return false;
     }
@@ -209,33 +253,6 @@ static bool irBuilderDeclareBuiltinFunction(IRBuilder *builder, const char *name
         irSymbolFree(symbol);
         return false;
     }
-
-    return true;
-}
-
-static bool irBuilderDeclareBuiltinRuntimeFunctions(IRBuilder *builder) {
-    IRType *print_string_params[1];
-    IRType *print_int_params[1];
-
-    print_string_params[0] = irTypeCreate(IR_TYPE_STRING);
-    if (print_string_params[0] == NULL) {
-        return false;
-    }
-    if (!irBuilderDeclareBuiltinFunction(builder, "printString", irTypeCreate(IR_TYPE_VOID), print_string_params, 1)) {
-        irTypeFree(print_string_params[0]);
-        return false;
-    }
-    irTypeFree(print_string_params[0]);
-
-    print_int_params[0] = irTypeCreate(IR_TYPE_INT);
-    if (print_int_params[0] == NULL) {
-        return false;
-    }
-    if (!irBuilderDeclareBuiltinFunction(builder, "printInt", irTypeCreate(IR_TYPE_VOID), print_int_params, 1)) {
-        irTypeFree(print_int_params[0]);
-        return false;
-    }
-    irTypeFree(print_int_params[0]);
 
     return true;
 }
@@ -446,11 +463,6 @@ IRModule *irBuildModule(AstNode *program, const SemanticResult *semantic) {
         return NULL;
     }
 
-    if (!irBuilderDeclareBuiltinRuntimeFunctions(builder)) {
-        irBuilderFree(builder);
-        return NULL;
-    }
-
     for (i = 0; i < program->data.program.count; i++) {
         AstNode *node = program->data.program.items[i];
 
@@ -460,7 +472,12 @@ IRModule *irBuildModule(AstNode *program, const SemanticResult *semantic) {
                 return NULL;
             }
         } else if (node->type == AST_FUNC_DECL) {
-            if (!irBuilderPredeclareFunction(builder, node)) {
+            if (node->data.func_decl.is_extern) {
+                if (!irBuilderPredeclareExternFunction(builder, node)) {
+                    irBuilderFree(builder);
+                    return NULL;
+                }
+            } else if (!irBuilderPredeclareFunction(builder, node)) {
                 irBuilderFree(builder);
                 return NULL;
             }
@@ -477,6 +494,10 @@ IRModule *irBuildModule(AstNode *program, const SemanticResult *semantic) {
         AstNode *node = program->data.program.items[i];
 
         if (node->type != AST_FUNC_DECL) {
+            continue;
+        }
+
+        if (node->data.func_decl.is_extern) {
             continue;
         }
 

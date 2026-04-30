@@ -120,7 +120,14 @@ static void writeLabel(char **buffer, size_t *size, AstNode *node) {
         case AST_PROGRAM: appendFormat(buffer, size, " (PROGRAM)\n"); break;
         case AST_BLOCK: appendFormat(buffer, size, " (BLOCK)\n"); break;
         case AST_VAR_DECL: appendFormat(buffer, size, " (VAR_DECL "); appendFormat(buffer, size, node->data.var_decl.name); appendFormat(buffer, size, ")\n"); break;
-        case AST_FUNC_DECL: appendFormat(buffer, size, " (FUNC_DECL "); appendFormat(buffer, size, node->data.func_decl.name); appendFormat(buffer, size, ")\n"); break;
+        case AST_FUNC_DECL:
+            appendFormat(buffer, size, " (FUNC_DECL ");
+            if (node->data.func_decl.is_extern) {
+                appendFormat(buffer, size, "extern ");
+            }
+            appendFormat(buffer, size, node->data.func_decl.name);
+            appendFormat(buffer, size, ")\n");
+            break;
         case AST_PARAM: appendFormat(buffer, size, " (PARAM "); appendFormat(buffer, size, node->data.param.name); appendFormat(buffer, size, ")\n"); break;
         case AST_IF: appendFormat(buffer, size, " (IF)\n"); break;
         case AST_WHILE: appendFormat(buffer, size, " (WHILE)\n"); break;

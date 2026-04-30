@@ -116,7 +116,9 @@ static void collectFunction(AstNode *node, Scope *scope, SemanticResult *result)
         }
     }
 
-    collectSymbols(node->data.func_decl.body, functionScope, result);
+    if (!node->data.func_decl.is_extern) {
+        collectSymbols(node->data.func_decl.body, functionScope, result);
+    }
     scopeFree(functionScope);
 }
 
@@ -350,42 +352,6 @@ static size_t semanticStringLiteralLength(const char *value) {
     }
 
     return length;
-}
-
-static bool declareBuiltinFunction(Scope *scope, const char *name, SemanticType *return_type, SemanticType **params, size_t param_count) {
-    Symbol *symbol = symbolCreateFunction(name, return_type, params, param_count);
-
-    if (symbol == NULL) {
-        return false;
-    }
-
-    if (!scopeDeclare(scope, symbol)) {
-        symbolFree(symbol);
-        return false;
-    }
-
-    return true;
-}
-
-static void declareBuiltinRuntimeFunctions(Scope *scope) {
-    SemanticType *print_string_params[1];
-    SemanticType *print_int_params[1];
-
-    if (scope == NULL) {
-        return;
-    }
-
-    print_string_params[0] = semanticTypeNewPrimitive(SEM_TYPE_STRING);
-    if (print_string_params[0] != NULL) {
-        declareBuiltinFunction(scope, "printString", semanticTypeNewPrimitive(SEM_TYPE_VOID), print_string_params, 1);
-        semanticTypeFree(print_string_params[0]);
-    }
-
-    print_int_params[0] = semanticTypeNewPrimitive(SEM_TYPE_INT);
-    if (print_int_params[0] != NULL) {
-        declareBuiltinFunction(scope, "printInt", semanticTypeNewPrimitive(SEM_TYPE_VOID), print_int_params, 1);
-        semanticTypeFree(print_int_params[0]);
-    }
 }
 
 static Scope *createValidationRoot(const Scope *globalScope) {
@@ -742,6 +708,11 @@ static void validateFunction(AstNode *node, Scope *scope, SemanticContext *ctx) 
         return;
     }
 
+    if (node->data.func_decl.is_extern) {
+        scopeFree(functionScope);
+        return;
+    }
+
     context.function_name = node->data.func_decl.name;
     context.return_type = semanticTypeFromAst(node->data.func_decl.return_type);
     ctx->current_function = &context;
@@ -904,7 +875,6 @@ SemanticResult semanticAnalyze(AstNode *program) {
     ctx.current_function = NULL;
     ctx.loop_depth = 0;
     if (result.global_scope != NULL) {
-        declareBuiltinRuntimeFunctions(result.global_scope);
         collectSymbols(program, result.global_scope, &result);
         validationRoot = createValidationRoot(result.global_scope);
         if (validationRoot != NULL) {

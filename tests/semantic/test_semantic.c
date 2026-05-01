@@ -756,6 +756,78 @@ void test_semantic_rejects_assignment_through_pointer_with_wrong_type(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_pointer_addition_with_int_offset(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[0]; q::*int = p + 2; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_pointer_subtraction_with_int_offset(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[2]; q::*int = p - 1; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_integer_plus_pointer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[0]; q::*int = 1 + p; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "operator '+' requires numeric operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_pointer_plus_pointer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[0]; q::*int = &arr[1]; r::*int = p + q; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "operator '+' requires numeric operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_pointer_minus_pointer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[2]; q::*int = &arr[1]; r::*int = p - q; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "operator '-' requires numeric operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_void_pointer_arithmetic(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main(value::*void) -> void { next::*void = value + 1; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "operator '+' requires numeric operands") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accepts_nested_array_literal_with_matching_shapes(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void { matrix::Array<Array<int>> = {{1, 2}, {3, 4}}; }"

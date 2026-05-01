@@ -331,6 +331,72 @@ static IRValue irBuilderLowerCallRValue(IRBuilder *builder, const AstNode *node)
     return result;
 }
 
+static IRValue irBuilderLowerPointerArithmetic(IRBuilder *builder, const AstNode *node, IRValue left, IRValue right) {
+    IROperand *indices;
+    IRType *pointee_type;
+    IROperand offset_operand;
+    IRValue gep_value;
+    IRValue result = irValueEmpty();
+
+    if (!left.has_value || !right.has_value || left.type == NULL || left.type->kind != IR_TYPE_POINTER || left.type->element_type == NULL) {
+        if (left.has_value) {
+            irOperandFree(&left.value);
+        }
+        if (right.has_value) {
+            irOperandFree(&right.value);
+        }
+        irTypeFree(left.type);
+        irTypeFree(right.type);
+        return result;
+    }
+
+    offset_operand = right.value;
+    if (node->data.binary.op == AST_BINARY_SUB) {
+        IRValue negated = irBuilderEmitBinary(
+            builder,
+            IR_INSTR_SUB,
+            irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0)),
+            right.value,
+            irTypeCreate(IR_TYPE_INT)
+        );
+
+        if (!negated.has_value) {
+            irOperandFree(&left.value);
+            irTypeFree(left.type);
+            irTypeFree(right.type);
+            return result;
+        }
+
+        offset_operand = negated.value;
+        irTypeFree(negated.type);
+    }
+
+    indices = calloc(1, sizeof(IROperand));
+    if (indices == NULL) {
+        irOperandFree(&left.value);
+        irOperandFree(&offset_operand);
+        irTypeFree(left.type);
+        irTypeFree(right.type);
+        return result;
+    }
+
+    indices[0] = offset_operand;
+    pointee_type = irTypeClone(left.type->element_type);
+    irTypeFree(left.type);
+    irTypeFree(right.type);
+    gep_value = irBuilderEmitGep(builder, left.value, indices, 1, pointee_type);
+
+    if (!gep_value.has_address || gep_value.address.type == NULL) {
+        return gep_value;
+    }
+
+    result.type = irTypeClone(gep_value.address.type);
+    result.value = gep_value.address;
+    result.has_value = true;
+    irTypeFree(gep_value.type);
+    return result;
+}
+
 static IRValue irBuilderLowerBinaryRValue(IRBuilder *builder, const AstNode *node) {
     IRValue left = irBuilderLowerRValue(builder, node->data.binary.left);
     IRValue right = irBuilderLowerRValue(builder, node->data.binary.right);
@@ -344,10 +410,18 @@ static IRValue irBuilderLowerBinaryRValue(IRBuilder *builder, const AstNode *nod
 
     switch (node->data.binary.op) {
         case AST_BINARY_ADD:
+            if (left.type->kind == IR_TYPE_POINTER) {
+                return irBuilderLowerPointerArithmetic(builder, node, left, right);
+            }
+
             binary_result = irBuilderEmitBinary(builder, IR_INSTR_ADD, left.value, right.value, left.type);
             irTypeFree(right.type);
             return binary_result;
         case AST_BINARY_SUB:
+            if (left.type->kind == IR_TYPE_POINTER) {
+                return irBuilderLowerPointerArithmetic(builder, node, left, right);
+            }
+
             binary_result = irBuilderEmitBinary(builder, IR_INSTR_SUB, left.value, right.value, left.type);
             irTypeFree(right.type);
             return binary_result;

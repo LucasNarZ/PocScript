@@ -203,7 +203,7 @@ The table below distinguishes between features that are currently supported acro
 | Comparisons `>=`, `==`, `!=` | `fully-supported` | Lowered and emitted as LLVM comparisons in the active backend path |
 | Logical operators `&&`, `||` | `fully-supported` | Lowered and emitted as boolean LLVM operations |
 | Unary `!` and unary `-` | `fully-supported` | Lowered and emitted in the active backend path |
-| Pointer types `*T` | `fully-supported` | Parsed, validated structurally, and lowered to LLVM pointer types |
+| Pointer types `*T` | `fully-supported` | Parsed, validated structurally, lowered to LLVM pointer types, and supports `p + int` / `p - int` |
 | Address-of `&` | `fully-supported` | Supported for variables and array elements |
 | Dereference `*p` | `fully-supported` | Supported for reads and simple assignment targets |
 | `break` and `continue` | `fully-supported` | Lowered through explicit loop target branches |
@@ -223,7 +223,7 @@ The project is intentionally incomplete, but the currently documented language s
 - the language has no user-defined structs, records, classes, enums, modules, or generics
 - there is no explicit memory management model exposed to the language
 - there is no standard library beyond the tiny runtime helpers
-- pointer support is intentionally minimal: no pointer arithmetic, no `null`, and no implicit array-to-pointer decay
+- pointer support is intentionally minimal: only `p + int` and `p - int` are supported, with no `null` and no implicit array-to-pointer decay
 
 ### Semantic limitations
 

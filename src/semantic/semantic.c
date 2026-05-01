@@ -258,6 +258,28 @@ static void appendConditionTypeError(AstNode *node, SemanticResult *result) {
     appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "condition must be bool");
 }
 
+static bool isNonVoidPointerType(const SemanticType *type) {
+    return type != NULL
+        && type->kind == SEM_TYPE_POINTER
+        && type->element_type != NULL
+        && type->element_type->kind != SEM_TYPE_VOID;
+}
+
+static SemanticType *checkPointerArithmetic(AstNode *node, SemanticType *leftType, SemanticType *rightType) {
+    if (node == NULL) {
+        return NULL;
+    }
+
+    if ((node->data.binary.op != AST_BINARY_ADD && node->data.binary.op != AST_BINARY_SUB)
+            || !isNonVoidPointerType(leftType)
+            || rightType == NULL
+            || rightType->kind != SEM_TYPE_INT) {
+        return NULL;
+    }
+
+    return semanticTypeClone(leftType);
+}
+
 static void appendAssignmentTypeError(AstNode *node, SemanticResult *result, const SemanticType *expectedType, const SemanticType *actualType) {
     char message[256];
 
@@ -500,11 +522,21 @@ static SemanticType *checkBinary(AstNode *node, Scope *scope, SemanticContext *c
         case AST_BINARY_SUB:
         case AST_BINARY_MUL:
         case AST_BINARY_DIV:
-            if (!semanticTypeIsNumeric(leftType) || !semanticTypeIsNumeric(rightType) || !semanticTypeEquals(leftType, rightType)) {
-                appendNumericOperandError(node, ctx->result, node->data.binary.op);
-            } else {
+            if (semanticTypeIsNumeric(leftType) && semanticTypeIsNumeric(rightType) && semanticTypeEquals(leftType, rightType)) {
                 semanticTypeFree(resultType);
                 resultType = semanticTypeClone(leftType);
+            } else if (node->data.binary.op != AST_BINARY_MUL && node->data.binary.op != AST_BINARY_DIV) {
+                SemanticType *pointerResult = checkPointerArithmetic(node, leftType, rightType);
+
+                if (pointerResult != NULL) {
+                    semanticTypeFree(resultType);
+                    resultType = pointerResult;
+                    break;
+                }
+
+                appendNumericOperandError(node, ctx->result, node->data.binary.op);
+            } else {
+                appendNumericOperandError(node, ctx->result, node->data.binary.op);
             }
             break;
         case AST_BINARY_GT:

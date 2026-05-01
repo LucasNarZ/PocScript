@@ -288,6 +288,32 @@ void test_ir_printer_emits_store_through_pointer_dereference(void) {
     }
 }
 
+void test_ir_printer_emits_gep_for_pointer_addition(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[0]; q::*int = p + 2; ret *q; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "getelementptr inbounds i32") != NULL);
+        EXPECT_TRUE(strstr(llvm, ", i32 2") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_gep_for_pointer_subtraction(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[2]; q::*int = p - 1; ret *q; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "getelementptr inbounds i32") != NULL);
+        EXPECT_TRUE(strstr(llvm, "sub i32 0, 1") != NULL || strstr(llvm, ", i32 -1") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_bool_values_as_i1(void) {
     char *llvm = emitLlvmIrFromString("flag::bool = true; func main() -> bool { ret flag; }");
 

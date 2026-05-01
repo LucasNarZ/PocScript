@@ -697,6 +697,65 @@ void test_semantic_rejects_array_literal_with_incompatible_element_types(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_address_of_variable(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { x::int = 1; p::*int = &x; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_dereference_read_and_write(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { x::int = 1; p::*int = &x; y::int = *p; *p = 2; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_address_of_non_lvalue(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { x::int = 1; p::*int = &(x + 1); ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "address-of requires an addressable expression") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_dereference_of_non_pointer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { x::int = 1; y::int = *x; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "cannot dereference non-pointer value") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_assignment_through_pointer_with_wrong_type(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { x::int = 1; p::*int = &x; *p = true; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(strstr(result.errors.items[0].message, "assignment expects int but got bool") != NULL);
+    }
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accepts_nested_array_literal_with_matching_shapes(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void { matrix::Array<Array<int>> = {{1, 2}, {3, 4}}; }"

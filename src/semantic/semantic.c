@@ -26,6 +26,14 @@ static FlowState validateNode(AstNode *node, Scope *scope, SemanticContext *ctx)
 static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContext *ctx);
 static SemanticType *checkArrayAccess(AstNode *node, Scope *scope, SemanticContext *ctx);
 
+static bool isAddressableExpression(AstNode *node) {
+    if (node == NULL) {
+        return false;
+    }
+
+    return node->type == AST_IDENTIFIER || node->type == AST_ARRAY_ACCESS;
+}
+
 static void appendCategorizedError(AstNode *node, SemanticResult *result, SemanticErrorKind kind, const char *message) {
     int line = 0;
     int column = 0;
@@ -250,6 +258,19 @@ static void appendConditionTypeError(AstNode *node, SemanticResult *result) {
     appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, "condition must be bool");
 }
 
+static void appendAssignmentTypeError(AstNode *node, SemanticResult *result, const SemanticType *expectedType, const SemanticType *actualType) {
+    char message[256];
+
+    snprintf(
+        message,
+        sizeof(message),
+        "assignment expects %s but got %s",
+        semanticTypeName(expectedType),
+        semanticTypeName(actualType)
+    );
+    appendCategorizedError(node, result, SEMANTIC_ERROR_TYPE, message);
+}
+
 static void appendUndeclaredFunctionError(AstNode *node, SemanticResult *result, const char *name) {
     char message[256];
 
@@ -423,6 +444,30 @@ static SemanticType *checkAssignmentTarget(AstNode *node, Scope *scope, Semantic
         }
         case AST_ARRAY_ACCESS:
             return checkArrayAccess(node, scope, ctx);
+        case AST_UNARY: {
+            SemanticType *pointerType;
+
+            if (node->data.unary.op != AST_UNARY_DEREF) {
+                return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+            }
+
+            pointerType = checkExpression(node->data.unary.operand, scope, ctx);
+            if (pointerType->kind == SEM_TYPE_ERROR) {
+                return pointerType;
+            }
+
+            if (pointerType->kind != SEM_TYPE_POINTER || pointerType->element_type == NULL) {
+                appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "cannot dereference non-pointer value");
+                semanticTypeFree(pointerType);
+                return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+            }
+
+            {
+                SemanticType *pointeeType = semanticTypeClone(pointerType->element_type);
+                semanticTypeFree(pointerType);
+                return pointeeType;
+            }
+        }
         default:
             return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
     }
@@ -433,7 +478,11 @@ static SemanticType *checkAssign(AstNode *node, Scope *scope, SemanticContext *c
     SemanticType *valueType = checkExpression(node->data.assign.value, scope, ctx);
 
     if (targetType->kind != SEM_TYPE_ERROR && valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(targetType, valueType)) {
-        appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "assignment types are incompatible");
+        if (node->data.assign.target->type == AST_UNARY && node->data.assign.target->data.unary.op == AST_UNARY_DEREF) {
+            appendAssignmentTypeError(node, ctx->result, targetType, valueType);
+        } else {
+            appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "assignment types are incompatible");
+        }
     }
 
     semanticTypeFree(valueType);
@@ -495,7 +544,46 @@ static SemanticType *checkBinary(AstNode *node, Scope *scope, SemanticContext *c
 }
 
 static SemanticType *checkUnary(AstNode *node, Scope *scope, SemanticContext *ctx) {
-    SemanticType *operandType = checkExpression(node->data.unary.operand, scope, ctx);
+    SemanticType *operandType;
+
+    if (node->data.unary.op == AST_UNARY_ADDRESS_OF) {
+        SemanticType *pointerType;
+
+        if (!isAddressableExpression(node->data.unary.operand)) {
+            appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "address-of requires an addressable expression");
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        }
+
+        operandType = checkAssignmentTarget(node->data.unary.operand, scope, ctx);
+        if (operandType->kind == SEM_TYPE_ERROR) {
+            return operandType;
+        }
+
+        pointerType = semanticTypeNewPrimitive(SEM_TYPE_POINTER);
+        if (pointerType == NULL) {
+            semanticTypeFree(operandType);
+            return NULL;
+        }
+
+        pointerType->element_type = operandType;
+        return pointerType;
+    }
+
+    operandType = checkExpression(node->data.unary.operand, scope, ctx);
+
+    if (node->data.unary.op == AST_UNARY_DEREF) {
+        SemanticType *pointeeType;
+
+        if (operandType->kind != SEM_TYPE_POINTER || operandType->element_type == NULL) {
+            appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "cannot dereference non-pointer value");
+            semanticTypeFree(operandType);
+            return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+        }
+
+        pointeeType = semanticTypeClone(operandType->element_type);
+        semanticTypeFree(operandType);
+        return pointeeType;
+    }
 
     if (node->data.unary.op == AST_UNARY_NOT) {
         if (!semanticTypeIsBool(operandType)) {

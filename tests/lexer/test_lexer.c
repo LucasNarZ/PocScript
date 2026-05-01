@@ -178,3 +178,22 @@ void test_lexer_tokenizes_extern_function_declaration(void) {
 
     freeTokens(tokens);
 }
+
+void test_lexer_tokenizes_address_of_operator(void) {
+    Token *tokens = tokenizeString("p::*int = &x;");
+
+    EXPECT_TRUE(tokens != NULL);
+    if (tokens == NULL) {
+        return;
+    }
+
+    EXPECT_TRUE(tokens->type == TOKEN_IDENTIFIER);
+    EXPECT_TRUE(tokens->next->type == TOKEN_DOUBLE_COLON);
+    EXPECT_TRUE(tokens->next->next->type == TOKEN_STAR);
+    EXPECT_TRUE(tokens->next->next->next->type == TOKEN_TYPE_INT);
+    EXPECT_TRUE(tokens->next->next->next->next->type == TOKEN_ASSIGN);
+    EXPECT_TRUE(tokens->next->next->next->next->next->type == TOKEN_AMPERSAND);
+    EXPECT_TRUE(tokens->next->next->next->next->next->next->type == TOKEN_IDENTIFIER);
+
+    freeTokens(tokens);
+}

@@ -156,18 +156,20 @@ The current codebase supports:
 - variable declarations with `::`
 - top-level global variable declarations and function declarations only
 - primitive types `int`, `float`, `char`, `bool`, and `void`
+- pointer types with `*T`
 - `Array` and `[]`-style array types
 - integer, float, string, and bool literals
 - array literals, including nested array literals
 - assignments `=`, `+=`, and `-=`
 - binary expressions including arithmetic, comparison, and logical operators across the active pipeline
-- unary operators `!` and `-` across the active pipeline
+- unary operators `!`, `-`, `&`, and `*` across the active pipeline
 - blocks
 - `if`, `else`, `while`, `for`, `break`, and `continue`
 - function declarations with explicit return types and `ret`
 - function calls
 - builtin runtime calls to `printString` and `printInt`
 - array access syntax with one or more indices across the active pipeline
+- pointer address-of and dereference syntax across the active pipeline
 - LLVM IR emission for globals, functions, control flow, array access, string storage, and external runtime declarations
 - final executable generation with `_start` and a libc-free runtime linked by `ld`
 
@@ -201,6 +203,9 @@ The table below distinguishes between features that are currently supported acro
 | Comparisons `>=`, `==`, `!=` | `fully-supported` | Lowered and emitted as LLVM comparisons in the active backend path |
 | Logical operators `&&`, `||` | `fully-supported` | Lowered and emitted as boolean LLVM operations |
 | Unary `!` and unary `-` | `fully-supported` | Lowered and emitted in the active backend path |
+| Pointer types `*T` | `fully-supported` | Parsed, validated structurally, and lowered to LLVM pointer types |
+| Address-of `&` | `fully-supported` | Supported for variables and array elements |
+| Dereference `*p` | `fully-supported` | Supported for reads and simple assignment targets |
 | `break` and `continue` | `fully-supported` | Lowered through explicit loop target branches |
 
 `fully-supported` means the feature is implemented coherently across the currently active pipeline: parser, semantic analysis, IR generation, LLVM IR emission, and executable generation.
@@ -218,6 +223,7 @@ The project is intentionally incomplete, but the currently documented language s
 - the language has no user-defined structs, records, classes, enums, modules, or generics
 - there is no explicit memory management model exposed to the language
 - there is no standard library beyond the tiny runtime helpers
+- pointer support is intentionally minimal: no pointer arithmetic, no `null`, and no implicit array-to-pointer decay
 
 ### Semantic limitations
 

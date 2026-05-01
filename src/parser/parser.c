@@ -18,6 +18,7 @@ static AstNode *parseTerm(Parser *parser);
 static AstNode *parseNegation(Parser *parser);
 static AstNode *parseFactor(Parser *parser);
 static AstNode *parseType(Parser *parser);
+static AstNode *parsePointerType(Parser *parser);
 static AstNode *parseArrayLiteral(Parser *parser);
 static bool isAssignableTarget(const AstNode *node);
 
@@ -89,7 +90,7 @@ static void parserExpect(Parser *parser, TokenType type, const char *message) {
 }
 
 static bool isTypeToken(const Parser *parser) {
-    return parserIs(parser, TOKEN_TYPE_ARRAY) || parserIs(parser, TOKEN_TYPE_INT) || parserIs(parser, TOKEN_TYPE_FLOAT) || parserIs(parser, TOKEN_TYPE_CHAR) || parserIs(parser, TOKEN_TYPE_BOOL) || parserIs(parser, TOKEN_TYPE_VOID) || parserIs(parser, TOKEN_IDENTIFIER);
+    return parserIs(parser, TOKEN_STAR) || parserIs(parser, TOKEN_TYPE_ARRAY) || parserIs(parser, TOKEN_TYPE_INT) || parserIs(parser, TOKEN_TYPE_FLOAT) || parserIs(parser, TOKEN_TYPE_CHAR) || parserIs(parser, TOKEN_TYPE_BOOL) || parserIs(parser, TOKEN_TYPE_VOID) || parserIs(parser, TOKEN_IDENTIFIER);
 }
 
 static bool isDeclarationStart(const Parser *parser) {
@@ -530,6 +531,22 @@ static AstNode *parseTerm(Parser *parser) {
 }
 
 static AstNode *parseNegation(Parser *parser) {
+    if (parserIs(parser, TOKEN_AMPERSAND)) {
+        AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
+        node->data.unary.op = AST_UNARY_ADDRESS_OF;
+        parserAdvance(parser);
+        node->data.unary.operand = parseNegation(parser);
+        return node;
+    }
+
+    if (parserIs(parser, TOKEN_STAR)) {
+        AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
+        node->data.unary.op = AST_UNARY_DEREF;
+        parserAdvance(parser);
+        node->data.unary.operand = parseNegation(parser);
+        return node;
+    }
+
     if (parserIs(parser, TOKEN_BANG)) {
         AstNode *node = astNewNodeFromCurrent(parser, AST_UNARY);
         node->data.unary.op = AST_UNARY_NOT;
@@ -650,7 +667,19 @@ static bool isAssignableTarget(const AstNode *node) {
         return isAssignableTarget(node->data.array_access.base);
     }
 
+    if (node->type == AST_UNARY && node->data.unary.op == AST_UNARY_DEREF) {
+        return true;
+    }
+
     return false;
+}
+
+static AstNode *parsePointerType(Parser *parser) {
+    AstNode *node = astNewNodeFromCurrent(parser, AST_TYPE_POINTER);
+
+    parserExpect(parser, TOKEN_STAR, "expected '*' in pointer type");
+    node->data.type_pointer.target_type = parseType(parser);
+    return node;
 }
 
 static AstNode *parseType(Parser *parser) {
@@ -658,6 +687,10 @@ static AstNode *parseType(Parser *parser) {
 
     if (!isTypeToken(parser)) {
         parserSyntaxError(parser->current, "expected type");
+    }
+
+    if (parserIs(parser, TOKEN_STAR)) {
+        return parsePointerType(parser);
     }
 
     if (parserIs(parser, TOKEN_TYPE_ARRAY)) {

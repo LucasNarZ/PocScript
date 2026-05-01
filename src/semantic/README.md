@@ -116,9 +116,10 @@ Current kinds include:
 - `SEM_TYPE_STRING`
 - `SEM_TYPE_VOID`
 - `SEM_TYPE_ARRAY`
+- `SEM_TYPE_POINTER`
 - `SEM_TYPE_ERROR`
 
-Arrays are recursive: an array type stores an `element_type` pointer to another `SemanticType`.
+Arrays and pointers are recursive: each stores an `element_type` pointer to another `SemanticType`.
 
 ### `SemanticError` and `SemanticErrorList`
 
@@ -166,6 +167,7 @@ The current implementation keeps type rules intentionally strict:
 - no implicit numeric promotion between `int` and `float`
 - global variable initializers must be direct literal nodes
 - array element types must match
+- pointer types must match structurally
 - function arguments must match declared parameter types
 - function return expressions must match the declared return type
 - conditions must resolve to `bool`
@@ -208,6 +210,9 @@ The current semantic analyzer validates:
 - array literal element compatibility
 - integer-only array indexing
 - rejection of indexing non-array values
+- address-of only on addressable expressions
+- dereference only on pointer-typed expressions
+- assignment through dereference with exact pointee type matching
 
 ## Output Responsibility
 

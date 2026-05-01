@@ -57,15 +57,15 @@ bool semanticTypeEquals(const SemanticType *left, const SemanticType *right) {
         return false;
     }
 
-    if (left->kind != SEM_TYPE_ARRAY) {
+    if (left->kind != SEM_TYPE_ARRAY && left->kind != SEM_TYPE_POINTER) {
         return true;
     }
 
-    if (left->has_array_size != right->has_array_size) {
+    if (left->kind == SEM_TYPE_ARRAY && left->has_array_size != right->has_array_size) {
         return false;
     }
 
-    if (left->has_array_size && left->array_size != right->array_size) {
+    if (left->kind == SEM_TYPE_ARRAY && left->has_array_size && left->array_size != right->array_size) {
         return false;
     }
 
@@ -92,6 +92,8 @@ const char *semanticTypeName(const SemanticType *type) {
             return "void";
         case SEM_TYPE_ARRAY:
             return "array";
+        case SEM_TYPE_POINTER:
+            return "pointer";
         case SEM_TYPE_ERROR:
             return "error";
     }
@@ -105,6 +107,16 @@ SemanticType *semanticTypeFromAst(AstNode *typeNode) {
 
     if (typeNode == NULL) {
         return semanticTypeNewPrimitive(SEM_TYPE_ERROR);
+    }
+
+    if (typeNode->type == AST_TYPE_POINTER) {
+        type = semanticTypeNewPrimitive(SEM_TYPE_POINTER);
+        if (type == NULL) {
+            return NULL;
+        }
+
+        type->element_type = semanticTypeFromAst(typeNode->data.type_pointer.target_type);
+        return type;
     }
 
     if (typeNode->type == AST_TYPE_ARRAY) {

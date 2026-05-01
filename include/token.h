@@ -38,6 +38,7 @@ typedef enum {
     TOKEN_IDENTIFIER,
     TOKEN_OR_OR,
     TOKEN_AND_AND,
+    TOKEN_AMPERSAND,
     TOKEN_PLUS,
     TOKEN_MINUS,
     TOKEN_STAR,

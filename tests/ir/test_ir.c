@@ -260,6 +260,34 @@ void test_ir_printer_emits_float_values_as_double(void) {
     }
 }
 
+void test_ir_printer_emits_load_through_pointer_dereference(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { x::int = 1; p::*int = &x; ret *p; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "alloca i32") != NULL);
+        EXPECT_TRUE(strstr(llvm, "alloca i32*") != NULL);
+        EXPECT_TRUE(strstr(llvm, "load i32*, i32**") != NULL);
+        EXPECT_TRUE(strstr(llvm, "load i32, i32*") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_store_through_pointer_dereference(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main() -> int { x::int = 1; p::*int = &x; *p = 2; ret x; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "store i32 2") != NULL);
+        EXPECT_TRUE(strstr(llvm, "load i32*, i32**") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_bool_values_as_i1(void) {
     char *llvm = emitLlvmIrFromString("flag::bool = true; func main() -> bool { ret flag; }");
 

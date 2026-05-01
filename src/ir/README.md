@@ -246,6 +246,8 @@ It also lowers unary operators:
 
 - unary `-` -> `sub 0, value`
 - unary `!` -> `xor value, 1`
+- unary `&` -> reuse the existing lvalue address as an rvalue pointer
+- unary `*` -> `load` from the pointer operand
 
 Comparison results use `bool` / `i1`.
 
@@ -274,6 +276,8 @@ The resulting address is then loaded when the access is used as an rvalue.
 ### Assignments
 
 Simple assignment lowers to `store`.
+
+Pointer assignment through dereference also lowers to `store`, using the dereferenced pointer value as the destination address.
 
 Compound assignments currently supported are:
 

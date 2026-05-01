@@ -31,7 +31,8 @@ typedef enum {
     AST_STRING_LITERAL,
     AST_BOOL_LITERAL,
     AST_TYPE_NAME,
-    AST_TYPE_ARRAY
+    AST_TYPE_ARRAY,
+    AST_TYPE_POINTER
 } AstNodeType;
 
 typedef enum {
@@ -61,7 +62,9 @@ typedef enum {
 
 typedef enum {
     AST_UNARY_NEGATE,
-    AST_UNARY_NOT
+    AST_UNARY_NOT,
+    AST_UNARY_ADDRESS_OF,
+    AST_UNARY_DEREF
 } AstUnaryOp;
 
 typedef enum {
@@ -157,6 +160,10 @@ typedef struct {
     AstNode *size_expr;
 } AstTypeArrayData;
 
+typedef struct {
+    AstNode *target_type;
+} AstTypePointerData;
+
 struct AstNode {
     AstNodeType type;
     int line;
@@ -199,6 +206,7 @@ struct AstNode {
         } bool_literal;
         AstTypeNameData type_name;
         AstTypeArrayData type_array;
+        AstTypePointerData type_pointer;
     } data;
 };
 

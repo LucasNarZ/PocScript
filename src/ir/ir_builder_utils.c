@@ -53,6 +53,15 @@ IRType *irBuilderTypeFromAst(const AstNode *type_node) {
         return NULL;
     }
 
+    if (type_node->type == AST_TYPE_POINTER) {
+        element_type = irBuilderTypeFromAst(type_node->data.type_pointer.target_type);
+        if (element_type == NULL) {
+            return NULL;
+        }
+
+        return irTypeCreatePointer(element_type);
+    }
+
     if (type_node->type == AST_TYPE_ARRAY) {
         element_type_node = type_node->data.type_array.element_type;
         if (type_node->data.type_array.size_expr != NULL

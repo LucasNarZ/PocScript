@@ -308,6 +308,31 @@ void test_parser_requires_func_after_extern(void) {
     );
 }
 
+void test_parser_parses_pointer_type_declaration(void) {
+    assertParsesWithAstSubstring("p::*int;", "TYPE_POINTER");
+}
+
+void test_parser_parses_address_of_expression(void) {
+    assertParsesWithAstSubstring(
+        "func main() -> void { x::int = 1; p::*int = &x; }",
+        "ADDRESS_OF"
+    );
+}
+
+void test_parser_parses_dereference_expression(void) {
+    assertParsesWithAstSubstring(
+        "func main() -> void { x::int = 1; p::*int = &x; y::int = *p; }",
+        "DEREF"
+    );
+}
+
+void test_parser_accepts_dereference_assignment_target(void) {
+    assertParsesWithAstSubstring(
+        "func main() -> void { x::int = 1; p::*int = &x; *p = 2; }",
+        "(=)"
+    );
+}
+
 void test_parser_parses_assignment_without_symbol_lookup(void) {
     Token *tokens = tokenizeString("func main() -> void { x = y; }");
     AstNode *root;

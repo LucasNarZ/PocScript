@@ -62,6 +62,17 @@ static const char *assignOpName(AstAssignOp op) {
     return "=";
 }
 
+static const char *unaryOpName(AstUnaryOp op) {
+    switch (op) {
+        case AST_UNARY_NEGATE: return "NEGATE";
+        case AST_UNARY_NOT: return "NOT";
+        case AST_UNARY_ADDRESS_OF: return "ADDRESS_OF";
+        case AST_UNARY_DEREF: return "DEREF";
+    }
+
+    return "UNARY";
+}
+
 static void appendText(char **buffer, size_t *size, const char *text) {
     size_t textLength = strlen(text);
     char *nextBuffer = realloc(*buffer, *size + textLength);
@@ -138,7 +149,14 @@ static void writeLabel(char **buffer, size_t *size, AstNode *node) {
         case AST_EXPR_STMT: appendFormat(buffer, size, " (EXPR_STMT)\n"); break;
         case AST_ASSIGN: appendFormat(buffer, size, " ("); appendFormat(buffer, size, assignOpName(node->data.assign.op)); appendFormat(buffer, size, ")\n"); break;
         case AST_BINARY: appendFormat(buffer, size, " ("); appendFormat(buffer, size, binaryOpName(node->data.binary.op)); appendFormat(buffer, size, ")\n"); break;
-        case AST_UNARY: appendFormat(buffer, size, " (UNARY)\n"); break;
+        case AST_UNARY:
+            appendFormat(buffer, size, " (UNARY)");
+            if (node->data.unary.op == AST_UNARY_ADDRESS_OF || node->data.unary.op == AST_UNARY_DEREF) {
+                appendFormat(buffer, size, " ");
+                appendFormat(buffer, size, unaryOpName(node->data.unary.op));
+            }
+            appendFormat(buffer, size, "\n");
+            break;
         case AST_CALL: appendFormat(buffer, size, " (CALL)\n"); break;
         case AST_ARRAY_ACCESS: appendFormat(buffer, size, " (ARRAY_ACCESS)\n"); break;
         case AST_ARRAY_LITERAL: appendFormat(buffer, size, " (ARRAY_LITERAL)\n"); break;
@@ -155,6 +173,7 @@ static void writeLabel(char **buffer, size_t *size, AstNode *node) {
         case AST_BOOL_LITERAL: appendFormat(buffer, size, node->data.bool_literal.value ? " (true)\n" : " (false)\n"); break;
         case AST_TYPE_NAME: appendFormat(buffer, size, " (TYPE "); appendFormat(buffer, size, node->data.type_name.name); appendFormat(buffer, size, ")\n"); break;
         case AST_TYPE_ARRAY: appendFormat(buffer, size, " (TYPE_ARRAY)\n"); break;
+        case AST_TYPE_POINTER: appendFormat(buffer, size, " (TYPE_POINTER)\n"); break;
     }
 }
 
@@ -234,6 +253,9 @@ static void writeNode(char **buffer, size_t *size, AstNode *node, int depth, int
         case AST_TYPE_ARRAY:
             if (node->data.type_array.element_type) writeNode(buffer, size, node->data.type_array.element_type, depth + 1, isLast);
             if (node->data.type_array.size_expr) writeNode(buffer, size, node->data.type_array.size_expr, depth + 1, isLast);
+            break;
+        case AST_TYPE_POINTER:
+            if (node->data.type_pointer.target_type) writeNode(buffer, size, node->data.type_pointer.target_type, depth + 1, isLast);
             break;
         default:
             break;
@@ -348,6 +370,9 @@ void astFree(AstNode *root) {
         case AST_TYPE_ARRAY:
             astFree(root->data.type_array.element_type);
             astFree(root->data.type_array.size_expr);
+            break;
+        case AST_TYPE_POINTER:
+            astFree(root->data.type_pointer.target_type);
             break;
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:

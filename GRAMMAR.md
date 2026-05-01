@@ -62,7 +62,8 @@ declaration     = identifier "::" type [ "=" initializer ] ;
 
 assignment      = assign-target assignment-operator logical-expression ;
 
-assign-target   = identifier { index-suffix } ;
+assign-target   = identifier { index-suffix }
+                | "*" unary-expression ;
 
 assignment-operator = "=" | "+=" | "-=" ;
 
@@ -83,7 +84,7 @@ additive-expression = multiplicative-expression
 multiplicative-expression = unary-expression
                             { ( "*" | "/" ) unary-expression } ;
 
-unary-expression = ( "!" | "-" ) unary-expression
+unary-expression = ( "!" | "-" | "&" | "*" ) unary-expression
                  | primary-expression ;
 
 primary-expression = number
@@ -105,7 +106,9 @@ array-element   = logical-expression ;
 
 array-separator = "," | ";" ;
 
-type            = array-generic-type | named-type ;
+type            = pointer-type | array-generic-type | named-type ;
+
+pointer-type    = "*" type ;
 
 array-generic-type = "Array" [ "<" type ">" ] array-type-suffixes ;
 
@@ -128,7 +131,7 @@ From lowest to highest within expressions:
 3. comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 4. addition and subtraction: `+`, `-`
 5. multiplication and division: `*`, `/`
-6. unary prefix: `!`, unary `-`
+6. unary prefix: `!`, unary `-`, `&`, unary `*`
 7. postfix: call `()` and indexing `[]`
 8. primaries: identifiers, literals, grouping, and array literal
 
@@ -142,6 +145,7 @@ Based on `src/lexer/lexer.c`:
 - `number`: integers or decimal floats such as `10` and `1.5`
 - `string`: accepts double-quoted or single-quoted text
 - `boolean`: `true` and `false`
+- `&`: address-of operator
 - `//...` comments and whitespace are ignored by the lexer
 
 The EBNF above uses the auxiliary lexical names `letter-or-underscore`, `letter`, `digit`, `underscore`, `integer`, `float`, and `quoted-text` as shorthand for the token categories produced by the lexer. In practice, string literals are produced as a single lexer category whether they use single quotes or double quotes.
@@ -200,6 +204,10 @@ arr[0](x);
 ## Implementation Notes
 
 - Unary `-` is accepted and parsed as a unary expression.
+- Pointer types use recursive prefix syntax such as `*int` and `**char`.
+- Unary `&` computes the address of an addressable expression.
+- Unary `*` dereferences a pointer expression.
+- Assignment targets now include dereference expressions such as `*p = 1;`.
 - The parser accepts `Array` without a generic parameter, for example `x::Array;`.
 - Types can receive repeated `[]` suffixes, with an optional size per dimension, for example `int[][10]`.
 - The size inside type `[]` uses the same `logical-expression` rule.

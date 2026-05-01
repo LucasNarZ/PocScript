@@ -14,6 +14,7 @@ typedef enum {
     SEM_TYPE_STRING,
     SEM_TYPE_VOID,
     SEM_TYPE_ARRAY,
+    SEM_TYPE_POINTER,
     SEM_TYPE_ERROR
 } SemanticTypeKind;
 

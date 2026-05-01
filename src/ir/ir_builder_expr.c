@@ -101,6 +101,8 @@ static IRValue irBuilderLowerArrayAccess(IRBuilder *builder, const AstNode *node
 }
 
 IRValue irBuilderLowerLValue(IRBuilder *builder, const AstNode *node) {
+    IRValue pointer_value;
+
     if (node == NULL) {
         return irValueEmpty();
     }
@@ -111,6 +113,26 @@ IRValue irBuilderLowerLValue(IRBuilder *builder, const AstNode *node) {
 
     if (node->type == AST_ARRAY_ACCESS) {
         return irBuilderLowerArrayAccess(builder, node);
+    }
+
+    if (node->type == AST_UNARY && node->data.unary.op == AST_UNARY_DEREF) {
+        pointer_value = irBuilderLowerRValue(builder, node->data.unary.operand);
+        if (!pointer_value.has_value || pointer_value.type == NULL || pointer_value.type->kind != IR_TYPE_POINTER || pointer_value.type->element_type == NULL) {
+            irTypeFree(pointer_value.type);
+            if (pointer_value.has_value) {
+                irOperandFree(&pointer_value.value);
+            }
+            return irValueEmpty();
+        }
+
+        {
+            IRValue result = irValueEmpty();
+            result.type = irTypeClone(pointer_value.type->element_type);
+            result.address = pointer_value.value;
+            result.has_address = true;
+            irTypeFree(pointer_value.type);
+            return result;
+        }
     }
 
     return irValueEmpty();
@@ -190,6 +212,35 @@ static IRValue irBuilderLowerLoadedRValue(IRBuilder *builder, const AstNode *nod
 }
 
 static IRValue irBuilderLowerUnaryRValue(IRBuilder *builder, const AstNode *node) {
+    if (node->data.unary.op == AST_UNARY_ADDRESS_OF) {
+        IRValue addressed = irBuilderLowerLValue(builder, node->data.unary.operand);
+        IRValue result = irValueEmpty();
+
+        if (!addressed.has_address || addressed.address.type == NULL) {
+            irTypeFree(addressed.type);
+            if (addressed.has_address) {
+                irOperandFree(&addressed.address);
+            }
+            return irValueEmpty();
+        }
+
+        result.type = irTypeClone(addressed.address.type);
+        result.value = addressed.address;
+        result.has_value = true;
+        irTypeFree(addressed.type);
+        return result;
+    }
+
+    if (node->data.unary.op == AST_UNARY_DEREF) {
+        IRValue dereferenced = irBuilderLowerLValue(builder, node);
+
+        if (!dereferenced.has_address || dereferenced.type == NULL) {
+            return irValueEmpty();
+        }
+
+        return irBuilderEmitLoad(builder, dereferenced.address, dereferenced.type);
+    }
+
     IRValue operand = irBuilderLowerRValue(builder, node->data.unary.operand);
 
     if (!operand.has_value) {

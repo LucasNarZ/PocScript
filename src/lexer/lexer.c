@@ -67,6 +67,7 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_IDENTIFIER, "^[_a-zA-Z][_a-zA-Z0-9]*"},
     {TOKEN_OR_OR, "^(\\|\\|)"},
     {TOKEN_AND_AND, "^(&&)"},
+    {TOKEN_AMPERSAND, "^(&)"},
     {TOKEN_PLUS, "^(\\+)"},
     {TOKEN_MINUS, "^(-)"},
     {TOKEN_STAR, "^(\\*)"},
@@ -118,6 +119,7 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_IDENTIFIER: return "IDENTIFIER";
         case TOKEN_OR_OR: return "OR_OR";
         case TOKEN_AND_AND: return "AND_AND";
+        case TOKEN_AMPERSAND: return "AMPERSAND";
         case TOKEN_PLUS: return "PLUS";
         case TOKEN_MINUS: return "MINUS";
         case TOKEN_STAR: return "STAR";

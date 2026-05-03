@@ -94,9 +94,6 @@ IRType *irBuilderTypeFromAst(const AstNode *type_node) {
         case AST_TYPE_VOID_KIND:
             return irTypeCreate(IR_TYPE_VOID);
         case AST_TYPE_CUSTOM_KIND:
-            if (type_node->data.type_name.name != NULL && strcmp(type_node->data.type_name.name, "string") == 0) {
-                return irTypeCreate(IR_TYPE_STRING);
-            }
             return NULL;
         default:
             return NULL;

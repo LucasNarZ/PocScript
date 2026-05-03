@@ -59,7 +59,8 @@ The node types defined in `include/ast.h` cover four main groups.
 - `AST_IDENTIFIER`: identifier
 - `AST_INT_LITERAL`: integer
 - `AST_FLOAT_LITERAL`: float
-- `AST_STRING_LITERAL`: string or char literal
+- `AST_CHAR_LITERAL`: character literal syntax such as `'a'` or `'\0'`
+- `AST_STRING_LITERAL`: string literal syntax, later typed as `*char` by semantic analysis
 - `AST_BOOL_LITERAL`: boolean
 - `AST_TYPE_NAME`: nominal type, builtin or custom
 - `AST_TYPE_ARRAY`: array type with element type and optional size

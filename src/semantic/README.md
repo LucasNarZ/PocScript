@@ -113,13 +113,16 @@ Current kinds include:
 - `SEM_TYPE_FLOAT`
 - `SEM_TYPE_CHAR`
 - `SEM_TYPE_BOOL`
-- `SEM_TYPE_STRING`
 - `SEM_TYPE_VOID`
 - `SEM_TYPE_ARRAY`
 - `SEM_TYPE_POINTER`
 - `SEM_TYPE_ERROR`
 
 Arrays and pointers are recursive: each stores an `element_type` pointer to another `SemanticType`.
+
+The language does not keep a dedicated string type in semantics. A literal such as `"hi"` resolves to `*char`.
+
+Character literals such as `'a'` and `'\0'` resolve to `char`.
 
 ### `SemanticError` and `SemanticErrorList`
 

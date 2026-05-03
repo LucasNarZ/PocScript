@@ -1,6 +1,9 @@
 #include "helpers/test_helpers.h"
 
 void test_semantic_accepts_builtin_print_functions(void);
+void test_semantic_accepts_char_pointer_initialized_from_string_literal(void);
+void test_semantic_rejects_string_type_name(void);
+void test_semantic_accepts_builtin_print_string_with_char_pointer(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
 void test_semantic_accepts_extern_function_declarations(void);
 void test_semantic_rejects_duplicate_extern_function_declaration(void);
@@ -11,6 +14,7 @@ void test_lexer_tokenizes_logical_and_equality_operators(void);
 void test_lexer_tokenizes_break_and_continue_keywords_together(void);
 void test_lexer_tokenizes_extern_function_declaration(void);
 void test_lexer_tokenizes_address_of_operator(void);
+void test_lexer_tokenizes_char_literals(void);
 void test_parser_parses_extern_function_declaration(void);
 void test_parser_rejects_extern_function_inside_block(void);
 void test_parser_requires_func_after_extern(void);
@@ -18,6 +22,9 @@ void test_parser_parses_pointer_type_declaration(void);
 void test_parser_parses_address_of_expression(void);
 void test_parser_parses_dereference_expression(void);
 void test_parser_accepts_dereference_assignment_target(void);
+void test_parser_parses_char_literal(void);
+void test_parser_rejects_empty_char_literal(void);
+void test_parser_rejects_multi_character_literal(void);
 void test_semantic_accepts_logical_and_with_bool_operands(void);
 void test_semantic_rejects_logical_and_with_non_bool_operand(void);
 void test_semantic_accepts_logical_or_with_bool_operands(void);
@@ -37,6 +44,7 @@ void test_semantic_rejects_dereference_of_non_pointer(void);
 void test_semantic_rejects_assignment_through_pointer_with_wrong_type(void);
 void test_semantic_accepts_pointer_addition_with_int_offset(void);
 void test_semantic_accepts_pointer_subtraction_with_int_offset(void);
+void test_semantic_accepts_pointer_string_traversal_with_char_literal_nul(void);
 void test_semantic_rejects_integer_plus_pointer(void);
 void test_semantic_rejects_pointer_plus_pointer(void);
 void test_semantic_rejects_pointer_minus_pointer(void);
@@ -49,6 +57,7 @@ void test_ir_printer_does_not_define_extern_function_body(void);
 void test_ir_printer_emits_float_values_as_double(void);
 void test_ir_printer_emits_bool_values_as_i1(void);
 void test_ir_printer_escapes_special_characters_in_string_literals(void);
+void test_ir_printer_emits_i8_comparison_for_char_literal_nul(void);
 void test_ir_printer_emits_sub_mul_and_div_operations(void);
 void test_ir_printer_rejects_non_void_function_without_return_on_all_paths(void);
 void test_ir_printer_writes_module_to_file(void);
@@ -87,6 +96,7 @@ int main(void) {
     RUN_TEST(test_lexer_tokenizes_break_and_continue_keywords_together, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_tokenizes_extern_function_declaration, "tests/lexer/test_lexer.c");
     RUN_TEST(test_lexer_tokenizes_address_of_operator, "tests/lexer/test_lexer.c");
+    RUN_TEST(test_lexer_tokenizes_char_literals, "tests/lexer/test_lexer.c");
     RUN_TEST(test_parser_parses_assignment_without_symbol_lookup, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_declaration_syntax_without_semantics, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_call_syntax_without_function_type, "tests/parser/test_parser.c");
@@ -119,6 +129,9 @@ int main(void) {
     RUN_TEST(test_parser_parses_address_of_expression, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_parses_dereference_expression, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_accepts_dereference_assignment_target, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_parses_char_literal, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_empty_char_literal, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_rejects_multi_character_literal, "tests/parser/test_parser.c");
     RUN_TEST(test_semantic_starts_with_no_errors_for_empty_program, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_incompatible_initializer_types, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_duplicate_variable_in_same_scope, "tests/semantic/test_semantic.c");
@@ -130,6 +143,9 @@ int main(void) {
     RUN_TEST(test_semantic_reports_non_boolean_condition, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_reports_call_to_undeclared_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_builtin_print_functions, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_char_pointer_initialized_from_string_literal, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_rejects_string_type_name, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_builtin_print_string_with_char_pointer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_extern_function_declarations, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_duplicate_extern_function_declaration, "tests/semantic/test_semantic.c");
@@ -182,6 +198,7 @@ int main(void) {
     RUN_TEST(test_semantic_rejects_assignment_through_pointer_with_wrong_type, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_pointer_addition_with_int_offset, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_pointer_subtraction_with_int_offset, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_pointer_string_traversal_with_char_literal_nul, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_integer_plus_pointer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_pointer_plus_pointer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_pointer_minus_pointer, "tests/semantic/test_semantic.c");
@@ -211,6 +228,7 @@ int main(void) {
     RUN_TEST(test_ir_printer_emits_float_values_as_double, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_bool_values_as_i1, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_escapes_special_characters_in_string_literals, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_i8_comparison_for_char_literal_nul, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_sub_mul_and_div_operations, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_rejects_non_void_function_without_return_on_all_paths, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_writes_module_to_file, "tests/ir/test_ir.c");

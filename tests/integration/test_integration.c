@@ -119,7 +119,7 @@ void test_integration_emits_ir_for_single_dimension_array_access(void) {
 
 void test_integration_emits_ir_for_runtime_print_calls(void) {
     char *llvm = emitLlvmIrFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "extern func printInt(value::int) -> void;\n"
         "func main() -> void { printString(\"hi\"); printInt(42); ret; }"
     );

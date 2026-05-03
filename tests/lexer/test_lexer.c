@@ -197,3 +197,38 @@ void test_lexer_tokenizes_address_of_operator(void) {
 
     freeTokens(tokens);
 }
+
+void test_lexer_tokenizes_char_literals(void) {
+    Token *tokens = tokenizeString("letter::char = 'a'; nul::char = '\\0';");
+    Token *current = tokens;
+
+    EXPECT_TRUE(tokens != NULL);
+    if (tokens == NULL) {
+        return;
+    }
+
+    while (current != NULL && current->type != TOKEN_ASSIGN) {
+        current = current->next;
+    }
+
+    EXPECT_TRUE(current != NULL);
+    EXPECT_TRUE(current != NULL && current->next != NULL);
+    if (current != NULL && current->next != NULL) {
+        EXPECT_TRUE(current->next->type == TOKEN_CHAR_LITERAL);
+        EXPECT_STR_EQ("'a'", current->next->value);
+    }
+
+    current = tokens;
+    while (current != NULL && !(current->type == TOKEN_IDENTIFIER && strcmp(current->value, "nul") == 0)) {
+        current = current->next;
+    }
+
+    EXPECT_TRUE(current != NULL);
+    EXPECT_TRUE(current != NULL && current->next != NULL && current->next->next != NULL && current->next->next->next != NULL && current->next->next->next->next != NULL);
+    if (current != NULL && current->next != NULL && current->next->next != NULL && current->next->next->next != NULL && current->next->next->next->next != NULL) {
+        EXPECT_TRUE(current->next->next->next->next->type == TOKEN_CHAR_LITERAL);
+        EXPECT_STR_EQ("'\\0'", current->next->next->next->next->value);
+    }
+
+    freeTokens(tokens);
+}

@@ -51,7 +51,8 @@ TokenDefinition types[NUM_TYPES] = {
     {TOKEN_KW_RET, "^(ret)\\b"},
     {TOKEN_KW_BREAK, "^(break)\\b"},
     {TOKEN_KW_CONTINUE, "^(continue)\\b"},
-    {TOKEN_STRING, "^\"([^\"\\\\]|\\\\.)*\"|^'([^'\\\\]|\\\\.)*'"},
+    {TOKEN_STRING, "^\"([^\"\\\\]|\\\\.)*\""},
+    {TOKEN_CHAR_LITERAL, "^'([^'\\\\]|\\\\.)'"},
     {TOKEN_EQ_EQ, "^(==)"},
     {TOKEN_GT_EQ, "^(>=)"},
     {TOKEN_LT_EQ, "^(<=)"},
@@ -104,6 +105,7 @@ const char *tokenTypeName(TokenType type){
         case TOKEN_KW_BREAK: return "KW_BREAK";
         case TOKEN_KW_CONTINUE: return "KW_CONTINUE";
         case TOKEN_STRING: return "STRING";
+        case TOKEN_CHAR_LITERAL: return "CHAR_LITERAL";
         case TOKEN_EQ_EQ: return "EQ_EQ";
         case TOKEN_GT_EQ: return "GT_EQ";
         case TOKEN_LT_EQ: return "LT_EQ";

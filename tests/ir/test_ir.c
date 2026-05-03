@@ -38,7 +38,7 @@ void test_ir_builder_creates_module_for_empty_program(void) {
 
 void test_ir_builder_predeclares_global_and_function_symbols(void) {
     IRModule *module = buildIrModuleFromString(
-        "greeting::string = \"hi\";\n"
+        "greeting::*char = \"hi\";\n"
         "func main() -> int { ret 1; }"
     );
 
@@ -52,7 +52,7 @@ void test_ir_builder_predeclares_global_and_function_symbols(void) {
 }
 
 void test_ir_printer_emits_private_string_global(void) {
-    char *llvm = emitLlvmIrFromString("func main() -> void { msg::string = \"hi\"; ret; }");
+    char *llvm = emitLlvmIrFromString("func main() -> void { msg::*char = \"hi\"; ret; }");
 
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
@@ -143,7 +143,7 @@ void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void) {
 void test_ir_builder_predeclares_builtin_runtime_functions(void) {
     IRModule *module = buildIrModuleFromString(
         "extern func printInt(value::int) -> void;\n"
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "func main() -> void { printInt(1); ret; }"
     );
 
@@ -157,7 +157,7 @@ void test_ir_builder_predeclares_builtin_runtime_functions(void) {
 
 void test_ir_printer_emits_runtime_function_declarations(void) {
     char *llvm = emitLlvmIrFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "extern func printInt(value::int) -> void;\n"
         "func main() -> void { printString(\"hi\"); printInt(1); ret; }"
     );
@@ -189,7 +189,7 @@ void test_ir_builder_registers_extern_function_symbols(void) {
 
 void test_ir_printer_emits_extern_function_declarations(void) {
     char *llvm = emitLlvmIrFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "extern func printInt(value::int) -> void;\n"
         "func main() -> void { printString(\"hi\"); printInt(1); ret; }"
     );
@@ -328,13 +328,32 @@ void test_ir_printer_emits_bool_values_as_i1(void) {
 
 void test_ir_printer_escapes_special_characters_in_string_literals(void) {
     char *llvm = emitLlvmIrFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "func main() -> void { printString(\"line\\nquote\\\"tab\\t\\\\\"); ret; }"
     );
 
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
         EXPECT_TRUE(strstr(llvm, "line\\5Cnquote\\5C\\22tab\\5Ct\\5C\\5C") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_i8_comparison_for_char_literal_nul(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func strlen(str::*char) -> int {\n"
+        "    len::int = 0;\n"
+        "    while (*str != '\\0') {\n"
+        "        len += 1;\n"
+        "        str = str + 1;\n"
+        "    }\n"
+        "    ret len;\n"
+        "}"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "icmp ne i8") != NULL);
         free(llvm);
     }
 }

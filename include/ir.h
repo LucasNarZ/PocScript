@@ -38,7 +38,6 @@ typedef enum {
     IR_TYPE_FLOAT,
     IR_TYPE_CHAR,
     IR_TYPE_BOOL,
-    IR_TYPE_STRING,
     IR_TYPE_ARRAY,
     IR_TYPE_POINTER
 } IRTypeKind;

@@ -83,7 +83,6 @@ The IR type system is recursive and currently supports:
 - `IR_TYPE_FLOAT`
 - `IR_TYPE_CHAR`
 - `IR_TYPE_BOOL`
-- `IR_TYPE_STRING`
 - `IR_TYPE_ARRAY`
 - `IR_TYPE_POINTER`
 
@@ -95,7 +94,7 @@ Important LLVM mappings used by the printer:
 - `float` -> `double`
 - `char` -> `i8`
 - `bool` -> `i1`
-- `string` -> `i8*`
+- `*char` -> `i8*`
 - arrays -> `[N x T]`
 - pointers -> `T*`
 
@@ -107,6 +106,7 @@ Current literal kinds are:
 
 - integer
 - float
+- character
 - string
 - bool
 

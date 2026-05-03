@@ -154,7 +154,7 @@ static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
 
         free(path);
         irOperandFree(&base_address);
-    } else if (node->data.var_decl.initializer != NULL && value_type->kind != IR_TYPE_STRING) {
+    } else if (node->data.var_decl.initializer != NULL) {
         IRValue initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer);
 
         if (!initializer.has_value) {

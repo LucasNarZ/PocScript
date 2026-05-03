@@ -382,21 +382,6 @@ static bool semanticTypeIsBool(const SemanticType *type) {
     return type != NULL && type->kind == SEM_TYPE_BOOL;
 }
 
-static size_t semanticStringLiteralLength(const char *value) {
-    size_t length;
-
-    if (value == NULL) {
-        return 0;
-    }
-
-    length = strlen(value);
-    if (length >= 2 && ((value[0] == '"' && value[length - 1] == '"') || (value[0] == '\'' && value[length - 1] == '\''))) {
-        return length - 2;
-    }
-
-    return length;
-}
-
 static Scope *createValidationRoot(const Scope *globalScope) {
     Scope *root = scopeCreate(NULL);
     size_t i;
@@ -749,11 +734,23 @@ static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContex
             return semanticTypeNewPrimitive(SEM_TYPE_INT);
         case AST_FLOAT_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_FLOAT);
-        case AST_STRING_LITERAL:
-            if (semanticStringLiteralLength(node->data.string_literal.value) == 1) {
-                return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+        case AST_CHAR_LITERAL:
+            return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+        case AST_STRING_LITERAL: {
+            SemanticType *pointerType = semanticTypeNewPrimitive(SEM_TYPE_POINTER);
+
+            if (pointerType == NULL) {
+                return NULL;
             }
-            return semanticTypeNewPrimitive(SEM_TYPE_STRING);
+
+            pointerType->element_type = semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+            if (pointerType->element_type == NULL) {
+                semanticTypeFree(pointerType);
+                return NULL;
+            }
+
+            return pointerType;
+        }
         case AST_BOOL_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
         case AST_ARRAY_LITERAL:

@@ -158,7 +158,7 @@ The current codebase supports:
 - primitive types `int`, `float`, `char`, `bool`, and `void`
 - pointer types with `*T`
 - `Array` and `[]`-style array types
-- integer, float, string, and bool literals
+- integer, float, bool, character literals, and string literals typed as `*char`
 - array literals, including nested array literals
 - assignments `=`, `+=`, and `-=`
 - binary expressions including arithmetic, comparison, and logical operators across the active pipeline
@@ -182,7 +182,8 @@ The table below distinguishes between features that are currently supported acro
 | Global variable declarations | `fully-supported` | Parsed, semantically validated, lowered to IR, and emitted to LLVM IR |
 | Function declarations | `fully-supported` | Explicit return type required |
 | Primitive types `int`, `float`, `char`, `bool`, `void` | `fully-supported` | Within the currently implemented semantic and backend rules |
-| String literals | `fully-supported` | Lowered through generated string storage globals |
+| Character literals | `fully-supported` | Single-quoted values like `'a'` and `'\0'` type-check as `char` |
+| String literals | `fully-supported` | Typed as `*char` and lowered through generated string storage globals |
 | Bool literals | `fully-supported` | Validated semantically and emitted in the backend |
 | Integer and float literals | `fully-supported` | Supported by frontend and backend |
 | Local variable declarations | `fully-supported` | Lowered with stack slots |
@@ -224,6 +225,7 @@ The project is intentionally incomplete, but the currently documented language s
 - there is no explicit memory management model exposed to the language
 - there is no standard library beyond the tiny runtime helpers
 - pointer support is intentionally minimal: only `p + int` and `p - int` are supported, with no `null` and no implicit array-to-pointer decay
+- there is no dedicated `string` type; text values are represented as `*char`
 
 ### Semantic limitations
 

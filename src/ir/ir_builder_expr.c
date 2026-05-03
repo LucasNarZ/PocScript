@@ -148,6 +148,8 @@ static IRValue irBuilderLowerLiteralRValue(const AstNode *node) {
             return irBuilderLiteralValue(IR_TYPE_INT, irLiteralCreateInt(node->data.int_literal.value));
         case AST_FLOAT_LITERAL:
             return irBuilderLiteralValue(IR_TYPE_FLOAT, irLiteralCreateFloat(node->data.float_literal.value));
+        case AST_CHAR_LITERAL:
+            return irBuilderLiteralValue(IR_TYPE_CHAR, irLiteralCreateInt((long) node->data.char_literal.value));
         case AST_BOOL_LITERAL:
             return irBuilderLiteralValue(IR_TYPE_BOOL, irLiteralCreateBool(node->data.bool_literal.value));
         default:
@@ -195,7 +197,7 @@ static IRValue irBuilderLowerStringLiteralRValue(IRBuilder *builder, const AstNo
         return irValueEmpty();
     }
 
-    result.type = irTypeCreate(IR_TYPE_STRING);
+    result.type = irTypeCreatePointer(irTypeCreate(IR_TYPE_CHAR));
     result.value = address_value.address;
     result.has_value = true;
     return result;
@@ -490,6 +492,7 @@ IRValue irBuilderLowerRValue(IRBuilder *builder, const AstNode *node) {
     switch (node->type) {
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:
+        case AST_CHAR_LITERAL:
         case AST_BOOL_LITERAL:
             return irBuilderLowerLiteralRValue(node);
         case AST_STRING_LITERAL:

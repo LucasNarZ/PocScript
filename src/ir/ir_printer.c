@@ -61,9 +61,6 @@ static void irPrintType(FILE *out, const IRType *type) {
         case IR_TYPE_BOOL:
             fputs("i1", out);
             break;
-        case IR_TYPE_STRING:
-            fputs("i8*", out);
-            break;
         case IR_TYPE_ARRAY:
             fprintf(out, "[%zu x ", type->has_array_size ? type->array_size : 0UL);
             irPrintType(out, type->element_type);
@@ -86,7 +83,6 @@ static void irPrintZeroValue(FILE *out, const IRType *type) {
         case IR_TYPE_INT:
             fputs("0", out);
             break;
-        case IR_TYPE_STRING:
         case IR_TYPE_POINTER:
             fputs("null", out);
             break;
@@ -152,7 +148,13 @@ static void irPrintGlobal(FILE *out, const IRModule *module, const IRGlobal *glo
     irPrintType(out, global->type);
     fputc(' ', out);
 
-    if (global->type != NULL && global->type->kind == IR_TYPE_STRING && global->initializer != NULL && global->initializer->kind == IR_LITERAL_STRING && global->has_storage_global) {
+    if (global->type != NULL
+            && global->type->kind == IR_TYPE_POINTER
+            && global->type->element_type != NULL
+            && global->type->element_type->kind == IR_TYPE_CHAR
+            && global->initializer != NULL
+            && global->initializer->kind == IR_LITERAL_STRING
+            && global->has_storage_global) {
         IRGlobal *storage = irPrinterFindGlobalById(module, global->storage_global_id);
 
         fputs("getelementptr inbounds (", out);

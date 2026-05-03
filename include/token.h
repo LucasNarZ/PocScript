@@ -23,6 +23,7 @@ typedef enum {
     TOKEN_KW_BREAK,
     TOKEN_KW_CONTINUE,
     TOKEN_STRING,
+    TOKEN_CHAR_LITERAL,
     TOKEN_EQ_EQ,
     TOKEN_GT_EQ,
     TOKEN_LT_EQ,

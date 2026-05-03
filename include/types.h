@@ -11,7 +11,6 @@ typedef enum {
     SEM_TYPE_FLOAT,
     SEM_TYPE_CHAR,
     SEM_TYPE_BOOL,
-    SEM_TYPE_STRING,
     SEM_TYPE_VOID,
     SEM_TYPE_ARRAY,
     SEM_TYPE_POINTER,

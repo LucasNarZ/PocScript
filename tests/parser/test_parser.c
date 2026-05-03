@@ -73,11 +73,12 @@ static void assertParseError(const char *input, const char *expectedMessage) {
     }
 
     if (pid == 0) {
-        Token *tokens = tokenizeString(input);
         Parser parser;
+        Token *tokens;
 
         dup2(fd, STDERR_FILENO);
         close(fd);
+        tokens = tokenizeString(input);
         parserInit(&parser, tokens);
         parserParseProgram(&parser);
         freeTokens(tokens);
@@ -135,11 +136,12 @@ static void assertParseErrorAt(const char *input, const char *expectedMessage, i
     }
 
     if (pid == 0) {
-        Token *tokens = tokenizeString(input);
         Parser parser;
+        Token *tokens;
 
         dup2(fd, STDERR_FILENO);
         close(fd);
+        tokens = tokenizeString(input);
         parserInit(&parser, tokens);
         parserParseProgram(&parser);
         freeTokens(tokens);
@@ -331,6 +333,21 @@ void test_parser_accepts_dereference_assignment_target(void) {
         "func main() -> void { x::int = 1; p::*int = &x; *p = 2; }",
         "(=)"
     );
+}
+
+void test_parser_parses_char_literal(void) {
+    assertParsesWithAstSubstring(
+        "func main() -> void { letter::char = 'a'; ret; }",
+        "CHAR_LITERAL"
+    );
+}
+
+void test_parser_rejects_empty_char_literal(void) {
+    assertParseError("func main() -> void { letter::char = ''; ret; }", "Unrecognized token:");
+}
+
+void test_parser_rejects_multi_character_literal(void) {
+    assertParseError("func main() -> void { letter::char = 'ab'; ret; }", "Unrecognized token:");
 }
 
 void test_parser_parses_assignment_without_symbol_lookup(void) {

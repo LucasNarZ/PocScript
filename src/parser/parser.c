@@ -57,6 +57,25 @@ static char *copyTokenValue(const Token *token) {
     return copy;
 }
 
+static char parseCharLiteralValue(const char *text) {
+    if (text == NULL) {
+        return '\0';
+    }
+
+    if (text[1] != '\\') {
+        return text[1];
+    }
+
+    switch (text[2]) {
+        case '0': return '\0';
+        case 'n': return '\n';
+        case 't': return '\t';
+        case '\\': return '\\';
+        case '\'': return '\'';
+        default: return text[2];
+    }
+}
+
 static bool parserAtEnd(const Parser *parser) {
     return parser->current == NULL || parser->current->type == TOKEN_EOF;
 }
@@ -588,6 +607,12 @@ static AstNode *parseFactor(Parser *parser) {
     if (parserIs(parser, TOKEN_STRING)) {
         node = astNewNodeFromCurrent(parser, AST_STRING_LITERAL);
         node->data.string_literal.value = copyTokenValue(parser->current);
+        parserAdvance(parser);
+        return node;
+    }
+    if (parserIs(parser, TOKEN_CHAR_LITERAL)) {
+        node = astNewNodeFromCurrent(parser, AST_CHAR_LITERAL);
+        node->data.char_literal.value = parseCharLiteralValue(parser->current->value);
         parserAdvance(parser);
         return node;
     }

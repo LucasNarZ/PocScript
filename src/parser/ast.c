@@ -169,6 +169,10 @@ static void writeLabel(char **buffer, size_t *size, AstNode *node) {
             snprintf(temp, sizeof(temp), " (%g)\n", node->data.float_literal.value);
             appendFormat(buffer, size, temp);
             break;
+        case AST_CHAR_LITERAL:
+            snprintf(temp, sizeof(temp), " (CHAR_LITERAL %d)\n", (int) node->data.char_literal.value);
+            appendFormat(buffer, size, temp);
+            break;
         case AST_STRING_LITERAL: appendFormat(buffer, size, " ("); appendFormat(buffer, size, node->data.string_literal.value); appendFormat(buffer, size, ")\n"); break;
         case AST_BOOL_LITERAL: appendFormat(buffer, size, node->data.bool_literal.value ? " (true)\n" : " (false)\n"); break;
         case AST_TYPE_NAME: appendFormat(buffer, size, " (TYPE "); appendFormat(buffer, size, node->data.type_name.name); appendFormat(buffer, size, ")\n"); break;
@@ -360,6 +364,8 @@ void astFree(AstNode *root) {
             break;
         case AST_IDENTIFIER:
             free(root->data.identifier.name);
+            break;
+        case AST_CHAR_LITERAL:
             break;
         case AST_STRING_LITERAL:
             free(root->data.string_literal.value);

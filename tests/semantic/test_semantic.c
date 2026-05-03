@@ -133,13 +133,47 @@ void test_semantic_reports_call_to_undeclared_function(void) {
 
 void test_semantic_accepts_builtin_print_functions(void) {
     SemanticResult result = analyzeRootFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "extern func printInt(value::int) -> void;\n"
         "func main() -> void {\n"
         "    printString(\"hi\");\n"
         "    printInt(42);\n"
         "    ret;\n"
         "}"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_char_pointer_initialized_from_string_literal(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { msg::*char = \"hi\"; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_string_type_name(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { msg::string = \"hi\"; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count >= 1);
+    if (result.errors.count > 0) {
+        EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+    }
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_builtin_print_string_with_char_pointer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func printString(value::*char) -> void;\n"
+        "func main() -> void { printString(\"hi\"); ret; }"
     );
 
     EXPECT_TRUE(result.errors.count == 0);
@@ -165,7 +199,7 @@ void test_semantic_rejects_redeclaration_of_builtin_print_function(void) {
 
 void test_semantic_accepts_extern_function_declarations(void) {
     SemanticResult result = analyzeRootFromString(
-        "extern func printString(value::string) -> void;\n"
+        "extern func printString(value::*char) -> void;\n"
         "extern func printInt(value::int) -> void;\n"
         "func main() -> void {\n"
         "    printString(\"hi\");\n"
@@ -534,7 +568,7 @@ void test_semantic_accepts_literal_global_initializers(void) {
         "x::int = 1;\n"
         "y::float = 1.5;\n"
         "flag::bool = true;\n"
-        "letter::char = \"a\";\n"
+        "text::*char = \"a\";\n"
     );
 
     EXPECT_TRUE(result.errors.count == 0);
@@ -769,6 +803,23 @@ void test_semantic_accepts_pointer_addition_with_int_offset(void) {
 void test_semantic_accepts_pointer_subtraction_with_int_offset(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void { arr::int[4] = {10, 20, 30, 40}; p::*int = &arr[2]; q::*int = p - 1; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_pointer_string_traversal_with_char_literal_nul(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func strlen(str::*char) -> int {\n"
+        "    len::int = 0;\n"
+        "    while (*str != '\\0') {\n"
+        "        len += 1;\n"
+        "        str = str + 1;\n"
+        "    }\n"
+        "    ret len;\n"
+        "}"
     );
 
     EXPECT_TRUE(result.errors.count == 0);

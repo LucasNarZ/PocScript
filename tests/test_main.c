@@ -87,6 +87,14 @@ void test_stdlib_memset_and_memcpy_preserve_buffer_content(void);
 void test_stdlib_strncpy_truncates_when_limit_is_shorter_than_source(void);
 void test_stdlib_puts_does_not_append_newline(void);
 void test_stdlib_puts_interprets_backslash_n_as_newline(void);
+void test_compiler_driver_rejects_missing_input_file(void);
+void test_compiler_driver_rejects_semantic_errors_without_writing_output(void);
+void test_compiler_driver_rejects_invalid_output_path(void);
+void test_cli_binary_rejects_too_many_arguments(void);
+void test_cli_binary_writes_ir_for_valid_input_file(void);
+void test_ir_printer_zero_initializes_global_int_without_initializer(void);
+void test_ir_printer_zero_initializes_global_pointer_without_initializer(void);
+void test_ir_printer_zero_initializes_global_array_without_initializer(void);
 
 int test_failures = 0;
 int tests_run = 0;
@@ -228,6 +236,11 @@ int main(void) {
     RUN_TEST(test_stdlib_strncpy_truncates_when_limit_is_shorter_than_source, "tests/stdlib/test_stdlib.c");
     RUN_TEST(test_stdlib_puts_does_not_append_newline, "tests/stdlib/test_stdlib.c");
     RUN_TEST(test_stdlib_puts_interprets_backslash_n_as_newline, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_compiler_driver_rejects_missing_input_file, "tests/compiler/test_driver_cli.c");
+    RUN_TEST(test_compiler_driver_rejects_semantic_errors_without_writing_output, "tests/compiler/test_driver_cli.c");
+    RUN_TEST(test_compiler_driver_rejects_invalid_output_path, "tests/compiler/test_driver_cli.c");
+    RUN_TEST(test_cli_binary_rejects_too_many_arguments, "tests/compiler/test_driver_cli.c");
+    RUN_TEST(test_cli_binary_writes_ir_for_valid_input_file, "tests/compiler/test_driver_cli.c");
     RUN_TEST(test_ir_builder_creates_module_for_empty_program, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_builder_predeclares_global_and_function_symbols, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_private_string_global, "tests/ir/test_ir.c");
@@ -244,6 +257,9 @@ int main(void) {
     RUN_TEST(test_ir_printer_does_not_define_extern_function_body, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_loop_comparisons_and_branches, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_reads_and_writes_global_variables, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_zero_initializes_global_int_without_initializer, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_zero_initializes_global_pointer_without_initializer, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_zero_initializes_global_array_without_initializer, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_float_values_as_double, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_bool_values_as_i1, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_escapes_special_characters_in_string_literals, "tests/ir/test_ir.c");

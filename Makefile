@@ -13,7 +13,7 @@ RUNTIME_OBJ = $(OBJDIR)/runtime/runtime.o
 RUNTIME_START_OBJ = $(OBJDIR)/runtime/start.o
 
 SRC = src/main.c src/compiler_driver.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
-TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/helpers/stdlib_test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c tests/semantic/test_semantic.c tests/ir/test_ir.c tests/stdlib/test_stdlib.c src/compiler_driver.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
+TEST_SRC = tests/test_main.c tests/helpers/test_support.c tests/helpers/stdlib_test_support.c tests/lexer/test_lexer.c tests/parser/test_parser.c tests/integration/test_integration.c tests/semantic/test_semantic.c tests/ir/test_ir.c tests/stdlib/test_stdlib.c tests/compiler/test_driver_cli.c src/compiler_driver.c src/lexer/lexer.c src/parser/parser.c src/parser/ast.c src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
 
 OBJ = $(addprefix $(OBJDIR)/,$(SRC:.c=.o))
 TEST_OBJ = $(addprefix $(OBJDIR)/,$(TEST_SRC:.c=.o))
@@ -78,11 +78,22 @@ $(RUNTIME_START_OBJ): runtime/start.asm
 
 clean:
 	rm -rf build
+	rm -f *.gcov
 
 ast: $(TARGET_AST)
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)
+
+coverage:
+	$(MAKE) clean
+	$(MAKE) test CFLAGS='-Wall -g --coverage' LDFLAGS='--coverage'
+	gcov -o build/obj/src src/compiler_driver.c
+	gcov -o build/obj/src/lexer src/lexer/lexer.c
+	gcov -o build/obj/src/parser src/parser/parser.c src/parser/ast.c
+	gcov -o build/obj/src/semantic src/semantic/semantic.c src/semantic/errors.c src/semantic/types.c src/semantic/scope.c
+	gcov -o build/obj/src/ir src/ir/ir_core.c src/ir/ir_instr.c src/ir/ir_module.c src/ir/ir_scope.c src/ir/ir_builder_utils.c src/ir/ir_builder_module.c src/ir/ir_builder_expr.c src/ir/ir_builder_stmt.c src/ir/ir_printer.c
+	rm -f *.gcov
 
 all: $(TARGET_AST)
 

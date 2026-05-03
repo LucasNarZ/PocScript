@@ -249,6 +249,42 @@ void test_ir_printer_reads_and_writes_global_variables(void) {
     }
 }
 
+void test_ir_printer_zero_initializes_global_int_without_initializer(void) {
+    char *llvm = emitLlvmIrFromString(
+        "counter::int; func main() -> int { ret counter; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "@counter = global i32 0") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_zero_initializes_global_pointer_without_initializer(void) {
+    char *llvm = emitLlvmIrFromString(
+        "message::*char; func main() -> *char { ret message; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "@message = global i8* null") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_zero_initializes_global_array_without_initializer(void) {
+    char *llvm = emitLlvmIrFromString(
+        "values::int[3]; func main() -> int { ret values[0]; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "@values = global [3 x i32] zeroinitializer") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_float_values_as_double(void) {
     char *llvm = emitLlvmIrFromString("ratio::float = 1.5; func main() -> float { ret ratio; }");
 

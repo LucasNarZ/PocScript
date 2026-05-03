@@ -1,0 +1,18 @@
+func main() -> int {
+    x::int = -1;
+
+    while (true) {
+        if (x < 0) {
+            break;
+        }
+
+        continue;
+    }
+
+    for(i::int = 0; i < 3; i += 1) {
+        x += -i;
+        continue;
+    }
+
+    ret 0;
+}

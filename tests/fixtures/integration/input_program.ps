@@ -1,0 +1,39 @@
+x::int = 10;
+y::int = 3;
+sum::int = 0;
+flag::bool = true;
+
+func add(a::int, b::int) -> int {
+    ret a + b;
+}
+
+func isPositive(n::int) -> bool {
+    ret n > 0;
+}
+
+func factorial(n::int) -> int {
+    acc::int = 1;
+    i::int = 1;
+    while(i <= n){
+        acc = acc * i;
+        i += 1;
+    }
+    ret acc;
+}
+
+func main() -> int {
+    sum = add(x, y);
+    flag = isPositive(sum);
+
+    if(flag){
+        sum += 1;
+    }
+
+    i::int = 0;
+    for(i::int = 0; i < 5; i += 1){
+        x += i;
+    }
+
+    fat::int = factorial(5);
+    ret 0;
+}

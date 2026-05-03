@@ -1,0 +1,6 @@
+extern func __poc_write(fd::int, buff::*char, len::int) -> int;
+extern func strlen(str::*char) -> int;
+
+func puts(str::*char) -> int {
+    ret __poc_write(1, str, strlen(str));
+}

@@ -1,0 +1,60 @@
+func strlen(str::*char) -> int {
+    len::int = 0;
+
+    while (*str != '\0') {
+        len += 1;
+        str = str + 1;
+    }
+
+    ret len;
+}
+
+func strcmp(a::*char, b::*char) -> int {
+    while (*a != '\0' && *b != '\0' && *a == *b) {
+        a = a + 1;
+        b = b + 1;
+    }
+
+    if (*a == *b) {
+        ret 0;
+    }
+
+    if (*a < *b) {
+        ret -1;
+    }
+
+    ret 1;
+}
+
+func strcpy(dest::*char, src::*char) -> *char {
+    out::*char = dest;
+
+    while (*src != '\0') {
+        *dest = *src;
+        dest = dest + 1;
+        src = src + 1;
+    }
+
+    *dest = '\0';
+    ret out;
+}
+
+func strncpy(dest::*char, src::*char, n::int) -> *char {
+    out::*char = dest;
+    i::int = 0;
+
+    while (i < n && *src != '\0') {
+        *dest = *src;
+        dest = dest + 1;
+        src = src + 1;
+        i += 1;
+    }
+
+    while (i < n) {
+        *dest = '\0';
+        dest = dest + 1;
+        i += 1;
+    }
+
+    ret out;
+}

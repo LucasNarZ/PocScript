@@ -1,0 +1,27 @@
+func memcpy(dest::*char, src::*char, n::int) -> *char {
+    out::*char = dest;
+    i::int = 0;
+
+    while (i < n) {
+        *dest = *src;
+        dest = dest + 1;
+        src = src + 1;
+        i += 1;
+    }
+
+    ret out;
+}
+
+func memset(dest::*char, value::int, n::int) -> *char {
+    out::*char = dest;
+    fill::char = value;
+    i::int = 0;
+
+    while (i < n) {
+        *dest = fill;
+        dest = dest + 1;
+        i += 1;
+    }
+
+    ret out;
+}

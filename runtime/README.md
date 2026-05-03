@@ -1,27 +1,29 @@
 # Runtime
 
-The `runtime/` directory contains the assembly code linked into the final executable generated from `build/ir/IR.ll`.
+The `runtime/` directory contains the low-level assembly runtime plus the PocScript standard library modules linked into the final executable.
 
 ## Files
 
-- `io.asm`: runtime I/O helpers exported to the generated program
+- `runtime.asm`: syscall-backed primitive runtime symbols such as `__poc_write`
 - `start.asm`: process entry point that defines `_start` and calls the generated `main`
+- `lib/string.ps`: libc-like string helpers compiled from PocScript
+- `lib/memory.ps`: libc-like memory helpers compiled from PocScript
+- `lib/io.ps`: libc-like stdout helper functions compiled from PocScript
 
-## Exported Runtime Functions
+## Runtime vs Stdlib
 
-The language currently exposes these runtime functions to user code:
+The runtime and the stdlib now have separate responsibilities:
 
-- `printString(string) -> void`
-- `printInt(int) -> void`
+- assembly runtime exports low-level primitives like `__poc_write`
+- stdlib modules export libc-like functions such as `strlen`, `strcmp`, `strcpy`, `strncpy`, `memcpy`, `memset`, and `puts`
 
-These names are registered as builtins in semantic analysis, mirrored into the IR global symbol table, emitted as external LLVM declarations, and resolved by `ld` against `build/obj/runtime/io.o`.
+User code consumes stdlib functions through explicit `extern func ...` declarations, and `make assembly` links the compiled stdlib objects automatically.
 
-## `io.asm`
+## `runtime.asm`
 
-`io.asm` exports two global symbols:
+`runtime.asm` currently exports:
 
-- `printString`: receives a null-terminated string pointer in `rdi`, computes its length, and writes it to stdout with the Linux `write` syscall
-- `printInt`: receives an integer in `rdi`, converts it to ASCII on the stack, and forwards the resulting string to `printString`
+- `__poc_write`: receives the Linux `write` syscall arguments and performs the syscall directly
 
 The implementation does not use libc.
 
@@ -37,11 +39,15 @@ This keeps process startup separate from runtime helper functions and allows the
 
 ## Build Integration
 
-The `makefile` assembles and links this directory through these stages:
+The `makefile` assembles, compiles, and links this directory through these stages:
 
-1. `nasm -f elf64 runtime/io.asm -o build/obj/runtime/io.o`
-2. `nasm -f elf64 runtime/start.asm -o build/obj/runtime/start.o`
-3. `clang -c build/ir/IR.ll -o build/obj/IR.o`
-4. `ld -o build/bin/output build/obj/runtime/start.o build/obj/runtime/io.o build/obj/IR.o`
+1. `./build/bin/compiler input.ps build/ir/input.ll`
+2. `./build/bin/compiler runtime/lib/string.ps build/ir/runtime/lib/string.ll`
+3. `./build/bin/compiler runtime/lib/memory.ps build/ir/runtime/lib/memory.ll`
+4. `./build/bin/compiler runtime/lib/io.ps build/ir/runtime/lib/io.ll`
+5. `clang -c ...` compiles each generated `.ll` into its matching `.o`
+6. `nasm -f elf64 runtime/runtime.asm -o build/obj/runtime/runtime.o`
+7. `nasm -f elf64 runtime/start.asm -o build/obj/runtime/start.o`
+8. `ld -o build/bin/output build/obj/runtime/start.o build/obj/runtime/runtime.o build/obj/runtime/lib/*.o build/obj/input.o`
 
 Use `make assembly` to build the final executable.

@@ -12,5 +12,6 @@ char *nodeTreeToString(AstNode *root);
 SemanticResult analyzeRootFromString(const char *input);
 IRModule *buildIrModuleFromString(const char *input);
 char *emitLlvmIrFromString(const char *input);
+bool writeLlvmIrFromStringToFile(const char *input, const char *output_path);
 
 #endif

@@ -334,7 +334,7 @@ void test_ir_printer_escapes_special_characters_in_string_literals(void) {
 
     EXPECT_TRUE(llvm != NULL);
     if (llvm != NULL) {
-        EXPECT_TRUE(strstr(llvm, "line\\5Cnquote\\5C\\22tab\\5Ct\\5C\\5C") != NULL);
+        EXPECT_TRUE(strstr(llvm, "line\\0Aquote\\22tab\\09\\5C") != NULL);
         free(llvm);
     }
 }
@@ -413,6 +413,35 @@ void test_ir_printer_writes_module_to_file(void) {
 
     free(written);
     irModuleFree(module);
+    unlink(pathTemplate);
+}
+
+void test_ir_printer_writes_source_string_to_file_through_compiler_driver(void) {
+    char pathTemplate[] = "/tmp/pocscript-driver-ir-XXXXXX.ll";
+    int fd = mkstemps(pathTemplate, 3);
+    char *written;
+    bool ok;
+
+    EXPECT_TRUE(fd >= 0);
+    if (fd < 0) {
+        return;
+    }
+
+    close(fd);
+    ok = writeLlvmIrFromStringToFile(
+        "func main() -> int { ret 7; }",
+        pathTemplate
+    );
+    written = readFileToString(pathTemplate);
+
+    EXPECT_TRUE(ok);
+    EXPECT_TRUE(written != NULL);
+    if (written != NULL) {
+        EXPECT_TRUE(strstr(written, "define i32 @main()") != NULL);
+        EXPECT_TRUE(strstr(written, "ret i32 7") != NULL);
+    }
+
+    free(written);
     unlink(pathTemplate);
 }
 

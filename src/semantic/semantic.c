@@ -25,6 +25,7 @@ typedef struct {
 static FlowState validateNode(AstNode *node, Scope *scope, SemanticContext *ctx);
 static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContext *ctx);
 static SemanticType *checkArrayAccess(AstNode *node, Scope *scope, SemanticContext *ctx);
+static bool semanticTypeIsNumeric(const SemanticType *type);
 
 static bool isAddressableExpression(AstNode *node) {
     if (node == NULL) {
@@ -265,6 +266,11 @@ static bool isNonVoidPointerType(const SemanticType *type) {
         && type->element_type->kind != SEM_TYPE_VOID;
 }
 
+static bool isOrderedComparableType(const SemanticType *type) {
+    return semanticTypeIsNumeric(type)
+        || (type != NULL && type->kind == SEM_TYPE_CHAR);
+}
+
 static SemanticType *checkPointerArithmetic(AstNode *node, SemanticType *leftType, SemanticType *rightType) {
     if (node == NULL) {
         return NULL;
@@ -364,6 +370,10 @@ static bool semanticTypeIsCompatible(const SemanticType *expected, const Semanti
     }
 
     if (semanticTypeEquals(expected, actual)) {
+        return true;
+    }
+
+    if (expected->kind == SEM_TYPE_CHAR && actual->kind == SEM_TYPE_INT) {
         return true;
     }
 
@@ -528,7 +538,7 @@ static SemanticType *checkBinary(AstNode *node, Scope *scope, SemanticContext *c
         case AST_BINARY_LT:
         case AST_BINARY_GTE:
         case AST_BINARY_LTE:
-            if (!semanticTypeIsNumeric(leftType) || !semanticTypeIsNumeric(rightType) || !semanticTypeEquals(leftType, rightType)) {
+            if (!isOrderedComparableType(leftType) || !isOrderedComparableType(rightType) || !semanticTypeEquals(leftType, rightType)) {
                 appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, "comparison requires compatible numeric operands");
             } else {
                 semanticTypeFree(resultType);

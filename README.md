@@ -10,20 +10,20 @@ The compiler is intentionally split into small, explicit stages:
 - `src/parser/`: consumes tokens and builds an AST for declarations, statements, expressions, calls, control flow, and arrays
 - `src/semantic/`: validates scopes, declarations, types, function calls, returns, loop control, builtin runtime functions, and array rules
 - `src/ir/`: lowers the validated AST to an internal IR and prints LLVM IR to `build/ir/IR.ll`
-- `runtime/`: provides `_start` and builtin runtime functions linked into the final executable without libc
+- `runtime/`: provides `_start`, syscall-backed runtime primitives, and libc-like stdlib modules linked into the final executable without libc
 - `tests/`: unit and integration tests for lexer, parser, semantic analysis, IR building, and IR printing
-- `src/main.c`: debug-oriented compiler entry point that reads `input.ps`, runs the full pipeline, and emits `build/ir/IR.ll`
+- `src/main.c`: compiler entry point that reads a `.ps` input path, runs the full pipeline, and emits LLVM IR to a chosen output file
 
 ## Current Architecture
 
 The current pipeline is:
 
-1. `tokenizeFile("input.ps")` reads the source file and produces tokens.
+1. `tokenizeFile(...)` reads the source file and produces tokens.
 2. `parserParseProgram(...)` builds the AST.
 3. `semanticAnalyze(...)` validates the AST in two passes.
 4. `irBuildModule(...)` lowers the validated AST to the internal IR.
-5. `irPrintModuleToFile(...)` prints LLVM IR to `build/ir/IR.ll`.
-6. `make assembly` compiles `build/ir/IR.ll`, assembles the runtime, and links everything into `build/bin/output`.
+5. `irPrintModuleToFile(...)` prints LLVM IR to the requested output path.
+6. `make assembly` compiles `input.ps` and each stdlib module separately, assembles the runtime, and links everything into `build/bin/output`.
 
 In practice, there are two main artifacts:
 
@@ -69,7 +69,7 @@ This is a conscious simplicity tradeoff: the generated IR is easier to produce a
 
 ### Minimal runtime and no libc dependency
 
-The generated executable is linked directly with `ld` and a tiny assembly runtime. `_start` is provided by `runtime/start.asm`, and runtime helpers such as `printString` and `printInt` live in `runtime/io.asm`.
+The generated executable is linked directly with `ld`, a tiny assembly runtime, and stdlib objects compiled from PocScript. `_start` is provided by `runtime/start.asm`, low-level symbols such as `__poc_write` live in `runtime/runtime.asm`, and libc-like helpers such as `strlen`, `strcmp`, `memcpy`, and `puts` live under `runtime/lib/`.
 
 This keeps the backend close to the machine model and makes the final artifact easier to understand end-to-end.
 
@@ -188,7 +188,8 @@ The table below distinguishes between features that are currently supported acro
 | Integer and float literals | `fully-supported` | Supported by frontend and backend |
 | Local variable declarations | `fully-supported` | Lowered with stack slots |
 | Function calls | `fully-supported` | Includes calls to user functions and runtime builtins |
-| `printString` and `printInt` | `fully-supported` | Declared in semantic analysis, IR, and resolved by runtime linking |
+| External function declarations | `fully-supported` | User code can declare linked stdlib functions with `extern func ...` |
+| `strlen`, `strcmp`, `strcpy`, `strncpy`, `memcpy`, `memset`, `puts` | `fully-supported` | Compiled from `runtime/lib/*.ps` and linked automatically by `make assembly` |
 | `if` / `else` | `fully-supported` | Lowered to explicit blocks and branches |
 | `while` | `fully-supported` | Lowered to explicit loop blocks |
 | `for` | `fully-supported` | Lowered to init/cond/body/update/end blocks |
@@ -220,7 +221,7 @@ The project is intentionally incomplete, but the currently documented language s
 - file scope is restricted to global variable declarations and function declarations
 - function declarations require an explicit return type after `->`
 - global variable initializers must be direct literals
-- builtin I/O is currently limited to `printString` and `printInt`
+- stdlib usage still requires explicit `extern func ...` declarations in user code
 - the language has no user-defined structs, records, classes, enums, modules, or generics
 - there is no explicit memory management model exposed to the language
 - there is no standard library beyond the tiny runtime helpers
@@ -266,6 +267,30 @@ This generates `build/bin/compiler`.
 
 The program reads `input.ps`, parses it, runs semantic validation, and writes `build/ir/IR.ll` when the program is valid. When semantic errors exist, they are printed with line and column information and IR generation is skipped.
 
+### Compiler CLI
+
+```bash
+./build/bin/compiler
+./build/bin/compiler input.ps build/ir/input.ll
+./build/bin/compiler runtime/lib/string.ps build/ir/runtime/lib/string.ll
+```
+
+The first form keeps the old default behavior. The two-argument form is used by the build to compile the user program and each stdlib module separately.
+
+### Stdlib usage
+
+Stdlib objects are linked automatically by `make assembly`, but user code still declares the symbols it wants with `extern func ...`.
+
+```ps
+extern func strlen(str::*char) -> int;
+extern func puts(value::*char) -> int;
+
+func main() -> int {
+    puts("Hello");
+    ret strlen("Hello");
+}
+```
+
 ### Build the final executable
 
 ```bash
@@ -274,11 +299,12 @@ make assembly
 
 This performs the full backend build:
 
-1. runs `./build/bin/compiler` to generate `build/ir/IR.ll`
-2. compiles `build/ir/IR.ll` into `build/obj/IR.o` with `clang -c`
-3. assembles `runtime/io.asm` into `build/obj/runtime/io.o`
-4. assembles `runtime/start.asm` into `build/obj/runtime/start.o`
-5. links `build/obj/IR.o`, `build/obj/runtime/io.o`, and `build/obj/runtime/start.o` into `build/bin/output` with `ld`
+1. runs `./build/bin/compiler input.ps build/ir/input.ll`
+2. runs `./build/bin/compiler` for each stdlib module under `runtime/lib/`
+3. compiles each generated `.ll` into its matching `.o` with `clang -c`
+4. assembles `runtime/runtime.asm` into `build/obj/runtime/runtime.o`
+5. assembles `runtime/start.asm` into `build/obj/runtime/start.o`
+6. links the runtime objects, stdlib objects, and `build/obj/input.o` into `build/bin/output` with `ld`
 
 ### Run the final executable
 
@@ -286,7 +312,7 @@ This performs the full backend build:
 ./build/bin/output
 ```
 
-The final program starts at `_start`, calls the generated `main`, uses the runtime functions linked from `runtime/`, and exits through Linux syscalls without libc.
+The final program starts at `_start`, calls the generated `main`, uses the runtime and stdlib functions linked from `runtime/`, and exits through Linux syscalls without libc.
 
 ### Run the tests
 

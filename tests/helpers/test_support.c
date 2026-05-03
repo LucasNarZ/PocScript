@@ -1,4 +1,6 @@
- #include "test_support.h"
+#include "test_support.h"
+
+#include "compiler_driver.h"
 
 AstNode *parseRootFromString(const char *input) {
     Token *tokens = tokenizeString(input);
@@ -48,4 +50,8 @@ char *emitLlvmIrFromString(const char *input) {
     }
 
     return text;
+}
+
+bool writeLlvmIrFromStringToFile(const char *input, const char *output_path) {
+    return compileSourceStringToLlvmIr(input, output_path);
 }

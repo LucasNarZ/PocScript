@@ -157,6 +157,16 @@ void test_semantic_accepts_char_pointer_initialized_from_string_literal(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_char_initialized_from_int_literal(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { letter::char = 122; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_rejects_string_type_name(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void { msg::string = \"hi\"; ret; }"
@@ -681,6 +691,14 @@ void test_semantic_rejects_equality_with_incompatible_operands(void) {
 
 void test_semantic_accepts_inequality_with_compatible_operands(void) {
     SemanticResult result = analyzeRootFromString("func main() -> void { diff::bool = 1 != 2; }");
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_char_order_comparison(void) {
+    SemanticResult result = analyzeRootFromString("func main() -> void { diff::bool = 'a' < 'b'; }");
 
     EXPECT_TRUE(result.errors.count == 0);
 

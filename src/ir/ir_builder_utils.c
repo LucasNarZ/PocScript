@@ -22,9 +22,30 @@ char *irBuilderCopyString(const char *value) {
     return copy;
 }
 
+static char decodeEscapedChar(char value) {
+    switch (value) {
+        case 'n':
+            return '\n';
+        case 't':
+            return '\t';
+        case '0':
+            return '\0';
+        case '\\':
+            return '\\';
+        case '"':
+            return '"';
+        case '\'':
+            return '\'';
+        default:
+            return value;
+    }
+}
+
 char *irBuilderUnquoteString(const char *value) {
     size_t length;
     char *copy;
+    size_t read_index;
+    size_t write_index;
 
     if (value == NULL) {
         return NULL;
@@ -37,8 +58,18 @@ char *irBuilderUnquoteString(const char *value) {
             return NULL;
         }
 
-        memcpy(copy, value + 1, length - 2);
-        copy[length - 2] = '\0';
+        write_index = 0;
+        for (read_index = 1; read_index < length - 1; read_index++) {
+            if (value[read_index] == '\\' && read_index + 1 < length - 1) {
+                copy[write_index++] = decodeEscapedChar(value[read_index + 1]);
+                read_index++;
+                continue;
+            }
+
+            copy[write_index++] = value[read_index];
+        }
+
+        copy[write_index] = '\0';
         return copy;
     }
 

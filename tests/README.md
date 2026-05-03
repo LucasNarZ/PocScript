@@ -11,6 +11,7 @@ The `tests/` directory contains the automated validation for PocScript's current
 - `semantic/`: unit tests for scope, symbol resolution, type checking, function calls, function returns, and array validation
 - `ir/`: unit tests for IR construction and LLVM IR printing
 - `integration/`: full-flow tests from tokenization through AST and selected IR emission checks
+- `stdlib/`: focused end-to-end tests for PocScript stdlib functions compiled and linked with the runtime
 - `fixtures/`: `.ps` files and expected outputs used by the tests
 
 ## What Each Group Validates
@@ -65,6 +66,14 @@ Checks whether the IR layer:
 - prints valid LLVM IR fragments for the active backend path
 - writes LLVM IR to files when requested
 
+### `tests/stdlib/`
+
+Checks whether the stdlib pipeline:
+
+- compiles standalone PocScript stdlib modules correctly
+- links stdlib objects with a small user program and the assembly runtime
+- preserves expected behavior for `strlen`, `strcmp`, `strcpy`, `strncpy`, `memcpy`, `memset`, and `puts`
+
 ## Helpers
 
 The main helpers are:
@@ -74,6 +83,7 @@ The main helpers are:
 - `parseRootFromString`: helper to tokenize and parse in one call
 - `analyzeRootFromString`: helper to tokenize, parse, and run semantic analysis in one call
 - `nodeTreeToString`: converts the AST into the textual format used by the tests
+- `compileAndRunStdlibProgram`: compiles a temporary program plus stdlib modules, links them, runs the executable, and captures stdout
 
 ## How To Run
 

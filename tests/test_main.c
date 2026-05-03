@@ -2,6 +2,7 @@
 
 void test_semantic_accepts_builtin_print_functions(void);
 void test_semantic_accepts_char_pointer_initialized_from_string_literal(void);
+void test_semantic_accepts_char_initialized_from_int_literal(void);
 void test_semantic_rejects_string_type_name(void);
 void test_semantic_accepts_builtin_print_string_with_char_pointer(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
@@ -32,6 +33,7 @@ void test_semantic_rejects_logical_or_with_non_bool_operand(void);
 void test_semantic_accepts_equality_with_compatible_operands(void);
 void test_semantic_rejects_equality_with_incompatible_operands(void);
 void test_semantic_accepts_inequality_with_compatible_operands(void);
+void test_semantic_accepts_char_order_comparison(void);
 void test_semantic_rejects_inequality_with_incompatible_operands(void);
 void test_semantic_accepts_unary_not_for_bool_operand(void);
 void test_semantic_rejects_unary_not_for_non_bool_operand(void);
@@ -61,6 +63,7 @@ void test_ir_printer_emits_i8_comparison_for_char_literal_nul(void);
 void test_ir_printer_emits_sub_mul_and_div_operations(void);
 void test_ir_printer_rejects_non_void_function_without_return_on_all_paths(void);
 void test_ir_printer_writes_module_to_file(void);
+void test_ir_printer_writes_source_string_to_file_through_compiler_driver(void);
 void test_ir_printer_emits_missing_comparison_variants(void);
 void test_ir_printer_emits_unary_negation_and_not(void);
 void test_ir_printer_emits_logical_and_or(void);
@@ -77,6 +80,13 @@ void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void);
 void test_integration_emits_ir_for_globals_function_calls_and_control_flow(void);
 void test_integration_emits_ir_for_single_dimension_array_access(void);
 void test_integration_emits_ir_for_runtime_print_calls(void);
+void test_stdlib_strlen_and_puts_emit_expected_output(void);
+void test_stdlib_strcmp_distinguishes_equal_and_prefix_values(void);
+void test_stdlib_strcpy_copies_source_buffer(void);
+void test_stdlib_memset_and_memcpy_preserve_buffer_content(void);
+void test_stdlib_strncpy_truncates_when_limit_is_shorter_than_source(void);
+void test_stdlib_puts_does_not_append_newline(void);
+void test_stdlib_puts_interprets_backslash_n_as_newline(void);
 
 int test_failures = 0;
 int tests_run = 0;
@@ -144,6 +154,7 @@ int main(void) {
     RUN_TEST(test_semantic_reports_call_to_undeclared_function, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_builtin_print_functions, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_char_pointer_initialized_from_string_literal, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_char_initialized_from_int_literal, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_string_type_name, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_builtin_print_string_with_char_pointer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");
@@ -186,6 +197,7 @@ int main(void) {
     RUN_TEST(test_semantic_accepts_equality_with_compatible_operands, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_equality_with_incompatible_operands, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_inequality_with_compatible_operands, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_char_order_comparison, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_inequality_with_incompatible_operands, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_unary_not_for_bool_operand, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_unary_not_for_non_bool_operand, "tests/semantic/test_semantic.c");
@@ -209,6 +221,13 @@ int main(void) {
     RUN_TEST(test_integration_emits_ir_for_globals_function_calls_and_control_flow, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_emits_ir_for_single_dimension_array_access, "tests/integration/test_integration.c");
     RUN_TEST(test_integration_emits_ir_for_runtime_print_calls, "tests/integration/test_integration.c");
+    RUN_TEST(test_stdlib_strlen_and_puts_emit_expected_output, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_strcmp_distinguishes_equal_and_prefix_values, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_strcpy_copies_source_buffer, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_memset_and_memcpy_preserve_buffer_content, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_strncpy_truncates_when_limit_is_shorter_than_source, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_puts_does_not_append_newline, "tests/stdlib/test_stdlib.c");
+    RUN_TEST(test_stdlib_puts_interprets_backslash_n_as_newline, "tests/stdlib/test_stdlib.c");
     RUN_TEST(test_ir_builder_creates_module_for_empty_program, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_builder_predeclares_global_and_function_symbols, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_private_string_global, "tests/ir/test_ir.c");
@@ -232,6 +251,7 @@ int main(void) {
     RUN_TEST(test_ir_printer_emits_sub_mul_and_div_operations, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_rejects_non_void_function_without_return_on_all_paths, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_writes_module_to_file, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_writes_source_string_to_file_through_compiler_driver, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_missing_comparison_variants, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_unary_negation_and_not, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_logical_and_or, "tests/ir/test_ir.c");

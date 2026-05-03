@@ -60,7 +60,7 @@ Validates the combined flow:
 
 Checks whether the IR layer:
 
-- predeclares globals, functions, and builtin runtime symbols
+- predeclares globals, functions, and external function symbols
 - lowers expressions, control flow, array access, and array literals
 - preserves sized array information where required
 - prints valid LLVM IR fragments for the active backend path

@@ -10,7 +10,7 @@ The `src/ir/` directory contains PocScript's lowering stage from validated AST n
 - `src/ir/ir_module.c`: module, function, global, and basic block storage
 - `src/ir/ir_scope.c`: IR symbol table and nested scope chain
 - `src/ir/ir_builder_utils.c`: shared builder helpers for types, operands, loop targets, and IR instruction emission
-- `src/ir/ir_builder_module.c`: builder orchestration, global/function predeclaration, builtin setup, and whole-module lowering flow
+- `src/ir/ir_builder_module.c`: builder orchestration, global/function predeclaration, string storage collection, and whole-module lowering flow
 - `src/ir/ir_builder_expr.c`: lowering from AST expressions into IR values and addresses
 - `src/ir/ir_builder_stmt.c`: lowering from AST statements and blocks into IR control flow and stores
 - `src/ir/ir_printer.c`: conversion from the internal IR module to LLVM IR text
@@ -22,8 +22,8 @@ The backend flow is currently:
 1. The parser builds the AST.
 2. The semantic analyzer validates the AST and produces `SemanticResult`.
 3. `irBuildModule(...)` lowers the validated tree into an `IRModule`.
-4. `irPrintModuleToFile(...)` writes the LLVM IR text to `build/ir/IR.ll`.
-5. `clang` compiles `build/ir/IR.ll` and `ld` links it with the runtime objects.
+4. `irPrintModuleToFile(...)` writes the LLVM IR text to the requested output path.
+5. `clang` compiles the generated `.ll` files and `ld` links them with the runtime objects.
 
 `irBuildModule(...)` refuses to run when semantic analysis reported errors. The IR layer assumes the input program is already semantically valid.
 
@@ -49,7 +49,7 @@ Defined in `include/ir.h`.
 
 It owns:
 
-- `global_scope`: root symbol scope for globals, user functions, and builtin runtime functions
+- `global_scope`: root symbol scope for globals and user-declared functions, including extern declarations
 - `global_items[]`: all global storage entries, including compiler-generated string storage globals
 - `functions[]`: all function definitions collected from the AST
 
@@ -144,22 +144,13 @@ Lookup walks the parent chain, so function lowering can resolve:
 - locals in the current block/function scope
 - function parameters materialized as locals
 - globals
-- builtin runtime functions declared in the module scope
+- external functions declared in the module scope
 
 ## Lowering Strategy
 
-`irBuildModule(...)` runs in four major stages.
+`irBuildModule(...)` runs in three major stages.
 
-### 1. Builtin declaration
-
-Before touching the program AST, the builder inserts builtin runtime function symbols into the global scope:
-
-- `printString(string) -> void`
-- `printInt(int) -> void`
-
-These are not emitted as function definitions. The printer later emits them as external LLVM declarations.
-
-### 2. Global and function predeclaration
+### 1. Global and function predeclaration
 
 The builder performs a first pass over the program items.
 
@@ -177,9 +168,14 @@ For function declarations, it:
 - registers a function symbol with return type and parameter types
 - appends the function to the module
 
+For external function declarations, it:
+
+- registers only the function symbol with return type and parameter types
+- skips IR function creation because there is no body to lower
+
 This pass ensures later lowering can resolve forward references to functions and globals.
 
-### 3. String literal collection
+### 2. String literal collection
 
 The builder traverses the whole AST and creates private storage globals for every string literal it finds.
 
@@ -191,7 +187,7 @@ Each string literal becomes a generated global such as `.str.1` with:
 
 String globals used as source-level global initializers are also connected to their storage entry through `storage_global_id`.
 
-### 4. Function body lowering
+### 3. Function body lowering
 
 Each function body is lowered after predeclaration.
 
@@ -259,7 +255,7 @@ Calls lower by:
 2. emitting `call`
 3. capturing the result in a temporary when the callee return type is not `void`
 
-Calls target names already present in the module global scope, which includes both user functions and runtime builtins.
+Calls target names already present in the module global scope, which includes both normal functions and external declarations.
 
 ### Arrays
 
@@ -385,7 +381,7 @@ The current IR backend covers:
 - assignments `=`, `+=`, `-=`
 - `if`, `while`, and `for`
 - `ret`
-- builtin runtime calls to `printString` and `printInt`
+- calls to externally declared runtime or stdlib functions such as `printString`, `printInt`, `strlen`, and `puts`
 
 ## Current Limitations
 
@@ -395,7 +391,8 @@ Notable limitations in the current implementation are:
 
 - no lowering for all instruction kinds declared in `IRInstructionKind`
 - no printed support for `IR_INSTR_CONST`, `IR_INSTR_GLOBAL_ADDR`, `IR_INSTR_NEG`, `IR_INSTR_NOT`, `IR_INSTR_CAST`, and several comparison variants
-- array access lowering currently accepts exactly one index
+- array access lowering is documented around repeated source indices, but still depends on the current `getelementptr` path covered by the tests
+- no lowering for source programs that skip the required `extern func ...` declaration before calling an external symbol
 - no SSA phi nodes
 - locals are not promoted; they always go through memory slots
 - the builder depends on semantic analysis to reject unsupported or inconsistent programs before IR generation
@@ -412,7 +409,7 @@ Notable limitations in the current implementation are:
 - conditional and loop branch emission
 - array access through `getelementptr`
 - function calls
-- builtin runtime declarations
+- external function declarations
 - global variable loads and stores
 
 Those tests are the fastest way to confirm which pieces of the IR pipeline are already expected to work.

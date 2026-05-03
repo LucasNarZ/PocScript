@@ -8,11 +8,12 @@ The compiler is intentionally split into small, explicit stages:
 
 - `src/lexer/`: turns source text into a linked list of tokens with `type`, `value`, `line`, and `column`
 - `src/parser/`: consumes tokens and builds an AST for declarations, statements, expressions, calls, control flow, and arrays
-- `src/semantic/`: validates scopes, declarations, types, function calls, returns, loop control, builtin runtime functions, and array rules
-- `src/ir/`: lowers the validated AST to an internal IR and prints LLVM IR to `build/ir/IR.ll`
+- `src/semantic/`: validates scopes, declarations, types, function calls, returns, loop control, external function declarations, and array rules
+- `src/ir/`: lowers the validated AST to an internal IR and prints LLVM IR to the requested output path
 - `runtime/`: provides `_start`, syscall-backed runtime primitives, and libc-like stdlib modules linked into the final executable without libc
 - `tests/`: unit and integration tests for lexer, parser, semantic analysis, IR building, and IR printing
-- `src/main.c`: compiler entry point that reads a `.ps` input path, runs the full pipeline, and emits LLVM IR to a chosen output file
+- `src/compiler_driver.c`: shared driver that runs tokenization, parsing, semantic validation, and LLVM IR emission
+- `src/main.c`: thin CLI entry point that selects input and output paths and delegates to the compiler driver
 
 ## Current Architecture
 
@@ -99,6 +100,7 @@ In other words, the project tries to build as much as possible from scratch, but
 |-- build/
 |-- include/
 |   |-- ast.h
+|   |-- compiler_driver.h
 |   |-- constants.h
 |   |-- errors.h
 |   |-- ir.h
@@ -111,6 +113,7 @@ In other words, the project tries to build as much as possible from scratch, but
 |-- input.ps
 |-- makefile
 |-- src/
+|   |-- compiler_driver.c
 |   |-- main.c
 |   |-- lexer/
 |   |   |-- lexer.c
@@ -126,25 +129,34 @@ In other words, the project tries to build as much as possible from scratch, but
 |   |   |-- types.c
 |   |   `-- README.md
 |   `-- ir/
+|       |-- ir_builder_expr.c
+|       |-- ir_builder_internal.h
+|       |-- ir_builder_module.c
+|       |-- ir_builder_stmt.c
+|       |-- ir_builder_utils.c
 |       |-- ir_core.c
 |       |-- ir_instr.c
 |       |-- ir_module.c
-|       |-- ir_scope.c
-|       |-- ir_builder.c
 |       |-- ir_printer.c
+|       |-- ir_scope.c
 |       `-- README.md
 |-- runtime/
-|   |-- io.asm
+|   |-- lib/
+|   |   |-- io.ps
+|   |   |-- memory.ps
+|   |   `-- string.ps
+|   |-- runtime.asm
 |   |-- start.asm
 |   `-- README.md
 `-- tests/
+    |-- fixtures/
+    |-- helpers/
+    |-- integration/
+    |-- ir/
     |-- lexer/
     |-- parser/
     |-- semantic/
-    |-- integration/
-    |-- helpers/
-    |-- fixtures/
-    |-- ir/
+    |-- stdlib/
     |-- test_main.c
     `-- README.md
 ```
@@ -154,7 +166,7 @@ In other words, the project tries to build as much as possible from scratch, but
 The current codebase supports:
 
 - variable declarations with `::`
-- top-level global variable declarations and function declarations only
+- top-level global variable declarations, function declarations, and external function declarations only
 - primitive types `int`, `float`, `char`, `bool`, and `void`
 - pointer types with `*T`
 - `Array` and `[]`-style array types
@@ -167,7 +179,7 @@ The current codebase supports:
 - `if`, `else`, `while`, `for`, `break`, and `continue`
 - function declarations with explicit return types and `ret`
 - function calls
-- builtin runtime calls to `printString` and `printInt`
+- external function calls, including runtime or stdlib symbols declared with `extern func ...`
 - array access syntax with one or more indices across the active pipeline
 - pointer address-of and dereference syntax across the active pipeline
 - LLVM IR emission for globals, functions, control flow, array access, string storage, and external runtime declarations
@@ -187,7 +199,7 @@ The table below distinguishes between features that are currently supported acro
 | Bool literals | `fully-supported` | Validated semantically and emitted in the backend |
 | Integer and float literals | `fully-supported` | Supported by frontend and backend |
 | Local variable declarations | `fully-supported` | Lowered with stack slots |
-| Function calls | `fully-supported` | Includes calls to user functions and runtime builtins |
+| Function calls | `fully-supported` | Includes calls to user functions and external symbols declared with `extern func ...` |
 | External function declarations | `fully-supported` | User code can declare linked stdlib functions with `extern func ...` |
 | `strlen`, `strcmp`, `strcpy`, `strncpy`, `memcpy`, `memset`, `puts` | `fully-supported` | Compiled from `runtime/lib/*.ps` and linked automatically by `make assembly` |
 | `if` / `else` | `fully-supported` | Lowered to explicit blocks and branches |
@@ -340,7 +352,7 @@ make clean
 ## Architecture Notes
 
 - the parser remains purely syntactic; all semantic rules live in `src/semantic/`
-- builtin runtime functions are treated as global functions during semantic analysis and IR generation
+- external function declarations are treated as global function symbols during semantic analysis and IR generation
 - AST textual serialization in `src/parser/ast.c` is part of the practical contract because integration tests depend on it
 - the compiler favors simple explicit data structures over compact or heavily abstracted implementations
 - the project prioritizes readability and phase separation over performance and feature completeness

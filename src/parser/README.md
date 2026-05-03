@@ -36,7 +36,7 @@ The node types defined in `include/ast.h` cover four main groups.
 ### Declarations and control flow
 
 - `AST_VAR_DECL`: variable declaration
-- `AST_FUNC_DECL`: function declaration
+- `AST_FUNC_DECL`: function declaration or external function declaration
 - `AST_PARAM`: function parameter
 - `AST_IF`: `if` with support for `else` and `else if`
 - `AST_WHILE`: `while` loop
@@ -49,7 +49,7 @@ The node types defined in `include/ast.h` cover four main groups.
 
 - `AST_ASSIGN`: assignments `=`, `+=`, `-=`
 - `AST_BINARY`: binary operations
-- `AST_UNARY`: unary operations, currently used for `!` and unary `-`
+- `AST_UNARY`: unary operations `!`, unary `-`, `&`, and unary `*`
 - `AST_CALL`: function call
 - `AST_ARRAY_ACCESS`: indexed access, including multiple indices
 
@@ -64,6 +64,7 @@ The node types defined in `include/ast.h` cover four main groups.
 - `AST_BOOL_LITERAL`: boolean
 - `AST_TYPE_NAME`: nominal type, builtin or custom
 - `AST_TYPE_ARRAY`: array type with element type and optional size
+- `AST_TYPE_POINTER`: pointer type with a recursive target type
 
 ## General AST Format
 
@@ -76,7 +77,7 @@ Some important shapes are:
 
 - `AST_PROGRAM` and `AST_BLOCK`: store `items[]` lists
 - `AST_VAR_DECL`: `name`, `declared_type`, `initializer`
-- `AST_FUNC_DECL`: `name`, `return_type`, `params[]`, `body`
+- `AST_FUNC_DECL`: `name`, `return_type`, `params[]`, `body`, `is_extern`
 - `AST_IF`: `condition`, `then_branch`, `else_branch`
 - `AST_FOR`: `init`, `condition`, `update`, `body`
 - `AST_ASSIGN`: `target`, `value`, `op`
@@ -85,6 +86,7 @@ Some important shapes are:
 - `AST_CALL`: `callee`, `args[]`
 - `AST_ARRAY_ACCESS`: `base`, `indices[]`
 - `AST_TYPE_ARRAY`: `element_type`, `size_expr`
+- `AST_TYPE_POINTER`: `target_type`
 
 ## Conceptual Example
 
@@ -144,5 +146,6 @@ The real textual format is produced by `astToString` and is the same one used by
 - Errors are reported based on the current token, reusing `line` and `column` from the lexer.
 - The textual AST serialization is part of the project's practical contract because it is used to validate parsing in the tests.
 - Function declarations require an explicit return type after `->`, and the AST serialization includes that return type under `AST_FUNC_DECL`.
+- External function declarations use the same `AST_FUNC_DECL` node shape, but they set `is_extern = true`, omit a body, and require a trailing `;`.
 - `AST_RETURN` may have `value == NULL` for `ret;`.
 - `AST_PROGRAM` remains a generic node list structurally, but the parser now guarantees that only `AST_VAR_DECL` and `AST_FUNC_DECL` appear there.

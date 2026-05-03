@@ -40,7 +40,8 @@ Each token contains:
 ### Literals and identifiers
 
 - `TOKEN_NUMBER`: integer and floating-point numbers
-- `TOKEN_STRING`: strings and chars delimited by quotes
+- `TOKEN_STRING`: double-quoted strings
+- `TOKEN_CHAR_LITERAL`: single-quoted character literals such as `'a'` and `'\0'`
 - `TOKEN_BOOL`: `true` and `false`
 - `TOKEN_IDENTIFIER`: variable names, function names, and custom types
 
@@ -67,6 +68,7 @@ These two types help the scanner advance correctly, but they do not appear in th
 - `TOKEN_KW_FOR`: `for`
 - `TOKEN_KW_WHILE`: `while`
 - `TOKEN_KW_FUNC`: `func`
+- `TOKEN_KW_EXTERN`: `extern`
 - `TOKEN_KW_RET`: `ret`
 - `TOKEN_KW_BREAK`: `break`
 - `TOKEN_KW_CONTINUE`: `continue`
@@ -75,9 +77,10 @@ These two types help the scanner advance correctly, but they do not appear in th
 
 - comparison: `TOKEN_EQ_EQ`, `TOKEN_GT_EQ`, `TOKEN_LT_EQ`, `TOKEN_NOT_EQ`, `TOKEN_GT`, `TOKEN_LT`
 - logical: `TOKEN_AND_AND`, `TOKEN_OR_OR`, `TOKEN_BANG`
+- pointer/address: `TOKEN_AMPERSAND`, `TOKEN_STAR`
 - assignment: `TOKEN_ASSIGN`, `TOKEN_PLUS_ASSIGN`, `TOKEN_MINUS_ASSIGN`
 - function return arrow: `TOKEN_ARROW`
-- arithmetic: `TOKEN_PLUS`, `TOKEN_MINUS`, `TOKEN_STAR`, `TOKEN_SLASH`
+- arithmetic: `TOKEN_PLUS`, `TOKEN_MINUS`, `TOKEN_SLASH`
 
 ### Delimiters and separators
 

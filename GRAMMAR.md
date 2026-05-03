@@ -6,6 +6,7 @@ It documents the language as it exists in the implementation today, not as it id
 ## Overview
 
 - The input is a `program` with zero or more top-level declarations until `EOF`.
+- Top level accepts variable declarations, function definitions, and external function declarations written as `extern func ...;`.
 - `if`, `while`, `for`, and `func` always require a block with `{}`.
 - Regular statements end with `;`.
 - Declarations use `::`.
@@ -21,6 +22,7 @@ It documents the language as it exists in the implementation today, not as it id
 program         = { top-level-declaration } EOF ;
 
 top-level-declaration = function-declaration
+                      | extern-function-declaration
                       | declaration ";" ;
 
 statement       = if-statement
@@ -45,6 +47,8 @@ for-statement   = "for" "("
                   ")" block ;
 
 function-declaration = "func" identifier "(" [ parameter { "," parameter } ] ")" "->" return-type block ;
+
+extern-function-declaration = "extern" "func" identifier "(" [ parameter { "," parameter } ] ")" "->" return-type ";" ;
 
 return-type     = "void" | type ;
 
@@ -143,12 +147,13 @@ Based on `src/lexer/lexer.c`:
 
 - `identifier`: `[_a-zA-Z][_a-zA-Z0-9]*`
 - `number`: integers or decimal floats such as `10` and `1.5`
-- `string`: accepts double-quoted or single-quoted text
+- `string`: accepts double-quoted text
+- `char`: accepts single-quoted character literals with escape support
 - `boolean`: `true` and `false`
 - `&`: address-of operator
 - `//...` comments and whitespace are ignored by the lexer
 
-The EBNF above uses the auxiliary lexical names `letter-or-underscore`, `letter`, `digit`, `underscore`, `integer`, `float`, and `quoted-text` as shorthand for the token categories produced by the lexer. In practice, string literals are produced as a single lexer category whether they use single quotes or double quotes.
+The EBNF above uses the auxiliary lexical names `letter-or-underscore`, `letter`, `digit`, `underscore`, `integer`, `float`, and `quoted-text` as shorthand for the token categories produced by the lexer. In practice, the lexer produces separate token categories for double-quoted strings and single-quoted character literals.
 
 ## Important Syntactic Forms
 
@@ -225,6 +230,7 @@ arr[0](x);
 - `if`, `while`, `for`, and `func` do not accept a single statement without braces.
 - `break` and `continue` are accepted syntactically anywhere a simple statement is valid.
 - `break` and `continue` are valid semantically only inside `while` and `for`.
+- External function declarations are valid only at file scope and are represented in the AST as `AST_FUNC_DECL` nodes with `is_extern = true`.
 
 ## Source
 

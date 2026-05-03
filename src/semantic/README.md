@@ -204,24 +204,27 @@ The current semantic analyzer validates:
 - arithmetic, comparison, and logical operand rules
 - boolean conditions in `if`, `while`, and `for`
 - argument count and argument type compatibility in function calls
-- non-`void` functions containing at least one return statement
+- non-`void` functions returning along every control-flow path
 - return expression compatibility with the declared function return type
 - acceptance of empty returns inside `void` functions
 - rejection of empty returns inside non-`void` functions
 - rejection of value returns inside `void` functions
 - rejection of `ret` outside a function
+- unreachable statements after a guaranteed `ret`
+- rejection of `break` and `continue` outside loops
 - array literal element compatibility
 - integer-only array indexing
 - rejection of indexing non-array values
 - address-of only on addressable expressions
 - dereference only on pointer-typed expressions
 - assignment through dereference with exact pointee type matching
+- external function declarations participating in symbol collection and call validation without a body to analyze
 
 ## Output Responsibility
 
 `semanticAnalyze(...)` does not print anything by itself.
 
-It only returns structured data. The caller, such as `main.c`, is responsible for iterating through the collected errors and rendering them for the user.
+It only returns structured data. The caller, such as `src/compiler_driver.c`, is responsible for iterating through the collected errors and rendering them for the user.
 
 ## Notes
 

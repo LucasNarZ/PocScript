@@ -215,7 +215,7 @@ The table below distinguishes between features that are currently supported acro
 | Binary arithmetic `+`, `-`, `*`, `/` | `fully-supported` | Lowered in current backend |
 | Comparisons `>`, `<`, `<=` | `fully-supported` | Lowered in current backend |
 | Comparisons `>=`, `==`, `!=` | `fully-supported` | Lowered and emitted as LLVM comparisons in the active backend path |
-| Logical operators `&&`, `||` | `fully-supported` | Lowered and emitted as boolean LLVM operations |
+| Logical operators `&&`, `||` | `partially-supported` | Parsed, semantically validated, and emitted as boolean LLVM operations, but they still evaluate both operands and do not short-circuit yet |
 | Unary `!` and unary `-` | `fully-supported` | Lowered and emitted in the active backend path |
 | Pointer types `*T` | `fully-supported` | Parsed, validated structurally, lowered to LLVM pointer types, and supports `p + int` / `p - int` |
 | Address-of `&` | `fully-supported` | Supported for variables and array elements |
@@ -244,6 +244,7 @@ The project is intentionally incomplete, but the currently documented language s
 
 - type rules are intentionally strict
 - there is no implicit numeric promotion between `int` and `float`
+- `&&` and `||` currently require `bool` operands but still evaluate both sides instead of short-circuiting
 - semantic analysis focuses on correctness, not optimization or recovery of malformed syntax
 
 ### Backend limitations

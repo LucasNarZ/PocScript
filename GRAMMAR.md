@@ -218,6 +218,7 @@ arr[0](x);
 - The size inside type `[]` uses the same `logical-expression` rule.
 - Array literals accept both `,` and `;` as separators, including mixed usage.
 - The parser allows a trailing separator in array literals, for example `{1, 2,}` and `{1; 2;}`.
+- `&&` and `||` are parsed with the documented precedence, but the current backend still evaluates both operands and does not implement short-circuit semantics yet.
 - `initializer`, `array-element`, and the right-hand side of `assignment` are documented through `logical-expression`, which already includes array literals via `primary-expression`.
 - File scope accepts only variable declarations and function declarations.
 - Global variable initializers are restricted semantically to direct literal nodes.

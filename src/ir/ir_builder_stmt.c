@@ -312,12 +312,23 @@ static bool irBuilderLowerBlockNode(IRBuilder *builder, const AstNode *block) {
     return true;
 }
 
+static bool irBuilderLowerIfBranch(IRBuilder *builder, const AstNode *branch) {
+    if (branch == NULL) {
+        return true;
+    }
+
+    if (branch->type == AST_BLOCK) {
+        return irBuilderLowerBlockNode(builder, branch);
+    }
+
+    return irBuilderLowerStatement(builder, branch);
+}
+
 static bool irBuilderLowerIfStatement(IRBuilder *builder, const AstNode *node) {
     IRBasicBlock *then_block;
     IRBasicBlock *else_block;
     IRBasicBlock *end_block;
     IRValue condition;
-    size_t i;
 
     then_block = irFunctionCreateBlock(builder->current_function);
     else_block = irFunctionCreateBlock(builder->current_function);
@@ -343,22 +354,16 @@ static bool irBuilderLowerIfStatement(IRBuilder *builder, const AstNode *node) {
     }
 
     builder->current_block = then_block;
-    for (i = 0; i < node->data.if_stmt.then_branch->data.block.count; i++) {
-        if (!irBuilderLowerStatement(builder, node->data.if_stmt.then_branch->data.block.items[i])) {
-            return false;
-        }
+    if (!irBuilderLowerIfBranch(builder, node->data.if_stmt.then_branch)) {
+        return false;
     }
     if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, end_block)) {
         return false;
     }
 
     builder->current_block = else_block;
-    if (node->data.if_stmt.else_branch != NULL) {
-        for (i = 0; i < node->data.if_stmt.else_branch->data.block.count; i++) {
-            if (!irBuilderLowerStatement(builder, node->data.if_stmt.else_branch->data.block.items[i])) {
-                return false;
-            }
-        }
+    if (!irBuilderLowerIfBranch(builder, node->data.if_stmt.else_branch)) {
+        return false;
     }
     if (!irBuilderCurrentBlockHasTerminator(builder) && !irBuilderEmitBranch(builder, end_block)) {
         return false;

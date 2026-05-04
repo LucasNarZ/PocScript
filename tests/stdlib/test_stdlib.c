@@ -129,3 +129,16 @@ void test_stdlib_puts_interprets_backslash_n_as_newline(void) {
         free(output);
     }
 }
+
+void test_stdlib_printInt_emits_negative_multi_digit_value(void) {
+    char *output = compileAndRunStdlibProgram(
+        "extern func printInt(value::int) -> void;\n"
+        "func main() -> int { printInt(-1203); ret 0; }\n"
+    );
+
+    EXPECT_TRUE(output != NULL);
+    if (output != NULL) {
+        EXPECT_STR_EQ("-1203", output);
+        free(output);
+    }
+}

@@ -99,6 +99,20 @@ void test_ir_printer_emits_conditional_branches_and_labels(void) {
     }
 }
 
+void test_ir_printer_emits_else_if_chain(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func main(flag::bool) -> int { if (flag) { ret 1; } else if (!flag) { ret 2; } ret 0; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "br i1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "ret i32 1") != NULL);
+        EXPECT_TRUE(strstr(llvm, "ret i32 2") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_gep_for_array_access(void) {
     char *llvm = emitLlvmIrFromString(
         "func main() -> int { arr::int[3] = {1, 2, 3}; ret arr[1]; }"

@@ -160,6 +160,29 @@ void test_lexer_tokenizes_break_and_continue_keywords_together(void) {
     freeTokens(tokens);
 }
 
+void test_lexer_ignores_line_comments_and_tracks_next_token_position(void) {
+    Token *tokens = tokenizeString("x::int = 1; // comment\nflag::bool = true;");
+    Token *current = tokens;
+
+    EXPECT_TRUE(tokens != NULL);
+    if (tokens == NULL) {
+        return;
+    }
+
+    while (current != NULL && !(current->type == TOKEN_IDENTIFIER && strcmp(current->value, "flag") == 0)) {
+        EXPECT_TRUE(current->type != TOKEN_COMMENT);
+        current = current->next;
+    }
+
+    EXPECT_TRUE(current != NULL);
+    if (current != NULL) {
+        EXPECT_TRUE(current->line == 2);
+        EXPECT_TRUE(current->column == 1);
+    }
+
+    freeTokens(tokens);
+}
+
 void test_lexer_tokenizes_extern_function_declaration(void) {
     Token *tokens = tokenizeString("extern func printInt(value::int) -> void;");
 

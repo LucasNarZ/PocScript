@@ -310,6 +310,34 @@ void test_ir_printer_emits_float_values_as_double(void) {
     }
 }
 
+void test_ir_printer_emits_float_arithmetic_operations(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func math(a::float, b::float, c::float) -> float { ret (a + b) - c * b / 2.0; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "fadd double") != NULL);
+        EXPECT_TRUE(strstr(llvm, "fsub double") != NULL);
+        EXPECT_TRUE(strstr(llvm, "fmul double") != NULL);
+        EXPECT_TRUE(strstr(llvm, "fdiv double") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_emits_float_comparison_and_negation(void) {
+    char *llvm = emitLlvmIrFromString(
+        "func cmp(a::float, b::float) -> bool { ret -a >= b; }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "fsub double") != NULL);
+        EXPECT_TRUE(strstr(llvm, "fcmp oge double") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_load_through_pointer_dereference(void) {
     char *llvm = emitLlvmIrFromString(
         "func main() -> int { x::int = 1; p::*int = &x; ret *p; }"

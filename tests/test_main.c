@@ -58,6 +58,8 @@ void test_ir_builder_registers_extern_function_symbols(void);
 void test_ir_printer_emits_extern_function_declarations(void);
 void test_ir_printer_does_not_define_extern_function_body(void);
 void test_ir_printer_emits_float_values_as_double(void);
+void test_ir_printer_emits_float_arithmetic_operations(void);
+void test_ir_printer_emits_float_comparison_and_negation(void);
 void test_ir_printer_emits_bool_values_as_i1(void);
 void test_ir_printer_escapes_special_characters_in_string_literals(void);
 void test_ir_printer_emits_i8_comparison_for_char_literal_nul(void);
@@ -267,6 +269,8 @@ int main(void) {
     RUN_TEST(test_ir_printer_zero_initializes_global_pointer_without_initializer, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_zero_initializes_global_array_without_initializer, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_float_values_as_double, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_float_arithmetic_operations, "tests/ir/test_ir.c");
+    RUN_TEST(test_ir_printer_emits_float_comparison_and_negation, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_bool_values_as_i1, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_escapes_special_characters_in_string_literals, "tests/ir/test_ir.c");
     RUN_TEST(test_ir_printer_emits_i8_comparison_for_char_literal_nul, "tests/ir/test_ir.c");

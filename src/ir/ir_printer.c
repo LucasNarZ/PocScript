@@ -225,7 +225,10 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
         case IR_INSTR_CMP_LT:
         case IR_INSTR_CMP_LE:
         case IR_INSTR_CMP_GT:
-        case IR_INSTR_CMP_GE:
+        case IR_INSTR_CMP_GE: {
+            bool is_float_op = instruction->data.binary.left.type != NULL
+                && instruction->data.binary.left.type->kind == IR_TYPE_FLOAT;
+
             if (instruction->kind == IR_INSTR_CMP_EQ
                     || instruction->kind == IR_INSTR_CMP_NE
                     || instruction->kind == IR_INSTR_CMP_GT
@@ -234,22 +237,35 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
                     || instruction->kind == IR_INSTR_CMP_GE) {
                 fprintf(out, "  %%t%u = ", instruction->result_id);
                 fputs(
-                    instruction->kind == IR_INSTR_CMP_EQ ? "icmp eq " :
-                    instruction->kind == IR_INSTR_CMP_NE ? "icmp ne " :
-                    instruction->kind == IR_INSTR_CMP_GT ? "icmp sgt " :
-                    instruction->kind == IR_INSTR_CMP_LT ? "icmp slt " :
-                    instruction->kind == IR_INSTR_CMP_LE ? "icmp sle " :
-                    "icmp sge ",
+                    is_float_op
+                        ? (instruction->kind == IR_INSTR_CMP_EQ ? "fcmp oeq " :
+                           instruction->kind == IR_INSTR_CMP_NE ? "fcmp one " :
+                           instruction->kind == IR_INSTR_CMP_GT ? "fcmp ogt " :
+                           instruction->kind == IR_INSTR_CMP_LT ? "fcmp olt " :
+                           instruction->kind == IR_INSTR_CMP_LE ? "fcmp ole " :
+                           "fcmp oge ")
+                        : (instruction->kind == IR_INSTR_CMP_EQ ? "icmp eq " :
+                           instruction->kind == IR_INSTR_CMP_NE ? "icmp ne " :
+                           instruction->kind == IR_INSTR_CMP_GT ? "icmp sgt " :
+                           instruction->kind == IR_INSTR_CMP_LT ? "icmp slt " :
+                           instruction->kind == IR_INSTR_CMP_LE ? "icmp sle " :
+                           "icmp sge "),
                     out
                 );
                 irPrintType(out, instruction->data.binary.left.type);
             } else {
                 fprintf(out, "  %%t%u = %s ", instruction->result_id,
-                    instruction->kind == IR_INSTR_ADD ? "add" :
-                    instruction->kind == IR_INSTR_SUB ? "sub" :
-                    instruction->kind == IR_INSTR_MUL ? "mul" :
-                    instruction->kind == IR_INSTR_DIV ? "sdiv" :
-                    instruction->kind == IR_INSTR_AND ? "and" : "or");
+                    is_float_op
+                        ? (instruction->kind == IR_INSTR_ADD ? "fadd" :
+                           instruction->kind == IR_INSTR_SUB ? "fsub" :
+                           instruction->kind == IR_INSTR_MUL ? "fmul" :
+                           instruction->kind == IR_INSTR_DIV ? "fdiv" :
+                           instruction->kind == IR_INSTR_AND ? "and" : "or")
+                        : (instruction->kind == IR_INSTR_ADD ? "add" :
+                           instruction->kind == IR_INSTR_SUB ? "sub" :
+                           instruction->kind == IR_INSTR_MUL ? "mul" :
+                           instruction->kind == IR_INSTR_DIV ? "sdiv" :
+                           instruction->kind == IR_INSTR_AND ? "and" : "or"));
                 irPrintType(out, instruction->result_type);
             }
             fputc(' ', out);
@@ -258,10 +274,12 @@ static void irPrintInstruction(FILE *out, const IRModule *module, const IRInstru
             irPrintOperand(out, module, &instruction->data.binary.right);
             fputc('\n', out);
             break;
+        }
         case IR_INSTR_NEG:
-            fprintf(out, "  %%t%u = sub ", instruction->result_id);
+            fprintf(out, "  %%t%u = %s ", instruction->result_id,
+                instruction->result_type != NULL && instruction->result_type->kind == IR_TYPE_FLOAT ? "fsub" : "sub");
             irPrintType(out, instruction->result_type);
-            fputs(" 0, ", out);
+            fputs(instruction->result_type != NULL && instruction->result_type->kind == IR_TYPE_FLOAT ? " 0.000000, " : " 0, ", out);
             irPrintOperand(out, module, &instruction->data.unary.operand);
             fputc('\n', out);
             break;

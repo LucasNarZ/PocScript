@@ -578,7 +578,19 @@ void test_semantic_accepts_literal_global_initializers(void) {
         "x::int = 1;\n"
         "y::float = 1.5;\n"
         "flag::bool = true;\n"
+        "letter::char = 'a';\n"
         "text::*char = \"a\";\n"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_char_literal_global_initializer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "letter::char = 'a';\n"
+        "func main() -> int { ret 0; }"
     );
 
     EXPECT_TRUE(result.errors.count == 0);

@@ -3,6 +3,7 @@
 void test_semantic_accepts_builtin_print_functions(void);
 void test_semantic_accepts_char_pointer_initialized_from_string_literal(void);
 void test_semantic_accepts_char_initialized_from_int_literal(void);
+void test_semantic_accepts_char_literal_global_initializer(void);
 void test_semantic_rejects_string_type_name(void);
 void test_semantic_accepts_builtin_print_string_with_char_pointer(void);
 void test_semantic_rejects_redeclaration_of_builtin_print_function(void);
@@ -169,6 +170,7 @@ int main(void) {
     RUN_TEST(test_semantic_accepts_builtin_print_functions, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_char_pointer_initialized_from_string_literal, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_char_initialized_from_int_literal, "tests/semantic/test_semantic.c");
+    RUN_TEST(test_semantic_accepts_char_literal_global_initializer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_string_type_name, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_accepts_builtin_print_string_with_char_pointer, "tests/semantic/test_semantic.c");
     RUN_TEST(test_semantic_rejects_redeclaration_of_builtin_print_function, "tests/semantic/test_semantic.c");

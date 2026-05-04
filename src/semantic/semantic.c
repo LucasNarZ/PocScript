@@ -220,6 +220,7 @@ static bool isAllowedGlobalInitializer(AstNode *node) {
     switch (node->type) {
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:
+        case AST_CHAR_LITERAL:
         case AST_STRING_LITERAL:
         case AST_BOOL_LITERAL:
             return true;

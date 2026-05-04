@@ -2,40 +2,41 @@
 
 Token *head = NULL;
 
-static void appendToken(Token **head, TokenType type, const char *value, int line, int column) {
-    Token *token = malloc(sizeof(Token));
+static void appendToken(Token **head, TokenType type, const char *value,
+                        int line, int column) {
+  Token *token = malloc(sizeof(Token));
 
-    token->type = type;
-    token->value = malloc(strlen(value) + 1);
-    strcpy(token->value, value);
-    token->line = line;
-    token->column = column;
-    token->anterior = NULL;
-    token->next = NULL;
+  token->type = type;
+  token->value = malloc(strlen(value) + 1);
+  strcpy(token->value, value);
+  token->line = line;
+  token->column = column;
+  token->anterior = NULL;
+  token->next = NULL;
 
-    if (*head == NULL) {
-        *head = token;
-        return;
+  if (*head == NULL) {
+    *head = token;
+    return;
+  }
+
+  {
+    Token *temp = *head;
+    while (temp->next != NULL) {
+      temp = temp->next;
     }
-
-    {
-        Token *temp = *head;
-        while (temp->next != NULL) {
-            temp = temp->next;
-        }
-        temp->next = token;
-        token->anterior = temp;
-    }
+    temp->next = token;
+    token->anterior = temp;
+  }
 }
 
 static void lexerAppendToken(Lexer *lexer, TokenType type, const char *value) {
-    appendToken(&lexer->tokens, type, value, lexer->line, lexer->column);
+  appendToken(&lexer->tokens, type, value, lexer->line, lexer->column);
 }
 
 TokenDefinition types[NUM_TYPES] = {
     {TOKEN_NUMBER, "^([0-9]*\\.[0-9]+|[0-9]+)"},
     {TOKEN_BOOL, "^(true|false)\\b"},
-    {TOKEN_COMMENT, "//.*"},
+    {TOKEN_COMMENT, "^//[^\n]*"},
     {TOKEN_TYPE_ARRAY, "^(Array)\\b"},
     {TOKEN_TYPE_INT, "^(int)\\b"},
     {TOKEN_TYPE_FLOAT, "^(float)\\b"},

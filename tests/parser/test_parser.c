@@ -564,6 +564,24 @@ void test_parser_reports_syntax_error_at_eof_without_crashing(void) {
     assertParseError("func main() -> void { x =", "unexpected end of input in expression");
 }
 
+void test_parser_accumulates_syntax_errors_without_exiting(void) {
+    Parser parser;
+    Token *tokens = tokenizeString("func main() -> void { foo(1; bar(2; }");
+    AstNode *root;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+
+    EXPECT_TRUE(root != NULL);
+    EXPECT_TRUE(parser.errors.count == 2);
+    EXPECT_TRUE(strstr(parser.errors.items[0].message, "expected ')' after call arguments") != NULL);
+    EXPECT_TRUE(strstr(parser.errors.items[1].message, "expected ')' after call arguments") != NULL);
+
+    parserFree(&parser);
+    astFree(root);
+    freeTokens(tokens);
+}
+
 void test_parser_reports_specific_syntax_errors(void) {
     assertParseError("func main() -> void { if x) { ret 1; } }", "expected '(' after if");
     assertParseError("func main() -> void { if (x { ret 1; } }", "expected ')' after if condition");

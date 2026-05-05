@@ -30,5 +30,9 @@ SemanticType *semanticTypeClone(const SemanticType *type);
 void semanticTypeFree(SemanticType *type);
 bool semanticTypeEquals(const SemanticType *left, const SemanticType *right);
 const char *semanticTypeName(const SemanticType *type);
+bool semanticTypeIsArray(const SemanticType *type);
+bool semanticTypeIsPointer(const SemanticType *type);
+bool semanticTypeCanDecayToPointer(const SemanticType *array_type, const SemanticType *pointer_type);
+bool semanticTypeIsCompatibleWithDecay(const SemanticType *expected, const SemanticType *actual);
 
 #endif

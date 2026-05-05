@@ -203,6 +203,28 @@ static IRValue irBuilderLowerStringLiteralRValue(IRBuilder *builder, const AstNo
     return result;
 }
 
+IRValue irBuilderLowerValueForExpectedType(IRBuilder *builder, const AstNode *node, const IRType *expected_type) {
+    IRValue lvalue;
+
+    if (expected_type != NULL && expected_type->kind == IR_TYPE_POINTER) {
+        if (node != NULL && node->type == AST_STRING_LITERAL) {
+            return irBuilderLowerStringLiteralRValue(builder, node);
+        }
+
+        lvalue = irBuilderLowerLValue(builder, node);
+        if (lvalue.has_address && lvalue.type != NULL && lvalue.type->kind == IR_TYPE_ARRAY) {
+            return irBuilderDecayArrayToPointer(builder, lvalue);
+        }
+
+        irTypeFree(lvalue.type);
+        if (lvalue.has_address) {
+            irOperandFree(&lvalue.address);
+        }
+    }
+
+    return irBuilderLowerRValue(builder, node);
+}
+
 static IRValue irBuilderLowerLoadedRValue(IRBuilder *builder, const AstNode *node, IRValue (*lower_address)(IRBuilder *, const AstNode *)) {
     IRValue result = lower_address(builder, node);
 
@@ -291,7 +313,7 @@ static IRValue irBuilderLowerCallRValue(IRBuilder *builder, const AstNode *node)
     }
 
     for (i = 0; i < node->data.call.arg_count; i++) {
-        IRValue arg = irBuilderLowerRValue(builder, node->data.call.args[i]);
+        IRValue arg = irBuilderLowerValueForExpectedType(builder, node->data.call.args[i], callee->data.function.param_types[i]);
         if (!arg.has_value) {
             free(args);
             return irValueEmpty();

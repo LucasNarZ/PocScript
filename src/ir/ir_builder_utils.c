@@ -287,18 +287,58 @@ unsigned int irBuilderReserveResult(IRBuilder *builder) {
 }
 
 size_t irBuilderStringLiteralLength(const char *value) {
+    char *decoded;
     size_t length;
 
     if (value == NULL) {
         return 0;
     }
 
-    length = strlen(value);
-    if (length >= 2 && ((value[0] == '"' && value[length - 1] == '"') || (value[0] == '\'' && value[length - 1] == '\''))) {
-        return length - 2;
+    decoded = irBuilderUnquoteString(value);
+    if (decoded == NULL) {
+        return 0;
     }
 
+    length = strlen(decoded);
+    free(decoded);
     return length;
+}
+
+IRValue irBuilderDecayArrayToPointer(IRBuilder *builder, IRValue array_lvalue) {
+    IROperand *indices;
+    IRValue gep_value;
+    IRValue result = irValueEmpty();
+
+    if (!array_lvalue.has_address || array_lvalue.type == NULL || array_lvalue.type->kind != IR_TYPE_ARRAY || array_lvalue.type->element_type == NULL) {
+        irTypeFree(array_lvalue.type);
+        if (array_lvalue.has_address) {
+            irOperandFree(&array_lvalue.address);
+        }
+        return result;
+    }
+
+    indices = calloc(2, sizeof(IROperand));
+    if (indices == NULL) {
+        irTypeFree(array_lvalue.type);
+        irOperandFree(&array_lvalue.address);
+        return result;
+    }
+
+    indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+    indices[1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+    gep_value = irBuilderEmitGep(builder, array_lvalue.address, indices, 2, irTypeClone(array_lvalue.type->element_type));
+    irTypeFree(array_lvalue.type);
+
+    if (!gep_value.has_address || gep_value.address.type == NULL) {
+        irTypeFree(gep_value.type);
+        return result;
+    }
+
+    result.type = irTypeClone(gep_value.address.type);
+    result.value = gep_value.address;
+    result.has_value = true;
+    irTypeFree(gep_value.type);
+    return result;
 }
 
 IRValue irBuilderLiteralValue(IRTypeKind kind, IRLiteral *literal) {

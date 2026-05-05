@@ -17,6 +17,8 @@ unsigned int irBuilderReserveResult(IRBuilder *builder);
 bool irBuilderAppendInstruction(IRBuilder *builder, IRInstruction *instruction);
 size_t irBuilderStringLiteralLength(const char *value);
 unsigned int irBuilderAddStringStorage(IRBuilder *builder, const char *value);
+IRValue irBuilderDecayArrayToPointer(IRBuilder *builder, IRValue array_lvalue);
+IRValue irBuilderLowerValueForExpectedType(IRBuilder *builder, const AstNode *node, const IRType *expected_type);
 bool irBuilderMaterializeParameter(IRBuilder *builder, IRFunction *function, const IRParameter *parameter, size_t index);
 IRValue irBuilderLiteralValue(IRTypeKind kind, IRLiteral *literal);
 IRValue irBuilderEmitLoad(IRBuilder *builder, IROperand address, IRType *value_type);

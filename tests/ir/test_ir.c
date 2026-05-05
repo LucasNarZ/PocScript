@@ -61,6 +61,29 @@ void test_ir_printer_emits_private_string_global(void) {
     }
 }
 
+void test_ir_printer_decays_string_literal_for_char_pointer_initializer(void) {
+    char *llvm = emitLlvmIrFromString("func main() -> void { msg::*char = \"hi\"; ret; }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "getelementptr inbounds [3 x i8], [3 x i8]* @") != NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_initializes_unsized_char_array_from_string_literal(void) {
+    char *llvm = emitLlvmIrFromString("func main() -> void { text::Array<char> = \"hi\"; ret; }");
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "alloca [3 x i8]") != NULL);
+        EXPECT_TRUE(strstr(llvm, "store i8 104") != NULL);
+        EXPECT_TRUE(strstr(llvm, "store i8 105") != NULL);
+        EXPECT_TRUE(strstr(llvm, "store i8 0") != NULL);
+        free(llvm);
+    }
+}
+
 void test_ir_printer_emits_add_and_return(void) {
     char *llvm = emitLlvmIrFromString("func sum(a::int, b::int) -> int { ret a + b; }");
 
@@ -150,6 +173,20 @@ void test_ir_printer_preserves_sized_array_parameter_types_in_calls(void) {
         EXPECT_TRUE(strstr(llvm, "define i32 @first([3 x i32] %p1)") != NULL);
         EXPECT_TRUE(strstr(llvm, "call i32 @first([3 x i32]") != NULL);
         EXPECT_TRUE(strstr(llvm, "[0 x i32]") == NULL);
+        free(llvm);
+    }
+}
+
+void test_ir_printer_decays_array_argument_to_pointer_parameter(void) {
+    char *llvm = emitLlvmIrFromString(
+        "extern func first(value::*int) -> int; "
+        "func main() -> int { values::Array<int>[3] = {1, 2, 3}; ret first(values); }"
+    );
+
+    EXPECT_TRUE(llvm != NULL);
+    if (llvm != NULL) {
+        EXPECT_TRUE(strstr(llvm, "call i32 @first(i32*") != NULL);
+        EXPECT_TRUE(strstr(llvm, "getelementptr inbounds [3 x i32]") != NULL);
         free(llvm);
     }
 }

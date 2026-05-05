@@ -99,6 +99,50 @@ const char *semanticTypeName(const SemanticType *type) {
     return "unknown";
 }
 
+bool semanticTypeIsArray(const SemanticType *type) {
+    return type != NULL && type->kind == SEM_TYPE_ARRAY;
+}
+
+bool semanticTypeIsPointer(const SemanticType *type) {
+    return type != NULL && type->kind == SEM_TYPE_POINTER;
+}
+
+bool semanticTypeCanDecayToPointer(const SemanticType *array_type, const SemanticType *pointer_type) {
+    return semanticTypeIsArray(array_type)
+        && semanticTypeIsPointer(pointer_type)
+        && array_type->element_type != NULL
+        && pointer_type->element_type != NULL
+        && semanticTypeEquals(array_type->element_type, pointer_type->element_type);
+}
+
+bool semanticTypeIsCompatibleWithDecay(const SemanticType *expected, const SemanticType *actual) {
+    if (expected == NULL || actual == NULL) {
+        return false;
+    }
+
+    if (semanticTypeEquals(expected, actual)) {
+        return true;
+    }
+
+    if (expected->kind == SEM_TYPE_CHAR && actual->kind == SEM_TYPE_INT) {
+        return true;
+    }
+
+    if (semanticTypeCanDecayToPointer(actual, expected)) {
+        return true;
+    }
+
+    if (!semanticTypeIsArray(expected) || !semanticTypeIsArray(actual)) {
+        return false;
+    }
+
+    if (expected->has_array_size && actual->has_array_size && expected->array_size != actual->array_size) {
+        return false;
+    }
+
+    return semanticTypeIsCompatibleWithDecay(expected->element_type, actual->element_type);
+}
+
 SemanticType *semanticTypeFromAst(AstNode *typeNode) {
     SemanticType *type;
     AstNode *elementTypeNode;

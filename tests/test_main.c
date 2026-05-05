@@ -110,6 +110,8 @@ void test_ir_printer_zero_initializes_global_int_without_initializer(void);
 void test_ir_printer_zero_initializes_global_pointer_without_initializer(void);
 void test_ir_printer_zero_initializes_global_array_without_initializer(void);
 void test_parser_accumulates_syntax_errors_without_exiting(void);
+void test_parser_recovers_at_statement_boundary(void);
+void test_parser_recovers_at_block_boundary(void);
 
 int test_failures = 0;
 int tests_run = 0;
@@ -142,6 +144,8 @@ int main(void) {
     RUN_TEST(test_parser_copies_token_strings_into_ast, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_syntax_error_at_eof_without_crashing, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_accumulates_syntax_errors_without_exiting, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_recovers_at_statement_boundary, "tests/parser/test_parser.c");
+    RUN_TEST(test_parser_recovers_at_block_boundary, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_specific_syntax_errors, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_eof_errors_in_last_token_positions, "tests/parser/test_parser.c");
     RUN_TEST(test_parser_reports_error_positions, "tests/parser/test_parser.c");

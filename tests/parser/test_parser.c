@@ -582,6 +582,47 @@ void test_parser_accumulates_syntax_errors_without_exiting(void) {
     freeTokens(tokens);
 }
 
+void test_parser_recovers_at_statement_boundary(void) {
+    Parser parser;
+    Token *tokens = tokenizeString("func main() -> void { foo(1; x::int = 2; bar(3); }");
+    AstNode *root;
+    char *astString;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+    astString = astToString(root);
+
+    EXPECT_TRUE(parser.errors.count == 1);
+    EXPECT_TRUE(astString != NULL);
+    EXPECT_TRUE(strstr(astString, "VAR_DECL x") != NULL);
+    EXPECT_TRUE(strstr(astString, "(CALL)") != NULL);
+
+    free(astString);
+    parserFree(&parser);
+    astFree(root);
+    freeTokens(tokens);
+}
+
+void test_parser_recovers_at_block_boundary(void) {
+    Parser parser;
+    Token *tokens = tokenizeString("func main() -> void { if (true) { foo(1; } ret; }");
+    AstNode *root;
+    char *astString;
+
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+    astString = astToString(root);
+
+    EXPECT_TRUE(parser.errors.count == 1);
+    EXPECT_TRUE(astString != NULL);
+    EXPECT_TRUE(strstr(astString, "(RETURN)") != NULL);
+
+    free(astString);
+    parserFree(&parser);
+    astFree(root);
+    freeTokens(tokens);
+}
+
 void test_parser_reports_specific_syntax_errors(void) {
     assertParseError("func main() -> void { if x) { ret 1; } }", "expected '(' after if");
     assertParseError("func main() -> void { if (x { ret 1; } }", "expected ')' after if condition");

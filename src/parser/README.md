@@ -19,7 +19,7 @@ The main flow is:
 1. `parserInit` receives the token list.
 2. `parserParseProgram` creates an `AST_PROGRAM` node.
 3. File-scope items are parsed through a dedicated top-level path, while blocks continue to use recursive functions such as `parseStatement`, `parseAssign`, `parseLogical`, `parseType`, and `parseFactor`.
-4. On error, the parser aborts with a message containing line and column information.
+4. On syntax error, the parser records a structured error with line and column information, attempts bounded recovery, and returns control to the caller.
 
 The current parser is strictly syntactic. It builds the tree structure, but it does not perform type checking or semantic resolution.
 
@@ -143,7 +143,7 @@ The real textual format is produced by `astToString` and is the same one used by
 ## Notes
 
 - The parser assumes the lexer has already removed comments and whitespace.
-- Errors are reported based on the current token, reusing `line` and `column` from the lexer.
+- Syntax errors are recorded from the current token position, reusing `line` and `column` from the lexer, and may accumulate across a single parse run.
 - The textual AST serialization is part of the project's practical contract because it is used to validate parsing in the tests.
 - Function declarations require an explicit return type after `->`, and the AST serialization includes that return type under `AST_FUNC_DECL`.
 - External function declarations use the same `AST_FUNC_DECL` node shape, but they set `is_extern = true`, omit a body, and require a trailing `;`.

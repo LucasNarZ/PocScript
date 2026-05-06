@@ -44,12 +44,15 @@ static void freeTokenList(Token *head) {
 
 static AstNode *parseRoot(Token *tokens) {
     Parser parser;
+    AstNode *root;
 
     parserInit(&parser, tokens);
-    return parserParseProgram(&parser);
+    root = parserParseProgram(&parser);
+    parserFree(&parser);
+    return root;
 }
 
-static void assertParseError(const char *input, const char *expectedMessage) {
+static void assertFatalStderrError(const char *input, const char *expectedMessage) {
     char pathTemplate[] = "/tmp/pocscript-parser-error-XXXXXX";
     char buffer[512];
     pid_t pid;
@@ -81,6 +84,7 @@ static void assertParseError(const char *input, const char *expectedMessage) {
         tokens = tokenizeString(input);
         parserInit(&parser, tokens);
         parserParseProgram(&parser);
+        parserFree(&parser);
         freeTokens(tokens);
         _exit(0);
     }
@@ -111,72 +115,54 @@ static void assertParseError(const char *input, const char *expectedMessage) {
     unlink(pathTemplate);
 }
 
+static void assertParseError(const char *input, const char *expectedMessage) {
+    Parser parser;
+    Token *tokens;
+    AstNode *root;
+
+    if (strncmp(expectedMessage, "Unrecognized token:", 19) == 0) {
+        assertFatalStderrError(input, expectedMessage);
+        return;
+    }
+
+    tokens = tokenizeString(input);
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
+
+    EXPECT_TRUE(parser.errors.count > 0);
+    if (parser.errors.count > 0 && strstr(parser.errors.items[0].message, expectedMessage) == NULL) {
+        fprintf(stderr, "Expected parser error containing '%s', got '%s'\n", expectedMessage, parser.errors.items[0].message);
+    }
+    if (parser.errors.count > 0) {
+        EXPECT_TRUE(strstr(parser.errors.items[0].message, expectedMessage) != NULL);
+    }
+
+    parserFree(&parser);
+    astFree(root);
+    freeTokens(tokens);
+}
+
 static void assertParseErrorAt(const char *input, const char *expectedMessage, int expectedLine, int expectedColumn) {
-    char pathTemplate[] = "/tmp/pocscript-parser-error-at-XXXXXX";
-    char buffer[512];
-    char expectedPrefix[128];
-    pid_t pid;
-    int fd;
-    int status;
-    ssize_t bytesRead;
+    Parser parser;
+    Token *tokens = tokenizeString(input);
+    AstNode *root;
 
-    fd = mkstemp(pathTemplate);
-    EXPECT_TRUE(fd >= 0);
-    if (fd < 0) {
-        return;
-    }
+    parserInit(&parser, tokens);
+    root = parserParseProgram(&parser);
 
-    fflush(stdout);
-    pid = fork();
-    EXPECT_TRUE(pid >= 0);
-    if (pid < 0) {
-        close(fd);
-        unlink(pathTemplate);
-        return;
-    }
-
-    if (pid == 0) {
-        Parser parser;
-        Token *tokens;
-
-        dup2(fd, STDERR_FILENO);
-        close(fd);
-        tokens = tokenizeString(input);
-        parserInit(&parser, tokens);
-        parserParseProgram(&parser);
-        freeTokens(tokens);
-        _exit(0);
-    }
-
-    close(fd);
-    EXPECT_TRUE(waitpid(pid, &status, 0) == pid);
-    EXPECT_TRUE(WIFEXITED(status));
-    EXPECT_TRUE(WEXITSTATUS(status) == 1);
-
-    fd = open(pathTemplate, O_RDONLY);
-    EXPECT_TRUE(fd >= 0);
-    if (fd < 0) {
-        unlink(pathTemplate);
-        return;
-    }
-
-    bytesRead = read(fd, buffer, sizeof(buffer) - 1);
-    EXPECT_TRUE(bytesRead >= 0);
-    if (bytesRead >= 0) {
-        buffer[bytesRead] = '\0';
-        snprintf(expectedPrefix, sizeof(expectedPrefix), "SyntaxError at line %d, column %d:", expectedLine, expectedColumn);
-        if (strstr(buffer, expectedPrefix) == NULL) {
-            fprintf(stderr, "Expected parser error position '%s', got '%s'\n", expectedPrefix, buffer);
+    EXPECT_TRUE(parser.errors.count > 0);
+    if (parser.errors.count > 0) {
+        EXPECT_TRUE(parser.errors.items[0].line == expectedLine);
+        EXPECT_TRUE(parser.errors.items[0].column == expectedColumn);
+        if (strstr(parser.errors.items[0].message, expectedMessage) == NULL) {
+            fprintf(stderr, "Expected parser error containing '%s', got '%s'\n", expectedMessage, parser.errors.items[0].message);
         }
-        EXPECT_TRUE(strstr(buffer, expectedPrefix) != NULL);
-        if (strstr(buffer, expectedMessage) == NULL) {
-            fprintf(stderr, "Expected parser error containing '%s', got '%s'\n", expectedMessage, buffer);
-        }
-        EXPECT_TRUE(strstr(buffer, expectedMessage) != NULL);
+        EXPECT_TRUE(strstr(parser.errors.items[0].message, expectedMessage) != NULL);
     }
 
-    close(fd);
-    unlink(pathTemplate);
+    parserFree(&parser);
+    astFree(root);
+    freeTokens(tokens);
 }
 
 static void assertParsesWithAstSubstring(const char *input, const char *expectedSubstring) {
@@ -217,6 +203,7 @@ static void assertParsesWithAstSubstring(const char *input, const char *expected
         }
 
         close(fd);
+        parserFree(&parser);
         free(astString);
         astFree(root);
         freeTokens(tokens);

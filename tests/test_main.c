@@ -102,6 +102,7 @@ void test_stdlib_puts_does_not_append_newline(void);
 void test_stdlib_puts_interprets_backslash_n_as_newline(void);
 void test_stdlib_printInt_emits_negative_multi_digit_value(void);
 void test_compiler_driver_rejects_missing_input_file(void);
+void test_compiler_driver_rejects_syntax_errors_without_writing_output(void);
 void test_compiler_driver_rejects_semantic_errors_without_writing_output(void);
 void test_compiler_driver_rejects_invalid_output_path(void);
 void test_cli_binary_rejects_too_many_arguments(void);
@@ -265,6 +266,7 @@ int main(void) {
     RUN_TEST(test_stdlib_puts_interprets_backslash_n_as_newline, "tests/stdlib/test_stdlib.c");
     RUN_TEST(test_stdlib_printInt_emits_negative_multi_digit_value, "tests/stdlib/test_stdlib.c");
     RUN_TEST(test_compiler_driver_rejects_missing_input_file, "tests/compiler/test_driver_cli.c");
+    RUN_TEST(test_compiler_driver_rejects_syntax_errors_without_writing_output, "tests/compiler/test_driver_cli.c");
     RUN_TEST(test_compiler_driver_rejects_semantic_errors_without_writing_output, "tests/compiler/test_driver_cli.c");
     RUN_TEST(test_compiler_driver_rejects_invalid_output_path, "tests/compiler/test_driver_cli.c");
     RUN_TEST(test_cli_binary_rejects_too_many_arguments, "tests/compiler/test_driver_cli.c");

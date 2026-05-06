@@ -71,6 +71,28 @@ void test_compiler_driver_rejects_semantic_errors_without_writing_output(void) {
     EXPECT_TRUE(access(outputPath, F_OK) != 0);
 }
 
+void test_compiler_driver_rejects_syntax_errors_without_writing_output(void) {
+    char outputPath[] = "/tmp/pocscript-syntax-output-XXXXXX.ll";
+    int fd = mkstemps(outputPath, 3);
+    bool ok;
+
+    EXPECT_TRUE(fd >= 0);
+    if (fd < 0) {
+        return;
+    }
+
+    close(fd);
+    removeIfExists(outputPath);
+
+    ok = writeLlvmIrFromStringToFile(
+        "func main() -> void { foo(1; x::int = 2; bar(3; }",
+        outputPath
+    );
+
+    EXPECT_TRUE(!ok);
+    EXPECT_TRUE(access(outputPath, F_OK) != 0);
+}
+
 void test_compiler_driver_rejects_invalid_output_path(void) {
     bool ok = writeLlvmIrFromStringToFile(
         "func main() -> int { ret 1; }",

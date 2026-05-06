@@ -24,6 +24,7 @@ void test_tokenize_file_appends_single_eof_for_multiline_input(void) {
     EXPECT_TRUE(root != NULL);
     EXPECT_TRUE(root->data.program.count == 3);
 
+    parserFree(&parser);
     astFree(root);
     freeTokens(tokens);
 }

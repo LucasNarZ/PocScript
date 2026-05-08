@@ -22,6 +22,55 @@ static AstNode *parsePointerType(Parser *parser);
 static AstNode *parseArrayLiteral(Parser *parser);
 static bool isAssignableTarget(const AstNode *node);
 
+static void parserErrorListInit(ParserErrorList *list) {
+    list->items = NULL;
+    list->count = 0;
+    list->capacity = 0;
+}
+
+static void parserErrorListAppend(ParserErrorList *list, int line, int column, const char *message) {
+    ParserError *nextItems;
+    char *copy;
+    size_t nextCapacity;
+    size_t length;
+
+    if (list->count == list->capacity) {
+        nextCapacity = list->capacity == 0 ? 4 : list->capacity * 2;
+        nextItems = realloc(list->items, nextCapacity * sizeof(ParserError));
+        if (nextItems == NULL) {
+            return;
+        }
+
+        list->items = nextItems;
+        list->capacity = nextCapacity;
+    }
+
+    length = strlen(message);
+    copy = malloc(length + 1);
+    if (copy == NULL) {
+        return;
+    }
+
+    memcpy(copy, message, length + 1);
+    list->items[list->count].line = line;
+    list->items[list->count].column = column;
+    list->items[list->count].message = copy;
+    list->count++;
+}
+
+static void parserErrorListFree(ParserErrorList *list) {
+    size_t i;
+
+    for (i = 0; i < list->count; i++) {
+        free(list->items[i].message);
+    }
+
+    free(list->items);
+    list->items = NULL;
+    list->count = 0;
+    list->capacity = 0;
+}
+
 static AstNode *astNewNodeFromToken(AstNodeType type, const Token *token) {
     if (token == NULL) {
         return astNewNode(type);
@@ -80,14 +129,24 @@ static bool parserAtEnd(const Parser *parser) {
     return parser->current == NULL || parser->current->type == TOKEN_EOF;
 }
 
-static void parserSyntaxError(const Token *token, const char *message) {
-    if (token == NULL) {
-        fprintf(stderr, "SyntaxError at end of input: %s\n", message);
-        exit(1);
+static void parserSyntaxError(Parser *parser, const Token *token, const char *message) {
+    int line = 0;
+    int column = 0;
+
+    if (parser->is_panic) {
+        return;
     }
 
-    fprintf(stderr, "SyntaxError at line %d, column %d: %s\n", token->line, token->column, message);
-    exit(1);
+    if (token != NULL) {
+        line = token->line;
+        column = token->column;
+    } else if (parser->current != NULL) {
+        line = parser->current->line;
+        column = parser->current->column;
+    }
+
+    parserErrorListAppend(&parser->errors, line, column, message);
+    parser->is_panic = true;
 }
 
 static Token *parserAdvance(Parser *parser) {
@@ -100,12 +159,14 @@ static Token *parserAdvance(Parser *parser) {
     return current;
 }
 
-static void parserExpect(Parser *parser, TokenType type, const char *message) {
+static bool parserExpect(Parser *parser, TokenType type, const char *message) {
     if (!parserIs(parser, type)) {
-        parserSyntaxError(parser->current, message);
+        parserSyntaxError(parser, parser->current, message);
+        return false;
     }
 
     parserAdvance(parser);
+    return true;
 }
 
 static bool isTypeToken(const Parser *parser) {
@@ -118,6 +179,44 @@ static bool isDeclarationStart(const Parser *parser) {
     }
 
     return parser->current->type == TOKEN_IDENTIFIER && parser->current->next->type == TOKEN_DOUBLE_COLON;
+}
+
+static bool parserIsTopLevelRestart(const Parser *parser) {
+    return parserIs(parser, TOKEN_KW_FUNC) || parserIs(parser, TOKEN_KW_EXTERN) || isDeclarationStart(parser);
+}
+
+static void parserSynchronizeStatement(Parser *parser) {
+    while (!parserAtEnd(parser)) {
+        if (parserIs(parser, TOKEN_SEMICOLON)) {
+            parserAdvance(parser);
+            break;
+        }
+
+        if (parserIs(parser, TOKEN_RBRACE)) {
+            break;
+        }
+
+        parserAdvance(parser);
+    }
+
+    parser->is_panic = false;
+}
+
+static void parserSynchronizeTopLevel(Parser *parser) {
+    while (!parserAtEnd(parser)) {
+        if (parserIs(parser, TOKEN_SEMICOLON)) {
+            parserAdvance(parser);
+            break;
+        }
+
+        if (parserIsTopLevelRestart(parser)) {
+            break;
+        }
+
+        parserAdvance(parser);
+    }
+
+    parser->is_panic = false;
 }
 
 static AstBinaryOp binaryOpFromToken(TokenType type) {
@@ -185,8 +284,20 @@ static AstNode *parseIf(Parser *parser) {
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after if");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.if_stmt.condition = parseLogical(parser);
+    if (parser->is_panic) {
+        return node;
+    }
+
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after if condition");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.if_stmt.then_branch = parseBlock(parser);
 
     if (parserIs(parser, TOKEN_KW_ELSE)) {
@@ -206,8 +317,20 @@ static AstNode *parseWhile(Parser *parser) {
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after while");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.while_stmt.condition = parseLogical(parser);
+    if (parser->is_panic) {
+        return node;
+    }
+
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after while condition");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.while_stmt.body = parseBlock(parser);
     return node;
 }
@@ -217,18 +340,43 @@ static AstNode *parseFor(Parser *parser) {
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after for");
+    if (parser->is_panic) {
+        return node;
+    }
+
     if (!parserIs(parser, TOKEN_SEMICOLON)) {
         node->data.for_stmt.init = parseAssign(parser);
+        if (parser->is_panic) {
+            return node;
+        }
     }
     parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after for init");
+    if (parser->is_panic) {
+        return node;
+    }
+
     if (!parserIs(parser, TOKEN_SEMICOLON)) {
         node->data.for_stmt.condition = parseLogical(parser);
+        if (parser->is_panic) {
+            return node;
+        }
     }
     parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after for condition");
+    if (parser->is_panic) {
+        return node;
+    }
+
     if (!parserIs(parser, TOKEN_RPAREN)) {
         node->data.for_stmt.update = parseAssign(parser);
+        if (parser->is_panic) {
+            return node;
+        }
     }
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after for update");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.for_stmt.body = parseBlock(parser);
     return node;
 }
@@ -237,12 +385,17 @@ static AstNode *parseParameter(Parser *parser) {
     AstNode *param = astNewNodeFromCurrent(parser, AST_PARAM);
 
     if (!parserIs(parser, TOKEN_IDENTIFIER)) {
-        parserSyntaxError(parser->current, "expected parameter name");
+        parserSyntaxError(parser, parser->current, "expected parameter name");
+        return param;
     }
 
     param->data.param.name = copyTokenValue(parser->current);
     parserAdvance(parser);
     parserExpect(parser, TOKEN_DOUBLE_COLON, "expected '::' after parameter name");
+    if (parser->is_panic) {
+        return param;
+    }
+
     param->data.param.declared_type = parseType(parser);
     return param;
 }
@@ -252,28 +405,54 @@ static AstNode *parseFunction(Parser *parser) {
 
     parserAdvance(parser);
     if (!parserIs(parser, TOKEN_IDENTIFIER)) {
-        parserSyntaxError(parser->current, "expected function name after func");
+        parserSyntaxError(parser, parser->current, "expected function name after func");
+        return node;
     }
 
     node->data.func_decl.name = copyTokenValue(parser->current);
     node->data.func_decl.is_extern = false;
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after function name");
+    if (parser->is_panic) {
+        return node;
+    }
 
     if (!parserIs(parser, TOKEN_RPAREN)) {
         AstNode *param = parseParameter(parser);
-        astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+        if (param != NULL) {
+            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+        }
+        if (parser->is_panic) {
+            return node;
+        }
 
         while (parserIs(parser, TOKEN_COMMA)) {
             parserAdvance(parser);
             param = parseParameter(parser);
-            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+            if (param != NULL) {
+                astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+            }
+            if (parser->is_panic) {
+                return node;
+            }
         }
     }
 
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after function parameters");
+    if (parser->is_panic) {
+        return node;
+    }
+
     parserExpect(parser, TOKEN_ARROW, "expected '->' after function parameters");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.func_decl.return_type = parseType(parser);
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.func_decl.body = parseBlock(parser);
     return node;
 }
@@ -283,29 +462,59 @@ static AstNode *parseExternFunction(Parser *parser) {
 
     parserAdvance(parser);
     parserExpect(parser, TOKEN_KW_FUNC, "expected 'func' after extern");
+    if (parser->is_panic) {
+        return node;
+    }
+
     if (!parserIs(parser, TOKEN_IDENTIFIER)) {
-        parserSyntaxError(parser->current, "expected function name after func");
+        parserSyntaxError(parser, parser->current, "expected function name after func");
+        return node;
     }
 
     node->data.func_decl.name = copyTokenValue(parser->current);
     node->data.func_decl.is_extern = true;
     parserAdvance(parser);
     parserExpect(parser, TOKEN_LPAREN, "expected '(' after function name");
+    if (parser->is_panic) {
+        return node;
+    }
 
     if (!parserIs(parser, TOKEN_RPAREN)) {
         AstNode *param = parseParameter(parser);
-        astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+        if (param != NULL) {
+            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+        }
+        if (parser->is_panic) {
+            return node;
+        }
 
         while (parserIs(parser, TOKEN_COMMA)) {
             parserAdvance(parser);
             param = parseParameter(parser);
-            astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+            if (param != NULL) {
+                astAppendNode(&node->data.func_decl.params, &node->data.func_decl.param_count, param);
+            }
+            if (parser->is_panic) {
+                return node;
+            }
         }
     }
 
     parserExpect(parser, TOKEN_RPAREN, "expected ')' after function parameters");
+    if (parser->is_panic) {
+        return node;
+    }
+
     parserExpect(parser, TOKEN_ARROW, "expected '->' after function parameters");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.func_decl.return_type = parseType(parser);
+    if (parser->is_panic) {
+        return node;
+    }
+
     parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after extern function declaration");
     return node;
 }
@@ -313,6 +522,15 @@ static AstNode *parseExternFunction(Parser *parser) {
 void parserInit(Parser *parser, Token *tokens) {
     parser->tokens = tokens;
     parser->current = tokens;
+    parserErrorListInit(&parser->errors);
+    parser->is_panic = false;
+}
+
+void parserFree(Parser *parser) {
+    parserErrorListFree(&parser->errors);
+    parser->tokens = NULL;
+    parser->current = NULL;
+    parser->is_panic = false;
 }
 
 AstNode *parserParseProgram(Parser *parser) {
@@ -329,45 +547,56 @@ AstNode *parserParseProgram(Parser *parser) {
 }
 
 static AstNode *parseTopLevel(Parser *parser) {
+    AstNode *node;
+
     if (parserAtEnd(parser)) {
         return NULL;
     }
 
     if (parserIs(parser, TOKEN_KW_FUNC)) {
-        return parseFunction(parser);
+        node = parseFunction(parser);
+    } else if (parserIs(parser, TOKEN_KW_EXTERN)) {
+        node = parseExternFunction(parser);
+    } else if (isDeclarationStart(parser)) {
+        node = parseAssign(parser);
+        if (!parser->is_panic && !parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after global declaration")) {
+            node = NULL;
+        }
+    } else {
+        parserSyntaxError(parser, parser->current, "expected top-level declaration");
+        node = NULL;
     }
 
-    if (parserIs(parser, TOKEN_KW_EXTERN)) {
-        return parseExternFunction(parser);
+    if (parser->is_panic) {
+        parserSynchronizeTopLevel(parser);
+        return NULL;
     }
 
-    if (!isDeclarationStart(parser)) {
-        parserSyntaxError(parser->current, "expected top-level declaration");
-    }
-
-    {
-        AstNode *node = parseAssign(parser);
-        parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after global declaration");
-        return node;
-    }
+    return node;
 }
 
 static AstNode *parseBlock(Parser *parser) {
     AstNode *block = astNewNodeFromCurrent(parser, AST_BLOCK);
 
-    parserExpect(parser, TOKEN_LBRACE, "expected '{' to start block");
+    if (!parserExpect(parser, TOKEN_LBRACE, "expected '{' to start block")) {
+        return block;
+    }
 
     while (!parserAtEnd(parser) && !parserIs(parser, TOKEN_RBRACE)) {
         AstNode *item = parseStatement(parser);
+
+        if (parser->is_panic) {
+            parserSynchronizeStatement(parser);
+            continue;
+        }
+
         if (item != NULL) {
             astAppendNode(&block->data.block.items, &block->data.block.count, item);
         }
     }
 
-    if (parserIs(parser, TOKEN_RBRACE)) {
-        parserAdvance(parser);
-    } else {
-        parserSyntaxError(parser->current, "expected '}' to close block");
+    if (!parserExpect(parser, TOKEN_RBRACE, "expected '}' to close block")) {
+        parser->is_panic = false;
     }
 
     return block;
@@ -394,7 +623,13 @@ static AstNode *parseStatement(Parser *parser) {
     }
 
     node = parseLoopControl(parser);
-    parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after statement");
+    if (parser->is_panic || node == NULL) {
+        return NULL;
+    }
+
+    if (!parserExpect(parser, TOKEN_SEMICOLON, "expected ';' after statement")) {
+        return NULL;
+    }
 
     if (node->type == AST_ASSIGN || node->type == AST_VAR_DECL || node->type == AST_RETURN || node->type == AST_BREAK || node->type == AST_CONTINUE) {
         return node;
@@ -446,7 +681,14 @@ static AstNode *parseAssign(Parser *parser) {
         decl->data.var_decl.name = copyTokenValue(parser->current);
         parserAdvance(parser);
         parserExpect(parser, TOKEN_DOUBLE_COLON, "expected '::' after declaration name");
+        if (parser->is_panic) {
+            return decl;
+        }
+
         decl->data.var_decl.declared_type = parseType(parser);
+        if (parser->is_panic) {
+            return decl;
+        }
 
         if (parserIs(parser, TOKEN_ASSIGN)) {
             parserAdvance(parser);
@@ -458,9 +700,14 @@ static AstNode *parseAssign(Parser *parser) {
 
     {
         AstNode *node = parseLogical(parser);
+        if (parser->is_panic || node == NULL) {
+            return node;
+        }
+
         if (!parserAtEnd(parser) && (parserIs(parser, TOKEN_ASSIGN) || parserIs(parser, TOKEN_PLUS_ASSIGN) || parserIs(parser, TOKEN_MINUS_ASSIGN))) {
             if (!isAssignableTarget(node)) {
-                parserSyntaxError(parser->current, "invalid assignment target");
+                parserSyntaxError(parser, parser->current, "invalid assignment target");
+                return NULL;
             }
 
             AstNode *assign = astNewNodeFromCurrent(parser, AST_ASSIGN);
@@ -589,7 +836,7 @@ static AstNode *parseFactor(Parser *parser) {
     AstNode *node;
 
     if (parserAtEnd(parser)) {
-        parserSyntaxError(parser->current, "unexpected end of input in expression");
+        parserSyntaxError(parser, parser->current, "unexpected end of input in expression");
         return NULL;
     }
 
@@ -637,12 +884,22 @@ static AstNode *parseFactor(Parser *parser) {
                 parserAdvance(parser);
                 if (!parserIs(parser, TOKEN_RPAREN)) {
                     AstNode *arg = parseLogical(parser);
-                    astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
+                    if (arg != NULL) {
+                        astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
+                    }
+                    if (parser->is_panic) {
+                        return call;
+                    }
 
                     while (parserIs(parser, TOKEN_COMMA)) {
                         parserAdvance(parser);
                         arg = parseLogical(parser);
-                        astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
+                        if (arg != NULL) {
+                            astAppendNode(&call->data.call.args, &call->data.call.arg_count, arg);
+                        }
+                        if (parser->is_panic) {
+                            return call;
+                        }
                     }
                 }
                 parserExpect(parser, TOKEN_RPAREN, "expected ')' after call arguments");
@@ -657,7 +914,12 @@ static AstNode *parseFactor(Parser *parser) {
                 access->data.array_access.base = base;
                 parserAdvance(parser);
                 index = parseLogical(parser);
-                astAppendNode(&access->data.array_access.indices, &access->data.array_access.index_count, index);
+                if (index != NULL) {
+                    astAppendNode(&access->data.array_access.indices, &access->data.array_access.index_count, index);
+                }
+                if (parser->is_panic) {
+                    return access;
+                }
                 parserExpect(parser, TOKEN_RBRACKET, "expected ']' after array index");
                 base = access;
                 continue;
@@ -671,11 +933,14 @@ static AstNode *parseFactor(Parser *parser) {
     if (parserIs(parser, TOKEN_LPAREN)) {
         parserAdvance(parser);
         node = parseLogical(parser);
+        if (parser->is_panic) {
+            return node;
+        }
         parserExpect(parser, TOKEN_RPAREN, "expected ')' after grouped expression");
         return node;
     }
 
-    parserSyntaxError(parser->current, "unexpected token in expression");
+    parserSyntaxError(parser, parser->current, "unexpected token in expression");
     return NULL;
 }
 
@@ -703,6 +968,10 @@ static AstNode *parsePointerType(Parser *parser) {
     AstNode *node = astNewNodeFromCurrent(parser, AST_TYPE_POINTER);
 
     parserExpect(parser, TOKEN_STAR, "expected '*' in pointer type");
+    if (parser->is_panic) {
+        return node;
+    }
+
     node->data.type_pointer.target_type = parseType(parser);
     return node;
 }
@@ -711,7 +980,8 @@ static AstNode *parseType(Parser *parser) {
     AstNode *base;
 
     if (!isTypeToken(parser)) {
-        parserSyntaxError(parser->current, "expected type");
+        parserSyntaxError(parser, parser->current, "expected type");
+        return NULL;
     }
 
     if (parserIs(parser, TOKEN_STAR)) {
@@ -725,6 +995,9 @@ static AstNode *parseType(Parser *parser) {
         if (parserIs(parser, TOKEN_LT)) {
             parserAdvance(parser);
             arrayType->data.type_array.element_type = parseType(parser);
+            if (parser->is_panic) {
+                return arrayType;
+            }
             parserExpect(parser, TOKEN_GT, "expected '>' after array element type");
         }
 
@@ -741,11 +1014,18 @@ static AstNode *parseType(Parser *parser) {
 static AstNode *parseArrayLiteral(Parser *parser) {
     AstNode *array = astNewNodeFromCurrent(parser, AST_ARRAY_LITERAL);
 
-    parserExpect(parser, TOKEN_LBRACE, "expected '{' to start array literal");
+    if (!parserExpect(parser, TOKEN_LBRACE, "expected '{' to start array literal")) {
+        return array;
+    }
 
     if (!parserIs(parser, TOKEN_RBRACE)) {
         AstNode *element = parseLogical(parser);
-        astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
+        if (element != NULL) {
+            astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
+        }
+        if (parser->is_panic) {
+            return array;
+        }
 
         while (parserIs(parser, TOKEN_COMMA) || parserIs(parser, TOKEN_SEMICOLON)) {
             parserAdvance(parser);
@@ -754,7 +1034,12 @@ static AstNode *parseArrayLiteral(Parser *parser) {
             }
 
             element = parseLogical(parser);
-            astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
+            if (element != NULL) {
+                astAppendNode(&array->data.array_literal.elements, &array->data.array_literal.count, element);
+            }
+            if (parser->is_panic) {
+                return array;
+            }
         }
     }
 

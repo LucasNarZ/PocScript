@@ -9,6 +9,7 @@ AstNode *parseRootFromString(const char *input) {
 
     parserInit(&parser, tokens);
     root = parserParseProgram(&parser);
+    parserFree(&parser);
 
     freeTokens(tokens);
     return root;

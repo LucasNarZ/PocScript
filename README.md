@@ -170,7 +170,7 @@ The current codebase supports:
 - primitive types `int`, `float`, `char`, `bool`, and `void`
 - pointer types with `*T`
 - `Array` and `[]`-style array types
-- integer, float, bool, character literals, and string literals typed as `*char`
+- integer, float, bool, and character literals, plus string literals modeled as sized `Array<char>` values with controlled decay to `*char`
 - array literals, including nested array literals
 - assignments `=`, `+=`, and `-=`
 - binary expressions including arithmetic, comparison, and logical operators across the active pipeline
@@ -195,7 +195,7 @@ The table below distinguishes between features that are currently supported acro
 | Function declarations | `fully-supported` | Explicit return type required |
 | Primitive types `int`, `float`, `char`, `bool`, `void` | `fully-supported` | Within the currently implemented semantic and backend rules |
 | Character literals | `fully-supported` | Single-quoted values like `'a'` and `'\0'` type-check as `char` |
-| String literals | `fully-supported` | Typed as `*char` and lowered through generated string storage globals |
+| String literals | `fully-supported` | Typed semantically as sized `Array<char>` values including `\0`, and lowered through generated string storage globals with decay to `*char` when needed |
 | Bool literals | `fully-supported` | Validated semantically and emitted in the backend |
 | Integer and float literals | `fully-supported` | Supported by frontend and backend |
 | Local variable declarations | `fully-supported` | Lowered with stack slots |
@@ -215,7 +215,7 @@ The table below distinguishes between features that are currently supported acro
 | Binary arithmetic `+`, `-`, `*`, `/` | `fully-supported` | Lowered in current backend |
 | Comparisons `>`, `<`, `<=` | `fully-supported` | Lowered in current backend |
 | Comparisons `>=`, `==`, `!=` | `fully-supported` | Lowered and emitted as LLVM comparisons in the active backend path |
-| Logical operators `&&`, `||` | `fully-supported` | Lowered and emitted as boolean LLVM operations |
+| Logical operators `&&`, `||` | `partially-supported` | Parsed, semantically validated, and emitted as boolean LLVM operations, but they still evaluate both operands and do not short-circuit yet |
 | Unary `!` and unary `-` | `fully-supported` | Lowered and emitted in the active backend path |
 | Pointer types `*T` | `fully-supported` | Parsed, validated structurally, lowered to LLVM pointer types, and supports `p + int` / `p - int` |
 | Address-of `&` | `fully-supported` | Supported for variables and array elements |
@@ -237,13 +237,14 @@ The project is intentionally incomplete, but the currently documented language s
 - the language has no user-defined structs, records, classes, enums, modules, or generics
 - there is no explicit memory management model exposed to the language
 - there is no standard library beyond the tiny runtime helpers
-- pointer support is intentionally minimal: only `p + int` and `p - int` are supported, with no `null` and no implicit array-to-pointer decay
-- there is no dedicated `string` type; text values are represented as `*char`
+- pointer support is intentionally minimal: only `p + int` and `p - int` are supported, with no `null`, while implicit array-to-pointer decay is limited to initialization, assignment, and function-call arguments
+- there is no dedicated `string` type; text values are represented as sized `Array<char>` literals that can decay to `*char` in controlled contexts
 
 ### Semantic limitations
 
 - type rules are intentionally strict
 - there is no implicit numeric promotion between `int` and `float`
+- `&&` and `||` currently require `bool` operands but still evaluate both sides instead of short-circuiting
 - semantic analysis focuses on correctness, not optimization or recovery of malformed syntax
 
 ### Backend limitations

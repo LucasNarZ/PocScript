@@ -370,11 +370,11 @@ This example shows the current backend style clearly:
 The current IR backend covers:
 
 - global variables with optional literal initializers
-- generated storage for string literals
+- generated storage for string literals, plus decay to `i8*` where pointer-typed consumers need it
 - function definitions and function calls
 - local variable declarations
 - scalar loads and stores
-- array literal initialization
+- array literal initialization and direct `Array<char>` initialization from string literals
 - single-index array access
 - arithmetic `+`, `-`, `*`, `/`
 - comparisons `>`, `<`, `<=`
@@ -408,6 +408,7 @@ Notable limitations in the current implementation are:
 - compound assignment lowering
 - conditional and loop branch emission
 - array access through `getelementptr`
+- controlled array-to-pointer decay for pointer initializers and function-call arguments
 - function calls
 - external function declarations
 - global variable loads and stores

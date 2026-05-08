@@ -1,6 +1,7 @@
 #include "ir_builder_internal.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static bool irBuilderStoreArrayLiteralElements(
         IRBuilder *builder,
@@ -74,6 +75,73 @@ static bool irBuilderStoreArrayLiteralElements(
     return true;
 }
 
+static bool irBuilderStoreStringLiteralElements(
+        IRBuilder *builder,
+        const IROperand *base_address,
+        const IRType *array_type,
+        const AstNode *literal) {
+    char *decoded;
+    size_t decoded_length;
+    size_t i;
+
+    if (base_address == NULL
+            || array_type == NULL
+            || array_type->kind != IR_TYPE_ARRAY
+            || array_type->element_type == NULL
+            || array_type->element_type->kind != IR_TYPE_CHAR
+            || !array_type->has_array_size
+            || literal == NULL
+            || literal->type != AST_STRING_LITERAL) {
+        return false;
+    }
+
+    decoded = irBuilderUnquoteString(literal->data.string_literal.value);
+    if (decoded == NULL) {
+        return false;
+    }
+
+    decoded_length = strlen(decoded);
+    for (i = 0; i < array_type->array_size; i++) {
+        IROperand *indices = calloc(2, sizeof(IROperand));
+        IRValue slot;
+        unsigned char ch = i < decoded_length ? (unsigned char) decoded[i] : 0;
+
+        if (indices == NULL) {
+            free(decoded);
+            return false;
+        }
+
+        indices[0] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt(0));
+        indices[1] = irOperandCreateLiteral(irTypeCreate(IR_TYPE_INT), irLiteralCreateInt((long) i));
+        slot = irBuilderEmitGep(
+            builder,
+            irBuilderCloneOperand(base_address),
+            indices,
+            2,
+            irTypeCreate(IR_TYPE_CHAR)
+        );
+        if (!slot.has_address) {
+            free(decoded);
+            irTypeFree(slot.type);
+            return false;
+        }
+
+        if (!irBuilderEmitStore(
+                builder,
+                slot.address,
+                irOperandCreateLiteral(irTypeCreate(IR_TYPE_CHAR), irLiteralCreateInt((long) ch)))) {
+            free(decoded);
+            irTypeFree(slot.type);
+            return false;
+        }
+
+        irTypeFree(slot.type);
+    }
+
+    free(decoded);
+    return true;
+}
+
 static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
     IRType *value_type = irBuilderTypeFromAst(node->data.var_decl.declared_type);
     IRType *pointer_type;
@@ -90,6 +158,21 @@ static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
             && !value_type->has_array_size
             && node->data.var_decl.initializer->type == AST_ARRAY_LITERAL) {
         IRType *inferred_type = irBuilderInferArrayTypeFromLiteral(value_type, node->data.var_decl.initializer);
+
+        if (inferred_type == NULL) {
+            irTypeFree(value_type);
+            return false;
+        }
+
+        irTypeFree(value_type);
+        value_type = inferred_type;
+    } else if (node->data.var_decl.initializer != NULL
+            && value_type->kind == IR_TYPE_ARRAY
+            && !value_type->has_array_size
+            && value_type->element_type != NULL
+            && value_type->element_type->kind == IR_TYPE_CHAR
+            && node->data.var_decl.initializer->type == AST_STRING_LITERAL) {
+        IRType *inferred_type = irTypeCreateSizedArray(irTypeClone(value_type->element_type), irBuilderStringLiteralLength(node->data.var_decl.initializer->data.string_literal.value) + 1);
 
         if (inferred_type == NULL) {
             irTypeFree(value_type);
@@ -154,8 +237,22 @@ static bool irBuilderLowerVarDecl(IRBuilder *builder, const AstNode *node) {
 
         free(path);
         irOperandFree(&base_address);
+    } else if (node->data.var_decl.initializer != NULL
+            && value_type->kind == IR_TYPE_ARRAY
+            && value_type->element_type != NULL
+            && value_type->element_type->kind == IR_TYPE_CHAR
+            && node->data.var_decl.initializer->type == AST_STRING_LITERAL) {
+        IROperand base_address = irOperandCreateLocal(irTypeClone(pointer_type), slot_id);
+
+        if (!irBuilderStoreStringLiteralElements(builder, &base_address, value_type, node->data.var_decl.initializer)) {
+            irOperandFree(&base_address);
+            irTypeFree(value_type);
+            return false;
+        }
+
+        irOperandFree(&base_address);
     } else if (node->data.var_decl.initializer != NULL) {
-        IRValue initializer = irBuilderLowerRValue(builder, node->data.var_decl.initializer);
+        IRValue initializer = irBuilderLowerValueForExpectedType(builder, node->data.var_decl.initializer, value_type);
 
         if (!initializer.has_value) {
             irTypeFree(value_type);
@@ -187,7 +284,7 @@ static bool irBuilderLowerAssign(IRBuilder *builder, const AstNode *node) {
     }
 
     if (node->data.assign.op == AST_ASSIGN_SET) {
-        rhs = irBuilderLowerRValue(builder, node->data.assign.value);
+        rhs = irBuilderLowerValueForExpectedType(builder, node->data.assign.value, target.type);
         if (!rhs.has_value) {
             irTypeFree(target.type);
             irOperandFree(&target.address);

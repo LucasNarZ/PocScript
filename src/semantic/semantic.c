@@ -27,6 +27,29 @@ static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContex
 static SemanticType *checkArrayAccess(AstNode *node, Scope *scope, SemanticContext *ctx);
 static bool semanticTypeIsNumeric(const SemanticType *type);
 
+static size_t semanticStringLiteralDecodedLength(const char *value) {
+    size_t length = 0;
+    size_t i;
+
+    if (value == NULL) {
+        return 0;
+    }
+
+    for (i = 0; value[i] != '\0'; i++) {
+        if ((i == 0 && value[i] == '"') || (value[i + 1] == '\0' && value[i] == '"')) {
+            continue;
+        }
+
+        if (value[i] == '\\' && value[i + 1] != '\0' && value[i + 1] != '"') {
+            i++;
+        }
+
+        length++;
+    }
+
+    return length;
+}
+
 static bool isAddressableExpression(AstNode *node) {
     if (node == NULL) {
         return false;
@@ -220,6 +243,7 @@ static bool isAllowedGlobalInitializer(AstNode *node) {
     switch (node->type) {
         case AST_INT_LITERAL:
         case AST_FLOAT_LITERAL:
+        case AST_CHAR_LITERAL:
         case AST_STRING_LITERAL:
         case AST_BOOL_LITERAL:
             return true;
@@ -364,30 +388,6 @@ static bool semanticTypeIsNumeric(const SemanticType *type) {
     return type != NULL && (type->kind == SEM_TYPE_INT || type->kind == SEM_TYPE_FLOAT);
 }
 
-static bool semanticTypeIsCompatible(const SemanticType *expected, const SemanticType *actual) {
-    if (expected == NULL || actual == NULL) {
-        return false;
-    }
-
-    if (semanticTypeEquals(expected, actual)) {
-        return true;
-    }
-
-    if (expected->kind == SEM_TYPE_CHAR && actual->kind == SEM_TYPE_INT) {
-        return true;
-    }
-
-    if (expected->kind != SEM_TYPE_ARRAY || actual->kind != SEM_TYPE_ARRAY) {
-        return false;
-    }
-
-    if (expected->has_array_size && actual->has_array_size && expected->array_size != actual->array_size) {
-        return false;
-    }
-
-    return semanticTypeIsCompatible(expected->element_type, actual->element_type);
-}
-
 static bool semanticTypeIsBool(const SemanticType *type) {
     return type != NULL && type->kind == SEM_TYPE_BOOL;
 }
@@ -494,7 +494,7 @@ static SemanticType *checkAssign(AstNode *node, Scope *scope, SemanticContext *c
     SemanticType *targetType = checkAssignmentTarget(node->data.assign.target, scope, ctx);
     SemanticType *valueType = checkExpression(node->data.assign.value, scope, ctx);
 
-    if (targetType->kind != SEM_TYPE_ERROR && valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(targetType, valueType)) {
+    if (targetType->kind != SEM_TYPE_ERROR && valueType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatibleWithDecay(targetType, valueType)) {
         if (node->data.assign.target->type == AST_UNARY && node->data.assign.target->data.unary.op == AST_UNARY_DEREF) {
             appendAssignmentTypeError(node, ctx->result, targetType, valueType);
         } else {
@@ -679,10 +679,10 @@ static SemanticType *checkArrayAccess(AstNode *node, Scope *scope, SemanticConte
             appendCategorizedError(node->data.array_access.indices[i], ctx->result, SEMANTIC_ERROR_TYPE, "array index must be int");
         }
 
-        if (baseType->kind != SEM_TYPE_ARRAY) {
+        if (baseType->kind != SEM_TYPE_ARRAY && baseType->kind != SEM_TYPE_POINTER) {
             char message[256];
 
-            snprintf(message, sizeof(message), "cannot index non-array value of type %s", semanticTypeName(baseType));
+            snprintf(message, sizeof(message), "cannot index non-array/non-pointer value of type %s", semanticTypeName(baseType));
             appendCategorizedError(node, ctx->result, SEMANTIC_ERROR_TYPE, message);
             semanticTypeFree(indexType);
             semanticTypeFree(baseType);
@@ -722,7 +722,7 @@ static SemanticType *checkCall(AstNode *node, Scope *scope, SemanticContext *ctx
 
     for (i = 0; i < node->data.call.arg_count; i++) {
         SemanticType *argType = checkExpression(node->data.call.args[i], scope, ctx);
-        if (argType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(callee->params[i], argType)) {
+        if (argType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatibleWithDecay(callee->params[i], argType)) {
             appendWrongArgumentTypeError(node->data.call.args[i], ctx->result, callee->name, i + 1, callee->params[i], argType);
         }
         semanticTypeFree(argType);
@@ -747,19 +747,21 @@ static SemanticType *checkExpression(AstNode *node, Scope *scope, SemanticContex
         case AST_CHAR_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_CHAR);
         case AST_STRING_LITERAL: {
-            SemanticType *pointerType = semanticTypeNewPrimitive(SEM_TYPE_POINTER);
+            SemanticType *arrayType = semanticTypeNewPrimitive(SEM_TYPE_ARRAY);
 
-            if (pointerType == NULL) {
+            if (arrayType == NULL) {
                 return NULL;
             }
 
-            pointerType->element_type = semanticTypeNewPrimitive(SEM_TYPE_CHAR);
-            if (pointerType->element_type == NULL) {
-                semanticTypeFree(pointerType);
+            arrayType->element_type = semanticTypeNewPrimitive(SEM_TYPE_CHAR);
+            if (arrayType->element_type == NULL) {
+                semanticTypeFree(arrayType);
                 return NULL;
             }
 
-            return pointerType;
+            arrayType->has_array_size = true;
+            arrayType->array_size = semanticStringLiteralDecodedLength(node->data.string_literal.value) + 1;
+            return arrayType;
         }
         case AST_BOOL_LITERAL:
             return semanticTypeNewPrimitive(SEM_TYPE_BOOL);
@@ -788,7 +790,7 @@ static void validateVariableDeclaration(AstNode *node, Scope *scope, SemanticCon
             appendInvalidGlobalInitializerError(node, ctx->result, node->data.var_decl.name);
         } else {
             SemanticType *initializerType = checkExpression(node->data.var_decl.initializer, scope, ctx);
-            if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatible(declaredType, initializerType)) {
+            if (initializerType->kind != SEM_TYPE_ERROR && !semanticTypeIsCompatibleWithDecay(declaredType, initializerType)) {
                 appendInitializerTypeError(node, ctx->result, node->data.var_decl.name, declaredType, initializerType);
             }
             semanticTypeFree(initializerType);

@@ -157,6 +157,16 @@ void test_semantic_accepts_char_pointer_initialized_from_string_literal(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_char_array_initialized_from_string_literal(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { text::Array<char> = \"hi\"; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_accepts_char_initialized_from_int_literal(void) {
     SemanticResult result = analyzeRootFromString(
         "func main() -> void { letter::char = 122; ret; }"
@@ -305,6 +315,38 @@ void test_semantic_accepts_sized_array_argument_for_matching_parameter(void) {
     semanticResultFree(&result);
 }
 
+void test_semantic_accepts_general_array_to_pointer_decay_in_assignment(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { values::Array<int>[3] = {1, 2, 3}; ptr::*int = values; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_general_array_to_pointer_decay_in_call_arguments(void) {
+    SemanticResult result = analyzeRootFromString(
+        "extern func first(value::*int) -> int; "
+        "func main() -> int { values::Array<int>[3] = {1, 2, 3}; ret first(values); }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_rejects_too_small_char_array_initialized_from_string_literal(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { text::Array<char>[2] = \"hi\"; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 1);
+    EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
+
+    semanticResultFree(&result);
+}
+
 void test_semantic_reports_non_integer_array_index(void) {
     AstNode *root = parseRootFromString("func main() -> void { arr::Array<int> = {1, 2}; arr[true]; }");
     SemanticResult result = semanticAnalyze(root);
@@ -323,10 +365,20 @@ void test_semantic_reports_indexing_non_array_value(void) {
 
     EXPECT_TRUE(result.errors.count == 1);
     EXPECT_TRUE(result.errors.items[0].kind == SEMANTIC_ERROR_TYPE);
-    EXPECT_TRUE(strstr(result.errors.items[0].message, "cannot index non-array value of type int") != NULL);
+    EXPECT_TRUE(strstr(result.errors.items[0].message, "cannot index non-array/non-pointer value of type int") != NULL);
 
     semanticResultFree(&result);
     astFree(root);
+}
+
+void test_semantic_accepts_pointer_indexing(void) {
+    SemanticResult result = analyzeRootFromString(
+        "func main() -> void { text::*char = \"hi\"; text[1]; ret; }"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
 }
 
 void test_semantic_rejects_incompatible_assignment_through_array_access(void) {
@@ -578,7 +630,19 @@ void test_semantic_accepts_literal_global_initializers(void) {
         "x::int = 1;\n"
         "y::float = 1.5;\n"
         "flag::bool = true;\n"
+        "letter::char = 'a';\n"
         "text::*char = \"a\";\n"
+    );
+
+    EXPECT_TRUE(result.errors.count == 0);
+
+    semanticResultFree(&result);
+}
+
+void test_semantic_accepts_char_literal_global_initializer(void) {
+    SemanticResult result = analyzeRootFromString(
+        "letter::char = 'a';\n"
+        "func main() -> int { ret 0; }"
     );
 
     EXPECT_TRUE(result.errors.count == 0);

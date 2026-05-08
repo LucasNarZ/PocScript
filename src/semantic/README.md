@@ -120,7 +120,7 @@ Current kinds include:
 
 Arrays and pointers are recursive: each stores an `element_type` pointer to another `SemanticType`.
 
-The language does not keep a dedicated string type in semantics. A literal such as `"hi"` resolves to `*char`.
+The language does not keep a dedicated string type in semantics. A literal such as `"hi"` resolves to a sized `Array<char>` value that includes the trailing `\0` terminator.
 
 Character literals such as `'a'` and `'\0'` resolve to `char`.
 
@@ -171,7 +171,8 @@ The current implementation keeps type rules intentionally strict:
 - global variable initializers must be direct literal nodes
 - array element types must match
 - pointer types must match structurally
-- function arguments must match declared parameter types
+- array-to-pointer decay is allowed only in initialization, assignment, and function-call argument contexts
+- function arguments must match declared parameter types after applying the controlled decay rules above when relevant
 - function return expressions must match the declared return type
 - conditions must resolve to `bool`
 
@@ -214,7 +215,7 @@ The current semantic analyzer validates:
 - rejection of `break` and `continue` outside loops
 - array literal element compatibility
 - integer-only array indexing
-- rejection of indexing non-array values
+- rejection of indexing non-array/non-pointer values
 - address-of only on addressable expressions
 - dereference only on pointer-typed expressions
 - assignment through dereference with exact pointee type matching
